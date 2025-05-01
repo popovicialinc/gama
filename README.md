@@ -18,7 +18,7 @@ Okay, now that you have gathered all the essential, we have to set it all up.
 
 1) Extract "platform-tools-latest-windows.zip"
    
-2) Copy the .bat file in that folder
+2) Copy the .bat file in the "platform-tools" folder
 
 3) Run the script
 
@@ -26,7 +26,7 @@ Okay, now that you have gathered all the essential, we have to set it all up.
 
 1) Extract "platform-tools-latest-windows.zip" to a safe, permanent location — somewhere you won’t accidentally delete or move it later.
    
-2) Within the just-extracted folder, search for "adb.exe", right-click it and select "Copy as path". This will be useful in just a moment.
+2) Within the "platform-tools" folder, search for "adb.exe", right-click it and select "Copy as path". This will be useful in just a moment.
    
 3) Search for "Edit the system environment variables"
    
