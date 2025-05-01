@@ -64,15 +64,15 @@ A) Yes! It's perfectly fine and there literally is nothing you can mess up!
 
 **Q) Do I need to run this script every time I reboot my phone?**
 
-A) Unfortunately, yes, you do. [This excellent post](https://www.reddit.com/r/GalaxyS23Ultra/comments/1kbisga/full_tutorial_enable_vulkan_on_s23u_without_pc/) can guide you on how you can force Vulkan rendering without needing a PC at all - It's an integral solution that has the same outcome as my solution, but it's a bit more complex to use and set up. Still, a great solution nonetheless.
+A) Unfortunately, yes, you do. [This excellent Reddit post](https://www.reddit.com/r/GalaxyS23Ultra/comments/1kbisga/full_tutorial_enable_vulkan_on_s23u_without_pc/) can guide you on how you can force Vulkan rendering without needing a PC at all - It's an integral solution that has the same outcome as my solution - It's a bit more complex to use and set up. A great solution nonetheless.
 
 **Q) Why would I want to launch all apps?**
 
-A) This script force-closes all apps so that when they'll restart, they'll run under Vulkan. There may be some apps that simply won't start again unless you reboot your device. Solution? The exact antithesis of "Force-close all apps": FORCE-LAUNCH ALL APPS! Your device will get quite warm, sure, but don't worry, it's (probably) gonna be fine (👍)
+A) This script force-closes all apps so that when they restart, they'll run under Vulkan. There may be some apps that simply won't start again unless you reboot your device. Solution? The exact antithesis of "Force-close all apps": FORCE-LAUNCH ALL APPS! Your device will get quite warm, sure, but don't worry, it's (probably) gonna be fine! (👍)
 
 **Q) Does the device need to be connected via USB to PC before starting the .bat script?**
 
-A) Currently, the script isn't _very_ complex, it doesn't "wait" or "check" for certain conditions. For example, if no device is connected, and you press any key, ADB will throw the "error: no devices/emulators found" error, which means nothing has happened. You should probably restart the script at this point in time, because if you plug your device in and press any key, ADB will tell your device to launch EVERY. SINGLE. APP. YOU. HAVE. You would have initiated the (OPTIONAL) step (see the previous question). I'll fix this soon by adding more conditions and complexity, though! (👍👍👍)
+A) Currently, the script isn't _very_ complex, it doesn't "wait" or "check" for certain conditions. For example, if no device is connected, and you press any key, ADB will throw the "error: no devices/emulators found" error, which means nothing has happened. You should probably restart the script at this point in time, because if you plug your device in RIGHT NOW and press any key, ADB will tell your device to launch EVERY. SINGLE. APP. YOU. HAVE. You would have initiated the (OPTIONAL) step (see the previous question). I'll fix this soon by adding more conditions and complexity, though! (👍👍👍)
 
 
 
