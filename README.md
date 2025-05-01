@@ -55,6 +55,7 @@ You've done great in setting up ADB, excellent job!
 2) The script will instruct you further.
 
 **✨ FREQUENTLY ASKED QUESTIONS**
+
 **Q) Why should I even bother doing all of this?**
 
 A) Vulkan is newer, much more efficient low-level API than OpenGL, the current API used for rendering. Samsung enabled Vulkan rendering by default on OneUI 7 Beta 1, which offered low temperatures and strong battery life, but then disabled it in Beta 2, which resulted in higher temperatures (charging might be slower or stopped if the device is too) and poor battery life. This has been noticed by many.
