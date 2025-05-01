@@ -53,3 +53,16 @@ You've done great in setting up ADB, excellent job!
 1) Locate the "Force.Vulkan.S23.S23+.S23.Ultra.-.OneUI.7.bat" script (should be in your Downloads), and double-click on it.
 
 2) The script will instruct you further.
+
+**✨ FREQUENTLY ASKED QUESTIONS**
+**Q) Why should I even bother doing all of this?**
+
+A) Vulkan is newer, much more efficient low-level API than OpenGL, the current API used for rendering. Samsung enabled Vulkan rendering by default on OneUI 7 Beta 1, which offered low temperatures and strong battery life, but then disabled it in Beta 2, which resulted in higher temperatures (charging might be slower or stopped if the device is too) and poor battery life. This has been noticed by many.
+
+**Q) Is this script safe to run?**
+
+A) Yes! It's perfectly fine and there literally is nothing you can mess up!
+
+**Q) Do I need to run this script every time I reboot my phone?**
+
+A) Unfortunately, yes, you do. But don't worry, if you've set up ADB, all you really need to do is to use the script again.
