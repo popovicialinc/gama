@@ -14,7 +14,15 @@ This .bat script forces your Samsung Galaxy S23, S23+, or S23 Ultra to use Vulka
 
 Okay, now that you have gathered all the essential, we have to set it all up.
 
-**SETTING UP ADB.EXE (if you haven't already)**
+**The lazy way**
+
+1) Extract "platform-tools-latest-windows.zip"
+   
+2) Copy the .bat file in that folder
+
+3) Run the script
+
+**The permanent & difficult but recommended way**
 
 1) Extract "platform-tools-latest-windows.zip" to a safe, permanent location — somewhere you won’t accidentally delete or move it later.
    
@@ -36,9 +44,9 @@ Okay, now that you have gathered all the essential, we have to set it all up.
 
 10) Keep pressing "OK" until all panels are closed.
 
-**FORCING VULKAN RENDERING**
+FORCING VULKAN RENDERING
 
-You've done great in setting up ADB, excellent job!
+You've done great setting up ADB, excellent job! Should any intersect with ADB again, you won't be chained to the platform-tools folder!
 
 1) Locate the "Force.Vulkan.S23.S23+.S23.Ultra.-.OneUI.7.bat" script (should be in your Downloads), and double-click on it.
 
