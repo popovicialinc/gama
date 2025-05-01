@@ -68,7 +68,7 @@ A) Unfortunately, yes, you do. [This excellent post](https://www.reddit.com/r/Ga
 
 **Q) Why would I want to launch all apps?**
 
-A) This script force-closes all apps so that when they'll restart, they'll run under Vulkan. There may be some apps that simply won't restart - instead, they'll start ONLY when your device boots up. At that point, the effect of the script is long gone and you would need to run it again, but it would force-close all apps YET AGAIN, and you'd just be going around in circles of pain and annoyance. Solution? The exact antithesis of "Force-close all apps": FORCE-LAUNCH ALL APPS! Your device will get quite warm, sure, but don't worry, it's (probably) gonna be fine (👍)
+A) This script force-closes all apps so that when they'll restart, they'll run under Vulkan. There may be some apps that simply won't start again unless you reboot your device. Solution? The exact antithesis of "Force-close all apps": FORCE-LAUNCH ALL APPS! Your device will get quite warm, sure, but don't worry, it's (probably) gonna be fine (👍)
 
 **Q) Does the device need to be connected via USB to PC before starting the .bat script?**
 
