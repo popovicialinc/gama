@@ -66,4 +66,10 @@ A) Yes! It's perfectly fine and there literally is nothing you can mess up!
 
 **Q) Do I need to run this script every time I reboot my phone?**
 
-A) Unfortunately, yes, you do. But don't worry, if you've set up ADB, all you really need to do is to use the script again.
+A) Unfortunately, yes, you do. But don't worry, if you've set up ADB, all you really need to do is to use the script again.'
+
+Q) Why should I relaunch all apps?
+
+A) This script kills all apps so they'll re-start and run using Vulkan instead of OpenGL. If there any apps that won't start on their own until the next reboot, you should probably relaunch all apps. Your device will get quite warm, but don't worry, it's expected.
+
+Oh, and on the next reboot, the default will not be Vulkan, it will be OpenGL, so you'll need to re-run the script.
