@@ -4,6 +4,8 @@ This .bat script forces your Samsung Galaxy S23, S23+, or S23 Ultra to use Vulka
 
 This will provide you with better performance and better battery life.
 
+
+
 **🧩 Requirements**
 
 • A computer that runs Windows.
@@ -13,9 +15,12 @@ This will provide you with better performance and better battery life.
 • The script itself. [Download](https://github.com/popovicialinc/s23_oneui7_vulkan/releases/download/v1.0.0/Force.Vulkan.S23.S23+.S23.Ultra.-.OneUI.7.bat).
 
 
+
+
 **📦 Installation & Usage**
 
 Okay, now that you have gathered all the essential, we have to set it all up.
+
 
 **SETTING UP ADB.EXE (if you haven't already)**
 
@@ -38,6 +43,7 @@ Okay, now that you have gathered all the essential, we have to set it all up.
 9) If you have succesfully followed each steps and confirmed everything is working fine, you are good to go!
 
 10) Keep pressing "OK" until all panels are closed.
+
 
 
 **FORCING VULKAN RENDERING**
