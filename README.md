@@ -14,7 +14,7 @@ This .bat script forces your Samsung Galaxy S23, S23+, or S23 Ultra to use Vulka
 
 Okay, now that you have gathered all the essential, we have to set it all up.
 
-**The lazy way**
+**The simple way**
 
 1) Extract "platform-tools-latest-windows.zip"
    
@@ -66,8 +66,16 @@ A) Yes! It's perfectly fine and there literally is nothing you can mess up!
 
 A) Unfortunately, yes, you do. But don't worry, if you've set up ADB, all you really need to do is to use the script again.'
 
-Q) Why should I relaunch all apps?
+**Q) Why should I relaunch all apps?**
 
-A) This script kills all apps so they'll re-start and run using Vulkan instead of OpenGL. If there any apps that won't start on their own until the next reboot, you should probably relaunch all apps. Your device will get quite warm, but don't worry, it's expected.
+A) This script kills all apps so when they'll restart, they'll a and run using Vulkan instead of OpenGL. If there any apps that won't start on their own until the next reboot, you should probably relaunch all apps. Your device will get quite warm, but don't worry, it's expected.
 
-Oh, and on the next reboot, the default will not be Vulkan, it will be OpenGL, so you'll need to re-run the script.
+Q) Does the device need to be connected via USB to PC before starting the .bat script?
+
+A) Currently, the script isn't very complex, it doesn't "wait" or "check" for certain conditions. For example, if no device is connected, and you press any key, ADB will throw the "error: no devices/emulators found" error, which means nothing has happened. You should probably restart the script at this point in time, because if you plug your device in and press any key, ADB will tell your device to launch EVERY. SINGLE. APP. THERE. IS. Yep, you heard me right. You would initiate the (OPTIONAL) step. I'll fix this soon by adding more conditions and complexity, though!
+
+
+
+
+
+**Oh, and on the next reboot, the default will not be Vulkan, it will be OpenGL, so you'll need to re-run the script.**
