@@ -1,6 +1,8 @@
 **✅ What It Does**
 
-This .bat script forces your Samsung Galaxy S23, S23+, or S23 Ultra to use Vulkan instead of OpenGL for GPU rendering — no root required. Ideal for those who have updated to OneUI 7 and suffer from high temperatures (and thus slower charging) and worse battery life.
+This .bat script forces your Android device to use Vulkan instead of OpenGL for GPU rendering — no root required. 
+
+GAMA was created specifically for users who have upgraded to Samsung's OneUI 7 and are experiencing issues such as high temperatures (leading to decreased performance, often coupled with slower charging) and poor battery life.
 
 **🧩 Requirements**
 
@@ -18,7 +20,7 @@ Okay, now that you have gathered all the essential, we have to set it all up.
 
 1) Extract "platform-tools-latest-windows.zip"
    
-2) Copy the .bat file in that folder
+2) Copy the .bat file in the "platform-tools" folder
 
 3) Run the script
 
@@ -26,7 +28,7 @@ Okay, now that you have gathered all the essential, we have to set it all up.
 
 1) Extract "platform-tools-latest-windows.zip" to a safe, permanent location — somewhere you won’t accidentally delete or move it later.
    
-2) Within the just-extracted folder, search for "adb.exe", right-click it and select "Copy as path". This will be useful in just a moment.
+2) Within the "platform-tools" folder, search for "adb.exe", right-click it and select "Copy as path". This will be useful in just a moment.
    
 3) Search for "Edit the system environment variables"
    
@@ -46,9 +48,9 @@ Okay, now that you have gathered all the essential, we have to set it all up.
 
 FORCING VULKAN RENDERING
 
-You've done great setting up ADB, excellent job! Should any intersect with ADB again, you won't be chained to the platform-tools folder!
+You've done great setting up ADB, excellent job! Should you intersect with ADB again in the future, you won't be chained to the platform-tools folder!
 
-1) Locate the "Force.Vulkan.S23.S23+.S23.Ultra.-.OneUI.7.bat" script (should be in your Downloads), and double-click on it.
+1) Locate the "Force.Vulkan.rendering.on.S23-family.OneUI.7.bat" script (should be in your Downloads), and double-click on it.
 
 2) The script will instruct you further.
 
@@ -56,7 +58,7 @@ You've done great setting up ADB, excellent job! Should any intersect with ADB a
 
 **Q) Why should I even bother doing all of this?**
 
-A) Vulkan is newer, much more efficient low-level API than OpenGL, the current API used for rendering. Samsung enabled Vulkan rendering by default on OneUI 7 Beta 1, which offered low temperatures and strong battery life, but then disabled it in Beta 2, which resulted in higher temperatures (charging might be slower or stopped if the device is too) and poor battery life. This has been noticed by many.
+A) Vulkan is newer, much more efficient low-level API than OpenGL, the current API used for rendering. Samsung enabled Vulkan rendering by default on OneUI 7 Beta 1, which offered low temperatures and excellent battery life, but then disabled it in Beta 2, which resulted in higher temperatures (worse performance & possibly slower charging due to heat buildup in the device whilst using) and poor battery life. This has been noticed by many, and forcing Vulkan rendering has fixed all of that.
 
 **Q) Is this script safe to run?**
 
@@ -64,18 +66,11 @@ A) Yes! It's perfectly fine and there literally is nothing you can mess up!
 
 **Q) Do I need to run this script every time I reboot my phone?**
 
-A) Unfortunately, yes, you do. But don't worry, if you've set up ADB, all you really need to do is to use the script again.'
+A) Unfortunately, yes, you do. [This excellent Reddit post](https://www.reddit.com/r/GalaxyS23Ultra/comments/1kbisga/full_tutorial_enable_vulkan_on_s23u_without_pc/) can guide you on how you can force Vulkan rendering without needing a PC at all - It's an integral solution that has the same outcome as my solution - It's a bit more complex to use and set up. A great solution nonetheless.
 
-**Q) Why should I relaunch all apps?**
+**Q) Why would I want to launch all apps?**
 
-A) This script kills all apps so when they'll restart, they'll a and run using Vulkan instead of OpenGL. If there any apps that won't start on their own until the next reboot, you should probably relaunch all apps. Your device will get quite warm, but don't worry, it's expected.
+A) This script force-closes all apps so that when they restart, they'll run under Vulkan. There may be some apps that simply won't start again unless you reboot your device. Solution? The exact antithesis of "Force-close all apps": FORCE-LAUNCH ALL APPS! Your device will get quite warm, sure, but don't worry, it's (probably) gonna be fine! (👍)
 
-Q) Does the device need to be connected via USB to PC before starting the .bat script?
-
-A) Currently, the script isn't very complex, it doesn't "wait" or "check" for certain conditions. For example, if no device is connected, and you press any key, ADB will throw the "error: no devices/emulators found" error, which means nothing has happened. You should probably restart the script at this point in time, because if you plug your device in and press any key, ADB will tell your device to launch EVERY. SINGLE. APP. THERE. IS. Yep, you heard me right. You would initiate the (OPTIONAL) step. I'll fix this soon by adding more conditions and complexity, though!
-
-
-
-
-
-**Oh, and on the next reboot, the default will not be Vulkan, it will be OpenGL, so you'll need to re-run the script.**
+**Q) Does the device need to be connected via USB to PC before starting the .bat script?**
+A) Not necessarily. You can connect your device via USB to PC at any time - before or after starting the script. 
