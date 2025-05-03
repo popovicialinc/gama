@@ -1,6 +1,8 @@
 **✅ What It Does**
 
-This .bat script forces your Samsung Galaxy S23, S23+, or S23 Ultra to use Vulkan instead of OpenGL for GPU rendering — no root required. Ideal for those who have updated to OneUI 7 and suffer from high temperatures (and thus worse performance, often accompanied by slower charging) and poor battery life.
+This .bat script forces your Android device to use Vulkan instead of OpenGL for GPU rendering — no root required. 
+
+GAMA was created specifically for users who have upgraded to Samsung's OneUI 7 and are experiencing issues such as high temperatures (leading to decreased performance, often coupled with slower charging) and poor battery life.
 
 **🧩 Requirements**
 
@@ -48,7 +50,7 @@ FORCING VULKAN RENDERING
 
 You've done great setting up ADB, excellent job! Should you intersect with ADB again in the future, you won't be chained to the platform-tools folder!
 
-1) Locate the "Force.Vulkan.S23.S23+.S23.Ultra.-.OneUI.7.bat" script (should be in your Downloads), and double-click on it.
+1) Locate the "Force.Vulkan.rendering.on.S23-family.OneUI.7.bat" script (should be in your Downloads), and double-click on it.
 
 2) The script will instruct you further.
 
