@@ -22,7 +22,7 @@ Shoutout: This project is inspired by Ameen Sha Cheeranga’s Linux script. Much
 
 * Double‑click the .bat file and follow the prompts.
 
-* Heads up: You’ll need to rerun this script after every phone reboot.
+**Heads up: You’ll need to rerun this script after every phone reboot.**
 
 ## Recommended Setup (Permanent)
 
