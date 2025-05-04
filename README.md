@@ -2,8 +2,6 @@
 
 GAMA is a Windows batch script that redirects your Samsung device’s GPU renderer from OpenGL to Vulkan—no root needed. It’s tailor-made for One UI 7 users battling overheating, throttled performance, and suboptimal battery life.
 
-Shoutout: This project is inspired by Ameen Sha Cheeranga’s Linux script. Much love! ❤️
-
 # 🧩Prerequisites
 
 * A Windows PC
