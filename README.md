@@ -32,7 +32,7 @@ GAMA is a Windows batch script that changes your Android device’s GPU API from
 
 #### Adding ADB to your Path
 
-* In your platform-tools folder, shift+right-click adb.exe → Copy as path.
+* In your platform-tools folder, right-click adb.exe → Copy as path.
 
 * Search for "Edit the system environment variables" using Windows Search.
 
