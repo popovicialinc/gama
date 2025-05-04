@@ -9,10 +9,8 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 # 🧩Prerequisites
 
 * A Windows PC
-
-* [SDK Platform Tools](https://dl.google.com/android/repository/platform-tools-latest-windows.zip)
-
 * [GAMA](https://github.com/popovicialinc/gama/releases/latest)
+* [SDK Platform Tools](https://dl.google.com/android/repository/platform-tools-latest-windows.zip)
 
 # 📦Installation & Usage
 
