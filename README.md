@@ -10,7 +10,7 @@ Shoutout: This project is inspired by Ameen Sha Cheeranga’s Linux script. Much
 
 * [SDK Platform Tools](https://dl.google.com/android/repository/platform-tools-latest-windows.zip)
 
-* [GAMA Script](https://github.com/popovicialinc/gama/releases/latest)
+* [GAMA](https://github.com/popovicialinc/gama/releases/latest)
 
 # 📦Installation & Usage
 
