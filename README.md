@@ -35,26 +35,28 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 #### Adding ADB to your Path
 
 * In your platform-tools folder, right-click adb.exe → Copy as path.
-
 * Search for "Edit the system environment variables" using Windows Search.
-
 * Click Environment Variables....
-
 * Under System variables, find and edit Path.
-
 * Add a new entry — paste the adb.exe path.
-
 * Press OK until all dialogs close.
 
 #### Verifying
-
 * Open Command Prompt, type adb. If you see ADB help text, congrats  — you’re set!
 
 ### Run "gama-core.bat"
-
 * Follow the on‑screen instructions.
 
 **Pro Tip: Once ADB is in your PATH, you can invoke it from anywhere — you're not chained to the platforms-tools folder anymore.**
+
+# ⚠️Known issues
+## Caused by Vulkan
+* **Artifacting/visual bugs**
+* **Some GPUs don't play nice with Vulkan as of yet.** The Adreno GPUs aboard Snapdragon chips usually have no problems running Vulkan-only, so your mileage may vary - though my personal experience with GAMA and Vulkan has been absolutely perfect. 
+
+## Caused by system-wide app restart
+* **The default browser and the default keyboard will get reset.**
+* **Loss of WiFi-Calling/VoLTE capability** - **Fix**: Go to Settings > Connections > SIM manager, then toggle SIM 1/2 off and back on. (many thanks to Fun-Flight4427 and ActualMountain7899 for reporting the bug and finding a solution)
 
 # ✨FAQ
 
