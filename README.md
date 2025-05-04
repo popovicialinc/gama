@@ -65,6 +65,8 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 
 **Q: Must I run it after every reboot?** A: Yes, but check out [this Reddit tutorial](https://www.reddit.com/r/GalaxyS23Ultra/comments/1kdsmks/comment/mqdq7o3/?context=3) for a PC‑free, one‑and‑done method.
 
+**Q: How do I pronounce "GAMA"?** A: It's pronounced exactly as "gamma".
+
 **Q: Why does it close all apps?** A: Apps must relaunch under Vulkan. Some may insist on a reboot — just rerun the script if needed.
 
 **Q: Do I need a USB connection?** A: Nope. Plug in before or after launching — the script will either not see a device, and therefore prompt you to go back to the main menu, where you can select the requested procedure again, or it WILL se a device, in which case it will go right away and do the procedure you requested.
