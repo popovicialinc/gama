@@ -30,29 +30,29 @@ Shoutout: This project is inspired by Ameen Sha Cheeranga’s Linux script. Much
 
 * Unzip platform-tools-latest-windows.zip into a safe, permanent folder.
 
-* Add ADB to Your PATH
+#### Adding ADB to your Path
 
 * In your platform-tools folder, shift+right-click adb.exe → Copy as path.
 
-* Open Edit the system environment variables.
+* Search for "Edit the system environment variables" using Windows Search.
 
 * Click Environment Variables....
 
 * Under System variables, find and edit Path.
 
-* Add a new entry—paste the adb.exe path.
+* Add a new entry — paste the adb.exe path.
 
 * Press OK until all dialogs close.
 
-* Verify
+#### Verifying
 
-* Open Command Prompt, type adb. If you see ADB help text, congrats  —you’re set!
+* Open Command Prompt, type adb. If you see ADB help text, congrats  — you’re set!
 
-* Run GAMA
+### Run GAMA
 
 * Follow the on‑screen instructions.
 
-### Pro Tip: Once ADB is in your PATH, you can invoke it from anywhere — you're not chained to the platforms-tools folder anymore.
+**Pro Tip: Once ADB is in your PATH, you can invoke it from anywhere — you're not chained to the platforms-tools folder anymore.**
 
 # ✨FAQ
 
