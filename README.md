@@ -18,7 +18,7 @@ Shoutout: This project is inspired by Ameen Sha Cheeranga’s Linux script. Much
 
 * Extract platform-tools-latest-windows.zip.
 
-* Copy Force.Vulkan.rendering.on.S23-family.OneUI.7.bat into the platform-tools folder.
+* Copy gama.bat into the platform-tools folder.
 
 * Double‑click the .bat file and follow the prompts.
 
