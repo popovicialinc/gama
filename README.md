@@ -6,7 +6,7 @@ Shoutout: This project is inspired by Ameen Sha Cheeranga’s Linux script. Much
 
 # 🧩Prerequisites
 
-* a Windows PC
+* A Windows PC
 
 * [SDK Platform Tools](https://dl.google.com/android/repository/platform-tools-latest-windows.zip)
 
