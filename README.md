@@ -1,6 +1,8 @@
 # ✅Overview
 
-GAMA is a Windows batch script that changes your Android device’s GPU API from OpenGL to Vulkan  — no root needed. It’s tailor-made for One UI 7 users battling overheating, throttled performance, and suboptimal battery life.
+GAMA (GPU API Manager for Android-based devices) is a Windows batch script that changes your Android device’s GPU API  — no root needed. 
+
+It’s tailor-made for One UI 7 users battling overheating, throttled performance, and suboptimal battery life, especially S23 users - Forcing Vulkan rendering is a great way to enhance performance, increase battery life and lower running temperatures.
 
 [**The Linux equivalent of GAMA**](https://github.com/Ameen-Sha-Cheerangan/s23-ultra-vulkan-linux-script)
 
