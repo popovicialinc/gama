@@ -65,4 +65,3 @@ GAMA is a Windows batch script that changes your Android device’s GPU API from
 **Q: Why does it close all apps?** A: Apps must relaunch under Vulkan. Some may insist on a reboot — just rerun the script if needed.
 
 **Q: Do I need a USB connection?** A: Nope. Plug in before or after launching — the script will either not see a device, and therefore prompt you to go back to the main menu, where you can select the requested procedure again, or it WILL se a device, in which case it will go right away and do the procedure you requested.
-, 
