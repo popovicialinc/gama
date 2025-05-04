@@ -8,17 +8,17 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 
 # 🧩Prerequisites
 * A Windows PC
-* [GAMA](https://github.com/popovicialinc/gama/releases/latest)
+* The latest version of [GAMA](https://github.com/popovicialinc/gama/releases/latest)
 
 # 📦Installation & Usage
-* Extract the 
+* Extract the GAMA archive
 * Run "GAMA.bat"
 
-**Heads up: You’ll need to rerun this script after every phone reboot.**
+**Heads up: You’ll need to run this script after every phone reboot.**
 
 # ⚠️Known issues (list may expand in the future)
 ## Caused by Vulkan
-* **Visual artifacting**. Adreno GPUs aboard Snapdragon SOCs usually have no problems with Vulkan, so your mileage may vary - though my personal experience with GAMA and Vulkan has been absolutely perfect on my S23 Ultra running OneUI 7. 
+* **Visual artifacting**. Adreno GPUs aboard Snapdragon SOCs usually have no problems with Vulkan, so your mileage may vary - though my personal experience with Vulkan has been great on my S23 Ultra.
 
 ## Caused by system-wide app restart (aggressive app stop)
 * **The default browser and the default keyboard will get reset.**
