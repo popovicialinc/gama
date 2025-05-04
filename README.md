@@ -56,7 +56,7 @@ GAMA is a Windows batch script that changes your Android device’s GPU API from
 
 # ✨FAQ
 
-**Q: Why bother with Vulkan?** A: Vulkan is a newer, low‑overhead graphics API. One UI 7 Beta 1 defaulted to Vulkan, which kept temperatures cool and battery life strong. Beta 2 reverted to OpenGL—enter overheating and drain. This script forces Vulkan back on.
+**Q: Why bother with Vulkan?** A: Vulkan is a newer, low‑overhead graphics API. One UI 7 Beta 1 defaulted to Vulkan, which kept temperatures cool and battery life strong. Beta 2 reverted to OpenGL — enter overheating and drain. This script forces Vulkan back on.
 
 **Q: Is it safe?** A: Absolutely! It leverages official ADB commands — no system hacks, no risk.
 
