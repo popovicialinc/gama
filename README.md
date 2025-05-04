@@ -49,10 +49,9 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 
 **Pro Tip: Once ADB is in your PATH, you can invoke it from anywhere — you're not chained to the platforms-tools folder anymore.**
 
-# ⚠️Known issues
+# ⚠️Known issues (list may expand in the future)
 ## Caused by Vulkan
-* **Artifacting/visual bugs**
-* **Some GPUs don't play nice with Vulkan as of yet.** The Adreno GPUs aboard Snapdragon chips usually have no problems running Vulkan-only, so your mileage may vary - though my personal experience with GAMA and Vulkan has been absolutely perfect. 
+* **Visual artifacting**. Adreno GPUs aboard Snapdragon SOCs usually have no problems with Vulkan, so your mileage may vary - though my personal experience with GAMA and Vulkan has been absolutely perfect on my S23 Ultra running OneUI 7. 
 
 ## Caused by system-wide app restart
 * **The default browser and the default keyboard will get reset.**
