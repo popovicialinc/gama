@@ -16,13 +16,13 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 
 # 📦Installation & Usage
 
-## Quick Start (Temporary)
+## Quick Start
 
-* Extract platform-tools-latest-windows.zip.
+* Download the latest version of GAMA (not "gama-core")
 
-* Copy gama.bat into the platform-tools folder.
+* Extract everything
 
-* Double‑click the .bat file and follow the prompts.
+* Run "GAMA.bat"
 
 **Heads up: You’ll need to rerun this script after every phone reboot.**
 
@@ -50,7 +50,7 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 
 * Open Command Prompt, type adb. If you see ADB help text, congrats  — you’re set!
 
-### Run GAMA
+### Run "gama-core.bat"
 
 * Follow the on‑screen instructions.
 
