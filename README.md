@@ -1,76 +1,67 @@
-**✅ What It Does**
+#✅ Overview
 
-This .bat script forces your Android device to use Vulkan instead of OpenGL for GPU rendering — no root required. 
+GAMA is a Windows batch script that redirects your Samsung device’s GPU renderer from OpenGL to Vulkan—no root needed. It’s tailor-made for One UI 7 users battling overheating, throttled performance, and suboptimal battery life.
 
-GAMA was created specifically for users who have upgraded to Samsung's OneUI 7 and are experiencing issues such as high temperatures (leading to decreased performance, often coupled with slower charging) and poor battery life.
+Shoutout: This project is inspired by Ameen Sha Cheeranga’s Linux script. Much love! ❤️
 
-**🧩 Requirements**
+#🧩 Prerequisites
 
-• A computer that runs Windows.
+* a Windows PC
 
-• SDK Platform Tools. [Download](https://dl.google.com/android/repository/platform-tools-latest-windows.zip).
+* [SDK Platform Tools](https://dl.google.com/android/repository/platform-tools-latest-windows.zip)
 
-• The script itself. [Download](https://github.com/popovicialinc/s23_oneui7_vulkan/releases/latest).
+* [GAMA Script](https://github.com/popovicialinc/gama/releases/latest)
 
-**📦 Installation & Usage**
+#📦 Installation & Usage
 
-Okay, now that you have gathered all the essential, we have to set it all up.
+## Quick Start (Temporary)
 
-**The simple way**
+* Extract platform-tools-latest-windows.zip.
 
-1) Extract "platform-tools-latest-windows.zip"
-   
-2) Copy the .bat file in the "platform-tools" folder
+* Copy Force.Vulkan.rendering.on.S23-family.OneUI.7.bat into the platform-tools folder.
 
-3) Run the script
+* Double‑click the .bat file and follow the prompts.
 
-**The permanent & difficult but recommended way**
+* Heads up: You’ll need to rerun this script after every phone reboot.
 
-1) Extract "platform-tools-latest-windows.zip" to a safe, permanent location — somewhere you won’t accidentally delete or move it later.
-   
-2) Within the "platform-tools" folder, search for "adb.exe", right-click it and select "Copy as path". This will be useful in just a moment.
-   
-3) Search for "Edit the system environment variables"
-   
-4) In the bottom-right corner, you should see "Environment Variables...'; click on it.
-  
-5) Now, you're faced with two section: "User variables" (on the top) and "System variables" (on the bottom).
-  
-6) In "System variables", you should see a table with the headers "Variable" and "Value". On the first column (whose header is "Variable"), locate "Path" and double-click on it.
-  
-7) Now, pick any blank spot (where there isn't ANY text whatsoever; make sure NOT to mess with anything that's already there, you could break something!), double-click on that blank spot, and paste the path of "adb.exe" (see step 2 if you haven't copied its path already)
-    
-8) To test if you have done the steps correctly, search for CMD (Command Prompt), and type "adb". If a bunch of text appears, you're golden; if not, re-do the previous steps)
+## Recommended Setup (Permanent)
 
-9) If you have succesfully followed each steps and confirmed everything is working fine, you are good to go!
+### Extract & Store
 
-10) Keep pressing "OK" until all panels are closed.
+* Unzip platform-tools-latest-windows.zip into a safe, permanent folder.
 
-FORCING VULKAN RENDERING
+* Add ADB to Your PATH
 
-You've done great setting up ADB, excellent job! Should you intersect with ADB again in the future, you won't be chained to the platform-tools folder!
+* In your platform-tools folder, shift+right-click adb.exe → Copy as path.
 
-1) Locate the "Force.Vulkan.rendering.on.S23-family.OneUI.7.bat" script (should be in your Downloads), and double-click on it.
+* Open Edit the system environment variables.
 
-2) The script will instruct you further.
+* Click Environment Variables....
 
-**✨ FREQUENTLY ASKED QUESTIONS**
+* Under System variables, find and edit Path.
 
-**Q) Why should I even bother doing all of this?**
+* Add a new entry—paste the adb.exe path.
 
-A) Vulkan is newer, much more efficient low-level API than OpenGL, the current API used for rendering. Samsung enabled Vulkan rendering by default on OneUI 7 Beta 1, which offered low temperatures and excellent battery life, but then disabled it in Beta 2, which resulted in higher temperatures (worse performance & possibly slower charging due to heat buildup in the device whilst using) and poor battery life. This has been noticed by many, and forcing Vulkan rendering has fixed all of that.
+* Press OK until all dialogs close.
 
-**Q) Is this script safe to run?**
+* Verify
 
-A) Yes! It's perfectly fine and there literally is nothing you can mess up!
+* Open Command Prompt, type adb. If you see ADB help text, congrats  —you’re set!
 
-**Q) Do I need to run this script every time I reboot my phone?**
+* Run GAMA
 
-A) Unfortunately, yes, you do. [This excellent Reddit post](https://www.reddit.com/r/GalaxyS23Ultra/comments/1kbisga/full_tutorial_enable_vulkan_on_s23u_without_pc/) can guide you on how you can force Vulkan rendering without needing a PC at all - It's an integral solution that has the same outcome as my solution - It's a bit more complex to use and set up. A great solution nonetheless.
+* Follow the on‑screen instructions.
 
-**Q) Why would I want to launch all apps?**
+### Pro Tip: Once ADB is in your PATH, you can invoke it from anywhere — you're not chained to the platforms-tools folder anymore.
 
-A) This script force-closes all apps so that when they restart, they'll run under Vulkan. There may be some apps that simply won't start again unless you reboot your device. Solution? The exact antithesis of "Force-close all apps": FORCE-LAUNCH ALL APPS! Your device will get quite warm, sure, but don't worry, it's (probably) gonna be fine! (👍)
+#✨ FAQ
 
-**Q) Does the device need to be connected via USB to PC before starting the .bat script?**
-A) Not necessarily. You can connect your device via USB to PC at any time - before or after starting the script. 
+**Q: Why bother with Vulkan?** A: Vulkan is a newer, low‑overhead graphics API. One UI 7 Beta 1 defaulted to Vulkan, which kept temperatures cool and battery life strong. Beta 2 reverted to OpenGL—enter overheating and drain. This script forces Vulkan back on.
+
+**Q: Is it safe?** A: Absolutely! It leverages official ADB commands—no system hacks, no risk.
+
+**Q: Must I run it after every reboot?** A: Yes, but check out this Reddit tutorial for a PC‑free, one‑and‑done method.
+
+**Q: Why does it close all apps?** A: Apps must relaunch under Vulkan. Some may insist on a reboot—just rerun the script if needed.
+
+**Q: Do I need a USB connection?** A: Nope. Plug in before or after launching—the script will detect your device when you hit Enter.
