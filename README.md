@@ -12,7 +12,7 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 
 # 📦Installation & Usage
 * Extract the GAMA archive
-* Run "GAMA.bat"
+* Double-click "gama-core.bat"
 
 **Heads up: You’ll need to run this script after every phone reboot.**
 
