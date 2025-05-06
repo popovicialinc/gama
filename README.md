@@ -8,7 +8,7 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 
 # 🧩Prerequisites
 * A Windows PC
-* Your Android device (with USB Debugging enabled)
+* Your Android device ([with USB Debugging enabled](https://github.com/popovicialinc/gama/blob/main/README.md#to-enable-usb-debugging))
 * The latest version of [GAMA](https://github.com/popovicialinc/gama/releases/latest)
 
 
