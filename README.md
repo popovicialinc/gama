@@ -8,7 +8,7 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 
 # 🧩Prerequisites
 * A Windows PC
-* USB Debugging enabled
+* Your Android device (with USB Debugging enabled)
 * The latest version of [GAMA](https://github.com/popovicialinc/gama/releases/latest)
 
 
@@ -17,7 +17,9 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 * Connect your device via USB (make sure USB Debugging is enabled, otherwise GAMA won't recognise your device)
 * Double-click "gama-core.bat"
 
-
+## To enable USB Debugging
+* Settings > About phone > Software information > Press 7 times on Build number, input your password and a new "Developer options" button will appear at the very bottom of the Settings app)
+* Developer options > Scroll down and find "USB Debugging"; enable it and you're ready to race!
 
 **Heads up: You’ll need to run this script after every phone reboot.**
 
