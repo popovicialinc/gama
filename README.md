@@ -1,6 +1,6 @@
 # ✅Overview
 
-GAMA (GPU API Manager for Android-based devices) is a Windows batch script that changes your Android device’s GPU API  — no root needed. 
+**GAMA (GPU API Manager for Android-based devices) is a Windows batch script that changes your Android device’s GPU API — no root needed.**
 
 It’s tailor-made for One UI 7 users battling overheating, throttled performance, and suboptimal battery life, especially S23 users - Forcing Vulkan rendering is a great way to enhance performance, increase battery life and lower running temperatures.
 
