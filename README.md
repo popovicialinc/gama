@@ -1,30 +1,38 @@
 # ✅Overview
 
-GAMA (GPU API Manager for Android-based devices) is a Windows batch script that changes your Android device’s GPU API  — no root needed. 
+**GAMA (GPU API Manager for Android-based devices) is a Windows batch script that changes your Android device’s GPU API — no root needed.**
 
 It’s tailor-made for One UI 7 users battling overheating, throttled performance, and suboptimal battery life, especially S23 users - Forcing Vulkan rendering is a great way to enhance performance, increase battery life and lower running temperatures.
 
-[**The unofficial Linux equivalent of GAMA**](https://github.com/Ameen-Sha-Cheerangan/s23-ultra-vulkan-linux-script)
+[**The unofficial Linux equivalent of GAMA**](https://github.com/Ameen-Sha-Cheerangan/s23-ultra-vulkan-linux-script) (many thanks to Ameen Sha Cheerangan)
 
 # 🧩Prerequisites
-* A Windows PC
-* The latest version of [GAMA](https://github.com/popovicialinc/gama/releases/latest)
+* **A Windows PC**
+* **Your Android device** ([with USB Debugging enabled](https://github.com/popovicialinc/gama/blob/main/README.md#to-enable-usb-debugging))
+* **The latest version of** [**GAMA**](https://github.com/popovicialinc/gama/releases/latest)
+
 
 # 📦Installation & Usage
 * Extract the GAMA archive
-* Run "GAMA.bat"
+* Connect your device via USB (make sure USB Debugging is enabled, otherwise GAMA won't recognise your device)
+* Double-click "gama-core.bat"
+
+## To enable USB Debugging
+* Settings > About phone > Software information > Press 7 times on Build number, input your password and a new "Developer options" button will appear at the very bottom of the Settings app
+* Developer options > Scroll down and find "USB Debugging"; enable it and you're ready to race!
 
 **Heads up: You’ll need to run this script after every phone reboot.**
 
 # ⚠️Known issues (list may expand in the future)
 ## Caused by Vulkan
 * **Visual artifacting**. Adreno GPUs aboard Snapdragon SOCs usually have no problems with Vulkan, so your mileage may vary - though my personal experience with Vulkan has been great on my S23 Ultra.
+* **Not all apps will run under Vulkan**. The majority will, but there will be some exceptions. Nothing can fix this - Samsung needs to adopt Vulkan on all of their models, and the app developers need to fix their apps.
 
-## Caused by system-wide app restart (aggressive app stop)
+## Caused by system-wide app restart (aggressive app stop; solvable by using the more leanient "Normal" profile when GAMA asks you how aggressive it should be when stopping apps)
 * **The default browser and the default keyboard will get reset.**
 * **Loss of WiFi-Calling/VoLTE capability** - **Fix**: Go to Settings > Connections > SIM manager, then toggle SIM 1/2 off and back on. (many thanks to Fun-Flight4427 and ActualMountain7899 for reporting the bug and finding a solution)
 
-# ✨Frequently asked question
+# ✨Frequently asked questions
 
 **Q: Why bother with Vulkan?**
 A: Vulkan is a newer, low‑overhead graphics API. One UI 7 Beta 1 defaulted to Vulkan, which kept temperatures cool and battery life strong. Beta 2 reverted to OpenGL — enter overheating and drain. This script forces Vulkan back on.
