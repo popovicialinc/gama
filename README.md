@@ -8,20 +8,25 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 
 # 🧩Prerequisites
 * A Windows PC
+* USB Debugging enabled
 * The latest version of [GAMA](https://github.com/popovicialinc/gama/releases/latest)
+
 
 # 📦Installation & Usage
 * Extract the GAMA archive
+* Connect your device via USB (make sure USB Debugging is enabled, otherwise GAMA won't recognise your device)
 * Double-click "gama-core.bat"
+
+
 
 **Heads up: You’ll need to run this script after every phone reboot.**
 
 # ⚠️Known issues (list may expand in the future)
 ## Caused by Vulkan
 * **Visual artifacting**. Adreno GPUs aboard Snapdragon SOCs usually have no problems with Vulkan, so your mileage may vary - though my personal experience with Vulkan has been great on my S23 Ultra.
-* **Not all apps will run under Vulkan**. The majority will, but there will be some exceptions. Nothing can fix this - Samsung needs to adopt Vulkan on all of their models, and the app developers need to implement it.
+* **Not all apps will run under Vulkan**. The majority will, but there will be some exceptions. Nothing can fix this - Samsung needs to adopt Vulkan on all of their models, and the app developers need to fix their apps.
 
-## Caused by system-wide app restart (aggressive app stop)
+## Caused by system-wide app restart (aggressive app stop; solvable by using the more leanient "Normal" profile when GAMA asks you how aggressive it should be when stopping apps)
 * **The default browser and the default keyboard will get reset.**
 * **Loss of WiFi-Calling/VoLTE capability** - **Fix**: Go to Settings > Connections > SIM manager, then toggle SIM 1/2 off and back on. (many thanks to Fun-Flight4427 and ActualMountain7899 for reporting the bug and finding a solution)
 
