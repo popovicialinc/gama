@@ -19,6 +19,7 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 # ⚠️Known issues (list may expand in the future)
 ## Caused by Vulkan
 * **Visual artifacting**. Adreno GPUs aboard Snapdragon SOCs usually have no problems with Vulkan, so your mileage may vary - though my personal experience with Vulkan has been great on my S23 Ultra.
+* **Not all apps will run under Vulkan**. The majority will, but there will be some exceptions. Nothing can fix this - Samsung needs to adopt Vulkan on all of their models, and the app developers need to implement it.
 
 ## Caused by system-wide app restart (aggressive app stop)
 * **The default browser and the default keyboard will get reset.**
