@@ -30,7 +30,7 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 * **The default browser and the default keyboard will get reset.**
 * **Loss of WiFi-Calling/VoLTE capability** - **Fix**: Go to Settings > Connections > SIM manager, then toggle SIM 1/2 off and back on. (many thanks to Fun-Flight4427 and ActualMountain7899 for reporting the bug and finding a solution)
 
-# ✨Frequently asked question
+# ✨Frequently asked questions
 
 **Q: Why bother with Vulkan?**
 A: Vulkan is a newer, low‑overhead graphics API. One UI 7 Beta 1 defaulted to Vulkan, which kept temperatures cool and battery life strong. Beta 2 reverted to OpenGL — enter overheating and drain. This script forces Vulkan back on.
