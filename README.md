@@ -14,7 +14,7 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 
 # 📦Installation & Usage
 * Extract the GAMA archive
-* Connect your device via USB (make sure USB Debugging is enabled, otherwise GAMA won't recognise your device)
+* Connect your device via USB (make sure USB Debugging is enabled, otherwise GAMA won't recognise your device; make sure you only connect ONE device - the one you want GAMA to affect! Otherwise, you will get an error)
 * Double-click "gama-core.bat"
 
 ## To enable USB Debugging
