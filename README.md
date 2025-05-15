@@ -1,12 +1,3 @@
-## Table of Contents
-- [Overview](#overview)
-- [Prerequisites](#prerequisites)
-- [Installation & Usage](#installation--usage)
-- [Features](#features)
-- [FAQ](#faq)
-- [Contributing](#contributing)
-- [License](#license)
-
 # ✅Overview
 
 **GAMA (GPU API Manager for Android-based devices) is a Windows batch script that changes your Android device’s GPU API — no root needed.**
@@ -32,7 +23,7 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 
 **Heads up: You’ll need to run this script after every phone reboot.**
 
-# ⚠️Known issues (list may expand in the future)
+# ⚠️Known issues
 ## Caused by Vulkan
 * **Visual artifacting**. Adreno GPUs aboard Snapdragon SOCs usually have no problems with Vulkan, so your mileage may vary - though my personal experience with Vulkan has been great on my S23 Ultra.
 * **Not all apps will run under Vulkan**. The majority will, but there will be some exceptions. Nothing can fix this - Samsung needs to adopt Vulkan on all of their models, and the app developers need to fix their apps.
