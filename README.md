@@ -4,7 +4,7 @@
 
 It’s tailor-made for One UI 7 users battling overheating, throttled performance, and suboptimal battery life, especially S23 users - Forcing Vulkan rendering is a great way to enhance performance, increase battery life and lower running temperatures.
 
-[**The unofficial Linux equivalent of GAMA**](https://github.com/Ameen-Sha-Cheerangan/s23-ultra-vulkan-linux-script) (many thanks to Ameen Sha Cheerangan)
+[**The Linux equivalent of GAMA**](https://github.com/Ameen-Sha-Cheerangan/s23-ultra-vulkan-linux-script) (many thanks to Ameen Sha Cheerangan)
 
 # 🧩Prerequisites
 * **A Windows PC**
@@ -14,7 +14,7 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 
 # 📦Installation & Usage
 * Extract the GAMA archive
-* Connect your device via USB (make sure USB Debugging is enabled, otherwise GAMA won't recognise your device)
+* Connect your device via USB (make sure USB Debugging is enabled, otherwise GAMA won't recognise your device; make sure you only connect ONE device - the one you want GAMA to affect! Otherwise, you will get an error)
 * Double-click "gama-core.bat"
 
 ## To enable USB Debugging
@@ -23,7 +23,7 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 
 **Heads up: You’ll need to run this script after every phone reboot.**
 
-# ⚠️Known issues (list may expand in the future)
+# ⚠️Known issues
 ## Caused by Vulkan
 * **Visual artifacting**. Adreno GPUs aboard Snapdragon SOCs usually have no problems with Vulkan, so your mileage may vary - though my personal experience with Vulkan has been great on my S23 Ultra.
 * **Not all apps will run under Vulkan**. The majority will, but there will be some exceptions. Nothing can fix this - Samsung needs to adopt Vulkan on all of their models, and the app developers need to fix their apps.
