@@ -34,6 +34,7 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 * **Loss of WiFi-Calling/VoLTE capability** - **Fix**: Go to Settings > Connections > SIM manager, then toggle SIM 1/2 off and back on. (many thanks to Fun-Flight4427 and ActualMountain7899 for reporting the bug and finding a solution)
 
 # 💡 Common problems & their solutions
+## "error: no devices/emulators found"
 * This error means that ADB (and by extension, GAMA) can’t detect any connected Android devices. It usually happens if:
 ** **ADB debugging isn’t turned on** in your device’s Developer Options, or
 ** **There’s a connection issue** between your device and your Windows PC (bad cable, wrong USB mode, missing drivers, etc.)
