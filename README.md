@@ -36,12 +36,12 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 # 💡 Common problems & their solutions
 ## "error: no devices/emulators found"
 * This error means that ADB (and by extension, GAMA) can’t detect any connected Android devices. It usually happens if:
-  * **ADB debugging isn’t turned on** in your device’s Developer Options, or
-  * **There’s a connection issue** between your device and your Windows PC (bad cable, wrong USB mode, missing drivers, etc.)
+ * **ADB debugging isn’t turned on** in your device’s Developer Options, or
+ * **There’s a connection issue** between your device and your Windows PC (bad cable, wrong USB mode, missing drivers, etc.)
 ## "adb.exe: more than one device/emulator"
 * This error means that ADB (any by extension, GAMA) found multiple devices or that emulators are connected at the same time, and it doesn't know which one to use. To fix it:
-** **Disconnect extra devices** or close unused emulators.
-** **Restart your computer**
+ * **Disconnect extra devices** or close unused emulators.
+ * **Restart your computer**
 
 # ✨Frequently asked questions
 * **Q: Why bother with Vulkan?**
