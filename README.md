@@ -45,28 +45,28 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 
 # ✨Frequently asked questions
 * **Q: Why bother with Vulkan?**
-* A: Vulkan is a newer, low‑overhead graphics API. One UI 7 Beta 1 defaulted to Vulkan, which kept temperatures cool and battery life strong. Beta 2 reverted to OpenGL — enter overheating and drain. This script forces Vulkan back on.
+A: Vulkan is a newer, low‑overhead graphics API. One UI 7 Beta 1 defaulted to Vulkan, which kept temperatures cool and battery life strong. Beta 2 reverted to OpenGL — enter overheating and drain. This script forces Vulkan back on.
 
 * **Q: Is it safe?**
-* A: Absolutely! It leverages official ADB commands — no system hacks, no risk.
+A: Absolutely! It leverages official ADB commands — no system hacks, no risk.
 
 * **Q: Must I run it after every reboot?**
-* A: Yes, unfortunately.
+A: Yes, unfortunately.
 
 * **Q: How do I pronounce "GAMA"?**
-* A: It's pronounced exactly the same as "gamma".
+A: It's pronounced exactly the same as "gamma".
 
 * **Q: Will this void my warranty or trip Knox?**
-* A: Nope! This doesn’t mess with bootloaders or root. It’s 100% Knox-safe and warranty-friendly.
+A: Nope! This doesn’t mess with bootloaders or root. It’s 100% Knox-safe and warranty-friendly.
 
 * **Q: Will it break my phone?**
-* A: It’s just a graphics driver toggle - your device will be just fine.
+A: It’s just a graphics driver toggle - your device will be just fine.
 
 * **Q: What if I don’t notice a difference?**
-* A: Some devices and apps won’t show a huge change, but Vulkan generally offers better performance and thermal management. If you’re not seeing improvement, your phone might already be optimized.
+A: Some devices and apps won’t show a huge change, but Vulkan generally offers better performance and thermal management. If you’re not seeing improvement, your phone might already be optimized.
 
 * **Q: Can I undo this?**
-* A: Yup. GAMA now natively supports back-and-forth API changing - OpenGL-to-Vulkan or Vulkan-to-OpenGL. Easy peasy. Besides, a reboot wIll also reset the driver back to OpenGL, so you've got plenty of options!
+A: Yup. GAMA now natively supports back-and-forth API changing - OpenGL-to-Vulkan or Vulkan-to-OpenGL. Easy peasy. Besides, a reboot wIll also reset the driver back to OpenGL, so you've got plenty of options!
 
 * **Q: Why isn’t this a built-in setting already?!**
-* A: Great question — ask Samsung. If you ask me, this smells a whole lot like planned obsolescence... but anyway!
+A: Great question — ask Samsung. If you ask me, this smells a whole lot like planned obsolescence... but anyway!
