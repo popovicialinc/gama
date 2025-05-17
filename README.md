@@ -24,6 +24,7 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 **Heads up: You’ll need to run this script after every phone reboot.**
 
 # ⚠️Known issues
+
 ## Caused by Vulkan
 * **Visual artifacting**. Adreno GPUs aboard Snapdragon SOCs usually have no problems with Vulkan, so your mileage may vary - though my personal experience with Vulkan has been great on my S23 Ultra.
 * **Not all apps will run under Vulkan**. The majority will, but there will be some exceptions. Nothing can fix this - Samsung needs to adopt Vulkan on all of their models, and the app developers need to fix their apps.
@@ -32,31 +33,35 @@ It’s tailor-made for One UI 7 users battling overheating, throttled performan
 * **The default browser and the default keyboard will get reset.**
 * **Loss of WiFi-Calling/VoLTE capability** - **Fix**: Go to Settings > Connections > SIM manager, then toggle SIM 1/2 off and back on. (many thanks to Fun-Flight4427 and ActualMountain7899 for reporting the bug and finding a solution)
 
+# 💡 Common problems & their solutions
+* This error means that ADB (and by extension, GAMA) can’t detect any connected Android devices. It usually happens if:
+** **ADB debugging isn’t turned on** in your device’s Developer Options, or
+** **There’s a connection issue** between your device and your Windows PC (bad cable, wrong USB mode, missing drivers, etc.)
+
 # ✨Frequently asked questions
+* **Q: Why bother with Vulkan?**
+* A: Vulkan is a newer, low‑overhead graphics API. One UI 7 Beta 1 defaulted to Vulkan, which kept temperatures cool and battery life strong. Beta 2 reverted to OpenGL — enter overheating and drain. This script forces Vulkan back on.
 
-**Q: Why bother with Vulkan?**
-A: Vulkan is a newer, low‑overhead graphics API. One UI 7 Beta 1 defaulted to Vulkan, which kept temperatures cool and battery life strong. Beta 2 reverted to OpenGL — enter overheating and drain. This script forces Vulkan back on.
+* **Q: Is it safe?**
+* A: Absolutely! It leverages official ADB commands — no system hacks, no risk.
 
-**Q: Is it safe?**
-A: Absolutely! It leverages official ADB commands — no system hacks, no risk.
+* **Q: Must I run it after every reboot?**
+* A: Yes, unfortunately.
 
-**Q: Must I run it after every reboot?**
-A: Yes, unfortunately.
+* **Q: How do I pronounce "GAMA"?**
+* A: It's pronounced exactly the same as "gamma".
 
-**Q: How do I pronounce "GAMA"?**
-A: It's pronounced exactly the same as "gamma".
+* **Q: Will this void my warranty or trip Knox?**
+* A: Nope! This doesn’t mess with bootloaders or root. It’s 100% Knox-safe and warranty-friendly.
 
-**Q: Will this void my warranty or trip Knox?**
-A: Nope! This doesn’t mess with bootloaders or root. It’s 100% Knox-safe and warranty-friendly.
+* **Q: Will it break my phone?**
+* A: It’s just a graphics driver toggle - your device will be just fine.
 
-**Q: Will it break my phone?**
-A: It’s just a graphics driver toggle - your device will be just fine.
+* **Q: What if I don’t notice a difference?**
+* A: Some devices and apps won’t show a huge change, but Vulkan generally offers better performance and thermal management. If you’re not seeing improvement, your phone might already be optimized.
 
-**Q: What if I don’t notice a difference?**
-A: Some devices and apps won’t show a huge change, but Vulkan generally offers better performance and thermal management. If you’re not seeing improvement, your phone might already be optimized.
+* **Q: Can I undo this?**
+* A: Yup. GAMA now natively supports back-and-forth API changing - OpenGL-to-Vulkan or Vulkan-to-OpenGL. Easy peasy. Besides, a reboot wIll also reset the driver back to OpenGL, so you've got plenty of options!
 
-**Q: Can I undo this?**
-A: Yup. GAMA now natively supports back-and-forth API changing - OpenGL-to-Vulkan or Vulkan-to-OpenGL. Easy peasy. Besides, a reboot wIll also reset the driver back to OpenGL, so you've got plenty of options!
-
-**Q: Why isn’t this a built-in setting already?!**
-A: Great question — ask Samsung. If you ask me, this smells a whole lot like planned obsolescence to me... but anyway.
+* **Q: Why isn’t this a built-in setting already?!**
+* A: Great question — ask Samsung. If you ask me, this smells a whole lot like planned obsolescence... but anyway!
