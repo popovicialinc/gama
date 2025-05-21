@@ -7,7 +7,7 @@ cls
 echo.
 echo %CYAN%  = -------------------------------------------------- = %RESET%
 echo.
-echo %CYAN%     Launching all apps in 3 seconds... %RESET%
+echo %CYAN%     Launching all apps in 5 seconds... %RESET%
 echo.
 echo %CYAN%  = -------------------------------------------------- = %RESET%
 

@@ -1,17 +1,21 @@
+:: EASY CONTROLS
+
+set version=v1.4.1.2
+
+:: ESSENTIALS
 @echo off
 setlocal EnableDelayedExpansion
-title GAMA
-cls
-
+title GAMA %version%
 set CYAN=[96m
 set RESET=[0m
+cls
 
-:: Main Menu Loop
+:: MAIN MENU
 :main_menu
 mode con: cols=58 lines=34
 cls
 
-:: Check for ADB device
+:: Check for any ADB devices
 set adb_status=Disconnected
 for /f "tokens=1" %%A in ('adb get-state 2^>nul') do (
     if "%%A"=="device" (
@@ -20,7 +24,7 @@ for /f "tokens=1" %%A in ('adb get-state 2^>nul') do (
 )
 
 :: Check for updates
-set CURRENT_VERSION=1.4.2
+set CURRENT_VERSION=%version%
 set "VERSION_FILE=%TEMP%\gama_latest_version.txt"
 curl -s -o "%VERSION_FILE%" https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/version.txt
 
@@ -36,6 +40,7 @@ if exist "%VERSION_FILE%" (
     set checkforupdates_display=Update check failed
 )
 
+:: UI
 cls
 echo.
 echo %CYAN%  = -------------------------------------------------- = %RESET%
@@ -61,7 +66,7 @@ echo      [4] Visit GAMA's GitHub repository
 echo      [5] Refresh main menu
 echo          - Re-checks for updates
 echo          - Scans for connected devices
-echo      [6] Developer options
+echo      [6] Start Shizuku
 echo      [X] Exit
 echo.
 echo %CYAN%  = -------------------------------------------------- = %RESET%
@@ -92,7 +97,7 @@ goto :main_menu
 goto :main_menu
 
 :screen6
-call bin\dev.bat
+call bin\shizuku.bat
 goto :main_menu
 
 :screen7
