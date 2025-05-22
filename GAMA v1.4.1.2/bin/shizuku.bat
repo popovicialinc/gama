@@ -13,7 +13,7 @@ echo.
 echo       Starting Shizuku...
 echo.
 echo %CYAN%  = -------------------------------------------------- =%RESET%
-adb shell sh /storage/emulated/0/Android/data/moe.shizuku.privileged.api/start.sh
+"%~dp0\adb" shell sh /storage/emulated/0/Android/data/moe.shizuku.privileged.api/start.sh
 if %ERRORLEVEL%==0 (
 	color 0A
 	echo.

@@ -17,7 +17,7 @@ cls
 
 :: Check for any ADB devices
 set adb_status=Disconnected
-for /f "tokens=1" %%A in ('adb get-state 2^>nul') do (
+for /f "tokens=1" %%A in ('"%~dp0\adb" get-state 2^>nul') do (
     if "%%A"=="device" (
         set adb_status=Connected
     )

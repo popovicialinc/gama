@@ -70,12 +70,12 @@ echo       Applying the selected API...
 echo.
 echo %CYAN%  = -------------------------------------------------- =%RESET%
 
-adb shell setprop debug.hwui.renderer %RENDERER%
-adb shell am crash com.android.systemui
-adb shell am force-stop com.android.settings
-adb shell am force-stop com.sec.android.app.launcher
-adb shell am force-stop com.samsung.android.app.aodservice
-adb shell am force-stop com.google.android.inputmethod.latin
+"%~dp0\adb" shell setprop debug.hwui.renderer %RENDERER%
+"%~dp0\adb" shell am crash com.android.systemui
+"%~dp0\adb" shell am force-stop com.android.settings
+"%~dp0\adb" shell am force-stop com.sec.android.app.launcher
+"%~dp0\adb" shell am force-stop com.samsung.android.app.aodservice
+"%~dp0\adb" shell am force-stop com.google.android.inputmethod.latin
 set setprop_status=%ERRORLEVEL%
 
 if %ERRORLEVEL%==0 (
@@ -112,8 +112,8 @@ echo       Applying the selected API...
 echo.
 echo %CYAN%  = -------------------------------------------------- =%RESET%
 
-adb shell setprop debug.hwui.renderer %RENDERER%
-adb shell "for a in $(pm list packages | grep -v ia.mo | cut -f2 -d:); do am force-stop \"$a\"; done" >nul 2>&1
+"%~dp0\adb" shell setprop debug.hwui.renderer %RENDERER%
+"%~dp0\adb" shell "for a in $(pm list packages | grep -v ia.mo | cut -f2 -d:); do am force-stop \"$a\"; done" >nul 2>&1
 
 if %ERRORLEVEL%==0 (
 	color 0A
