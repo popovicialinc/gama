@@ -1,6 +1,6 @@
-:: EASY CONTROLS
+ :: EASY CONTROLS
 
-set version=v1.4.1.3
+set version=1.4.1.4
 
 :: ESSENTIALS
 @echo off
