@@ -13,7 +13,7 @@ echo %CYAN%  = -------------------------------------------------- = %RESET%
 
 timeout /t 5
 cls
-adb shell "for pkg in $(pm list packages | cut -f2 -d:); do monkey -p \"$pkg\" -c android.intent.category.LAUNCHER 1; done" 2>&1 | findstr /v "** No activities found to run"
+"%~dp0\adb" shell "for pkg in $(pm list packages | cut -f2 -d:); do monkey -p \"$pkg\" -c android.intent.category.LAUNCHER 1; done" 2>&1 | findstr /v "** No activities found to run"
 
 if %ERRORLEVEL% neq 0 (
 	color 0C
