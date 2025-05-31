@@ -1,5 +1,3 @@
-GAMA for Windows is now archived. Cause: I'm moving to Linux. 
-
 # ✅Overview
 
 **GAMA (GPU API Manager for Android-based devices) is a Windows batch script that changes your Android device’s GPU API — no root needed.**
