@@ -45,7 +45,7 @@ echo.
 echo %CYAN%     GPU API Manager for Android-based devices %RESET%
 echo %CYAN%     [GAMA v%version%] %RESET%
 echo.
-echo      Device: !adb_status!
+echo      Device status: !adb_status!
 echo      Update availability: !checkforupdates_display!
 echo.
 echo %CYAN%  = -------------------------------------------------- = %RESET%
