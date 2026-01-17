@@ -31,7 +31,7 @@ if exist "%TEMP%\gama_ver.txt" (
     if "!LATEST_VERSION!" NEQ "%version%" (
         set checkforupdates_display=New version available!%RESET%
     ) else (
-        set checkforupdates_display= You're on the latest version
+        set checkforupdates_display=You're on the latest version
     )
 ) else (
     set checkforupdates_display=%RED%Check failed%RESET%
