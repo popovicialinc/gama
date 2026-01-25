@@ -70,6 +70,7 @@ Whilst optimized for the Galaxy S23 lineup, this project is compatible with any 
   * Ensure [**USB Debugging**](https://github.com/popovicialinc/gama/tree/main?tab=readme-ov-file#to-enable-usb-debugging) is ON and only one device is connected.
 * Run "GAMA.bat"
   * A user-friendly main menu will pop up. Don't worry, everything is well-explained and designed to be simple-to-use. You can't break anything.
+  * TIP: Don't run "GAMA.bat" as administrator, it breaks the UI!
 * Enjoy!
 
 **Heads up: You’ll need to run this script after every phone reboot.**
