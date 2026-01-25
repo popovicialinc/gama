@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableDelayedExpansion
-set version=1.5
-title GAMA %version%
+set version=1.5.1
+title GAMA v%version%
 
 :: --- CONFIG ---
 set "ADB_EXE=%~dp0bin\adb.exe"
