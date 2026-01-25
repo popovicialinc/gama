@@ -1,63 +1,144 @@
-# ✅Overview
+<p align="center">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/video/gama_title_video.gif" width="100%" alt="GAMA Ultra 4K Banner">
+</p>
 
-**GAMA (GPU API Manager for Android-based devices) is a Windows batch script that changes your Android device’s GPU API — no root needed.**
+# ✅ Overview
 
-It’s tailor-made for One UI 7 users battling overheating, throttled performance, and suboptimal battery life, especially S23 users - Forcing Vulkan rendering is a great way to enhance performance, increase battery life and lower running temperatures.
+**GAMA (short for *GPU API Manager for Android-based devices*) is a Batch script that lets you switch the GPU rendering API on your Android device without requiring root access**
 
-[**The Linux equivalent of GAMA**](https://github.com/Ameen-Sha-Cheerangan/s23-ultra-vulkan-linux-script) (many thanks to Ameen Sha Cheerangan)
+While optimized for the Galaxy S23 lineup, this project is compatible with any Samsung device running One UI 7 or newer and aims to provide:
 
-# 🧩Prerequisites
+* ❄️ **Cooler Temp** - Better efficiency, less heat
+
+* 🔋 **Better Battery Life** - Better efficiency, better battery life
+
+* 🔓 **Zero Risk** - Root is not required, 100% Knox-safe.
+
+<br>
+<p align="center">
+  <img src="https://img.shields.io/badge/Android-B3E5FC?style=for-the-badge&logo=android&logoColor=333" />
+  <img src="https://img.shields.io/badge/Galaxy_S23-C8E6C9?style=for-the-badge&logo=samsung&logoColor=333" />
+  <img src="https://img.shields.io/badge/One_UI_7-F8BBD0?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/No_Root-E1BEE7?style=for-the-badge" />
+</p>
+
+# 📷 Photos
+<div>
+  <table border=0>
+    <tr>
+      <td align="center">
+        <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_main_menu.png" width="350"><br>
+        <sub>Main Menu</sub>
+      </td>
+      <td align="center">
+        <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_settings_renderer_vulkan.png" width="350"><br>
+        <sub>Choosing Aggressiveness Profile</sub>
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/error.png" width="350"><br>
+        <sub>Error State</sub>
+      </td>
+      <td align="center">
+        <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/success.png" width="350"><br>
+        <sub>Success Message</sub>
+      </td>
+    </tr>
+  </table>
+</div>
+
+
+# 🖥️ Other Platforms
+
+**GAMA is now available on other platforms!** Check out these ports maintained by the community:
+
+* 🐧 [**Linux Version**](https://github.com/Ameen-Sha-Cheerangan/s23-ultra-vulkan-linux-script) (adapted by Ameen Sha Cheerangan)
+
+* 🍎 [**MacOS Version**]() (Coming soon by bialobrzeskid)
+
+
+# 🧩 Prerequisites
 * **A Windows PC**
 * **Your Android device** ([with USB Debugging enabled](https://github.com/popovicialinc/gama/blob/main/README.md#to-enable-usb-debugging))
-* **The latest version of** [**GAMA**](https://github.com/popovicialinc/gama/releases/latest)
+* **The latest version of** [**GAMA**](https://github.com/popovicialinc/gama/releases/latest).
 
-
-# 📦Installation & Usage
-* Extract the GAMA archive
-* Connect your device via USB (make sure USB Debugging is enabled, otherwise GAMA won't recognise your device; make sure you only connect ONE device - the one you want GAMA to affect! Otherwise, you will get an error)
-* Run "GAMA". A user-friendly menu will appear. Everything is explained, and don't worry, you can't break anything.
-* Have fun!
-
-## To enable USB Debugging
-* Settings > About phone > Software information > Press 7 times on Build number, input your password and a new "Developer options" button will appear at the very bottom of the Settings app
-* Developer options > Scroll down and find "USB Debugging"; enable it and you're ready to race!
+# 📦 Installation & Usage
+* Extract the .zip archive of GAMA 
+* Connect your device via USB to your PC
+  * Ensure [**USB Debugging**](https://github.com/popovicialinc/gama/tree/main?tab=readme-ov-file#to-enable-usb-debugging) is ON and only one device is connected.
+* Run "GAMA.bat"
+  * A user-friendly main menu will pop up. Don't worry, everything is well-explained and designed to be simple-to-use. You can't break anything.
+* Enjoy!
 
 **Heads up: You’ll need to run this script after every phone reboot.**
 
-# ⚠️Known issues
-## Caused by Vulkan
-* **Visual artifacting**. Adreno GPUs aboard Snapdragon SOCs usually have no problems with Vulkan, so your mileage may vary - though my personal experience with Vulkan has been great on my S23 Ultra.
-* **Not all apps will run under Vulkan**. The majority will, but there will be some exceptions. Nothing can fix this - Samsung needs to adopt Vulkan on all of their models, and the app developers need to fix their apps.
+## How to enable USB Debugging
 
-## Caused by system-wide app restart (aggressive app stop; solvable by using the more leanient "Normal" profile when GAMA asks you how aggressive it should be when stopping apps)
-* **The default browser and the default keyboard will get reset.**
-* **Loss of WiFi-Calling/VoLTE capability** - **Fix**: Go to Settings > Connections > SIM manager, then toggle SIM 1/2 off and back on. (many thanks to Fun-Flight4427 and ActualMountain7899 for reporting the bug and finding a solution)
+1. Settings > About phone > Software information
 
-# ✨Frequently asked questions
+3. Tap **Build number** 7 times until you see "Developer mode has been turned on".
 
-**Q: Why bother with Vulkan?**
-A: Vulkan is a newer, low‑overhead graphics API. One UI 7 Beta 1 defaulted to Vulkan, which kept temperatures cool and battery life strong. Beta 2 reverted to OpenGL — enter overheating and drain. This script forces Vulkan back on.
+5. Go back to **Settings** > **Developer options**.
 
-**Q: Is it safe?**
-A: Absolutely! It leverages official ADB commands — no system hacks, no risk.
+7. Scroll down, find **USB Debugging**, and toggle it **ON**.
 
-**Q: Must I run it after every reboot?**
-A: Yes, unfortunately.
+You're ready to race!
 
-**Q: How do I pronounce "GAMA"?**
-A: It's pronounced exactly the same as "gamma".
+# ⚠️ Known Issues
 
-**Q: Will this void my warranty or trip Knox?**
-A: Nope! This doesn’t mess with bootloaders or root. It’s 100% Knox-safe and warranty-friendly.
+<details>
+<summary><b>🔸 Caused by Vulkan (App Compatibility)</b></summary>
+<br>
+<ul>
+  <li><b>Not all apps will run under Vulkan.</b> Some will revert back to OpenGL automatically.</li>
+  <li><b>Impact:</b> A great majority of apps installed on your device will run under Vulkan flawlessly. If an app reverts, it's normal behavior.</li>
+</ul>
+</details>
 
-**Q: Will it break my phone?**
-A: It’s just a graphics driver toggle - your device will be just fine.
+<details>
+<summary><b>🔸 Caused by GAMA ("Aggressive" Profile Side Effects)</b></summary>
+<br>
+<blockquote>
+  <p><b>⚠️ "Aggressive" Profile Warning</b></p>
+  <p>Using the <b>Aggressive</b> profile for stopping background apps is nuclear. While 99% of users won't need this, be aware of the side effects:</p>
+  <ul>
+    <li>🛑 <b>Resets Defaults:</b> Your default browser and keyboard will be reset.</li>
+    <li>📵 <b>Connectivity Loss:</b> Possible loss of WiFi-Calling/VoLTE capability.</li>
+    <li><b>The Fix:</b> Go to <i>Settings > Connections > SIM manager</i>, then toggle SIM 1/2 off and back on.</li>
+  </ul>
+  <p><i>(Thanks to Fun-Flight4427 and ActualMountain7899 for the fix)</i></p>
+</blockquote>
+</details>
 
-**Q: What if I don’t notice a difference?**
-A: Some devices and apps won’t show a huge change, but Vulkan generally offers better performance and thermal management. If you’re not seeing improvement, your phone might already be optimized.
+# ✨ Frequently asked questions
 
-**Q: Can I undo this?**
-A: Yup. GAMA now natively supports back-and-forth API changing - OpenGL-to-Vulkan or Vulkan-to-OpenGL. Easy peasy. Besides, a reboot wIll also reset the driver back to OpenGL, so you've got plenty of options!
+<details>
+<summary><b>Why bother with Vulkan?</b></summary>
+Vulkan is a newer, low‑overhead graphics API. One UI 7 Beta 1 defaulted to Vulkan, and users loved it! Device temperatures were cool, and battery life was strong. Beta 2 reverted to OpenGL, bringing back overheating and battery drain. GAMA forces Vulkan back on.
+</details>
 
-**Q: Why isn’t this a built-in setting already?!**
-A: Great question — ask Samsung. If you ask me, this smells a whole lot like planned obsolescence to me... but anyway.
+<details>
+<summary><b>Is it safe? Will it trip Knox?</b></summary>
+Absolutely! It leverages official ADB commands - no system hacks, no root, and no bootloader unlocking. It is <b>100% Knox-safe</b> and warranty-friendly.
+</details>
+
+<details>
+<summary><b>Do I have to run GAMA after every reboot?</b></summary>
+Yes, unfortunately. Android resets the global graphics driver preference on restart.
+</details>
+
+<details>
+<summary><b>What if I don’t notice a difference?</b></summary>
+Some devices and apps won’t show a huge change immediately, but Vulkan generally offers better long-term thermal management. If you’re not seeing improvement, your phone might already be well-optimized.
+</details>
+
+<details>
+<summary><b>Can I undo this?</b></summary>
+Yup. GAMA natively supports switching back: <b>Vulkan-to-OpenGL</b>. Alternatively, just restart your phone to reset everything to stock.
+</details>
+
+<details>
+<summary><b>Why isn’t this a built-in setting?</b></summary>
+Great question — ask Samsung. If you ask me, this smells a whole lot like planned obsolescence... but anyway.
+</details>
