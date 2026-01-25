@@ -6,7 +6,7 @@
 
 **GAMA (short for *GPU API Manager for Android-based devices*) is a Batch script that lets you switch the GPU rendering API on your Android device without requiring root access**
 
-While optimized for the Galaxy S23 lineup, this project is compatible with any Samsung device running One UI 7 or newer and aims to provide:
+Whilst optimized for the Galaxy S23 lineup, this project is compatible with any Samsung device running One UI 7 or newer and aims to provide:
 
 * ❄️ **Cooler Temp** - Better efficiency, less heat
 
