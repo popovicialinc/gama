@@ -120,7 +120,7 @@ Vulkan is a newer, low‑overhead graphics API. One UI 7 Beta 1 defaulted to Vul
 
 <details>
 <summary><b>Is it safe? Will it trip Knox?</b></summary>
-Absolutely! It leverages official ADB commands - no system hacks, no root, and no bootloader unlocking. It is <b>100% Knox-safe</b> and warranty-friendly.
+GAMA is <b>100% Knox-safe</b> and warranty-friendly. It leverages official ADB commands - no system hacks, no root, and no bootloader unlocking.
 </details>
 
 <details>
