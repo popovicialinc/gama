@@ -4,7 +4,7 @@
 
 # ✅ Overview
 
-**Android version coming soon!*
+*Android-native app coming soon!*
 
 **GPU API Manager for Android-based devices (GAMA) is a Batch script that lets you switch the GPU rendering API on your Android device without requiring root access**
 
