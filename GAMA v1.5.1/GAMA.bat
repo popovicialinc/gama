@@ -55,8 +55,8 @@ echo      What's next?
 echo.
 echo %CYAN%     Core Features%RESET%
 echo      Switch graphics API tp:
-echo          [1] Switch to Vulkan
-echo          [2] Switch to OpenGL
+echo          [1] Vulkan
+echo          [2] OpenGL
 echo      [3] Launch all installed apps
 echo.
 echo %CYAN%     Extra tools and resources %RESET%
