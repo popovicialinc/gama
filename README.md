@@ -67,7 +67,7 @@ As simple as that!
 
 ## 📷 **Photos**
 <div>
-  <table border=0>
+  <table border="0">
     <tr>
       <td align="center">
         <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_android_1.png" width="250"><br>
@@ -76,7 +76,8 @@ As simple as that!
       <td align="center">
         <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_android_2.png" width="250"><br>
         <sub>Settings / Dark Mode</sub>
-        <td align="center">
+      </td>
+      <td align="center">
         <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_android_3.png" width="250"><br>
         <sub>Settings / Light Mode</sub>
       </td>
@@ -93,6 +94,8 @@ As simple as that!
     </tr>
   </table>
 </div>
+
+
 
 <br>
 
