@@ -24,12 +24,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 1. Splash screen must be initialized BEFORE super.onCreate
         installSplashScreen()
 
         super.onCreate(savedInstanceState)
 
-        // 2. Setup system UI visibility
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val controller = WindowCompat.getInsetsController(window, window.decorView)
@@ -38,7 +36,6 @@ class MainActivity : ComponentActivity() {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
 
-        // 3. Shizuku listener
         Shizuku.addRequestPermissionResultListener(permissionListener)
 
         setContent {
@@ -46,7 +43,6 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxSize(),
                 color = Color.Black
             ) {
-                // Assuming GamaUI is defined in another file in your project
                 GamaUI()
             }
         }
