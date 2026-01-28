@@ -1,15 +1,5 @@
 package com.popovicialinc.gama
 
-/*
- * GAMA UI - Landscape Optimized
- *
- * This UI is optimized for both portrait and landscape orientations:
- * - Portrait/Tablet: Single column layout (original design)
- * - Landscape (phones): Two-column layout with title/info on left, controls on right
- * - Dialogs: Narrower and more compact in landscape mode
- * - Settings panels: Scrollable with optimized spacing for landscape
- */
-
 import android.content.Intent
 import android.net.Uri
 import android.view.HapticFeedbackConstants
@@ -85,7 +75,6 @@ data class ThemeColors(
     companion object {
         fun dark() = ThemeColors(
             background = Color(0xFF000000),
-            // Dimmer card background for premium feel
             cardBackground = Color(0xFF111111),
             primaryAccent = Color(0xFF4895EF),
             textPrimary = Color.White,
@@ -116,7 +105,6 @@ fun GamaUI() {
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
 
-    // Responsive sizing based on screen dimensions
     val screenWidth = configuration.screenWidthDp.dp
     val screenHeight = configuration.screenHeightDp.dp
     val isSmallScreen = screenWidth < 360.dp || screenHeight < 640.dp
@@ -124,12 +112,10 @@ fun GamaUI() {
     val isLandscape = screenWidth > screenHeight
     val isTablet = screenWidth >= 600.dp && screenHeight >= 600.dp
 
-    // Improved Haptic feedback helper
     fun performHaptic(type: Int = HapticFeedbackConstants.LONG_PRESS) {
         view.performHapticFeedback(type)
     }
 
-    // SharedPreferences for persistent settings
     val prefs = remember { context.getSharedPreferences("gama_prefs", android.content.Context.MODE_PRIVATE) }
 
     var shizukuStatus by remember { mutableStateOf("Checking...") }
@@ -143,11 +129,9 @@ fun GamaUI() {
     var showSettings by remember { mutableStateOf(false) }
     var showVisualEffects by remember { mutableStateOf(false) }
 
-    // Shizuku state
     var shizukuRunning by remember { mutableStateOf(false) }
     var shizukuPermissionGranted by remember { mutableStateOf(false) }
 
-    // Back gesture handlers - Priority logic
     BackHandler(enabled = showVisualEffects) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showVisualEffects = false
@@ -174,14 +158,12 @@ fun GamaUI() {
         showSettings = false
     }
 
-    // Settings preferences
     val systemInDarkTheme = isSystemInDarkTheme()
     var animationLevel by remember { mutableStateOf(prefs.getInt("animation_level", 0)) }
     var gradientEnabled by remember { mutableStateOf(prefs.getBoolean("gradient_enabled", true)) }
     var blurEnabled by remember { mutableStateOf(prefs.getBoolean("blur_enabled", true)) }
     var themePreference by remember { mutableStateOf(prefs.getInt("theme_preference", 0)) } // 0=Auto, 1=Dark, 2=Light
 
-    // Determine actual theme
     val isDarkTheme = when (themePreference) {
         1 -> true  // Dark
         2 -> false // Light
@@ -190,7 +172,6 @@ fun GamaUI() {
 
     val colors = if (isDarkTheme) ThemeColors.dark() else ThemeColors.light()
 
-    // ANIMATED BACKGROUND COLOR FOR SMOOTH TRANSITION
     val animatedBackgroundColor by animateColorAsState(
         targetValue = colors.background,
         animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
@@ -203,7 +184,6 @@ fun GamaUI() {
         label = "card_bg_anim"
     )
 
-    // Save preferences
     fun savePreferences() {
         prefs.edit().apply {
             putInt("animation_level", animationLevel)
@@ -214,7 +194,6 @@ fun GamaUI() {
         }
     }
 
-    // Animation system - UPDATED TIMINGS FOR LESS BOUNCE
     val animDuration = when (animationLevel) {
         0 -> 600 // Max
         1 -> 300 // Medium
@@ -238,14 +217,13 @@ fun GamaUI() {
         label = "overlay"
     )
 
-    // Main menu scale - LESS BOUNCY
     val mainMenuScale by animateFloatAsState(
         targetValue = if (anyPanelOpen) 0.82f else 1f,
         animationSpec = if (animationLevel == 2) {
             snap()
         } else {
             spring(
-                dampingRatio = 0.3f, // Much higher damping for premium "solid" feel
+                dampingRatio = 0.3f, // Much higher damping for premium feel
                 stiffness = Spring.StiffnessLow
             )
         },
@@ -267,8 +245,8 @@ fun GamaUI() {
     // Infinite transition for breathing gradient
     val infiniteTransition = rememberInfiniteTransition(label = "breathing")
     val breathingAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.2f, // Dimmer start
-        targetValue = 0.9f,  // Brighter peak
+        initialValue = 0.4f, // Dimmer start
+        targetValue = 1f,  // Brighter peak
         animationSpec = infiniteRepeatable(
             animation = tween(5000, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
@@ -339,7 +317,6 @@ fun GamaUI() {
 
             // Main content with blur
             if (isLandscape && !isTablet) {
-                // LANDSCAPE LAYOUT - Two column design
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
@@ -351,7 +328,7 @@ fun GamaUI() {
                         .then(
                             if (anyPanelOpen) {
                                 Modifier.pointerInput(Unit) {
-                                    detectTapGestures { /* Consume all taps */ }
+                                    detectTapGestures
                                 }
                             } else Modifier
                         ),
@@ -366,7 +343,7 @@ fun GamaUI() {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        // GAMA Title (compact for landscape)
+                        // GAMA Title 
                         AnimatedElement(
                             visible = isVisible,
                             delay = 0
@@ -426,7 +403,6 @@ fun GamaUI() {
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Version info (moved to left column in landscape)
                         AnimatedElement(
                             visible = isVisible,
                             delay = 750
@@ -454,7 +430,6 @@ fun GamaUI() {
                         }
                     }
 
-                    // RIGHT COLUMN - Controls and Actions
                     Column(
                         modifier = Modifier
                             .weight(1f)
@@ -503,7 +478,6 @@ fun GamaUI() {
                                         textAlign = TextAlign.Center
                                     )
 
-                                    // Command output
                                     AnimatedVisibility(
                                         visible = commandOutput.isNotEmpty(),
                                         enter = fadeIn(animationSpec = tween(400)) +
@@ -549,7 +523,6 @@ fun GamaUI() {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Action buttons
                         AnimatedElement(
                             visible = isVisible,
                             delay = 300
@@ -681,7 +654,6 @@ fun GamaUI() {
                     }
                 }
             } else {
-                // PORTRAIT/TABLET LAYOUT - Original single column design
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -693,7 +665,7 @@ fun GamaUI() {
                         .then(
                             if (anyPanelOpen) {
                                 Modifier.pointerInput(Unit) {
-                                    detectTapGestures { /* Consume all taps */ }
+                                    detectTapGestures
                                 }
                             } else Modifier
                         ),
@@ -1018,7 +990,7 @@ fun GamaUI() {
 
                     Spacer(modifier = Modifier.height(20.dp))
                 }
-            } // End of portrait/tablet layout
+            }
 
             // Dark overlay (when blur disabled)
             AnimatedVisibility(
@@ -2007,7 +1979,6 @@ private fun BouncyDialog(
         else -> 0
     }
 
-    // UPDATED: Much tighter, premium spring physics (0.8 damping)
     AnimatedVisibility(
         visible = visible,
         enter = if (animLevel == 2) {
