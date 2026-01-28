@@ -43,7 +43,7 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 * **Your Android device**
 * [**The latest .apk of GAMA**](https://github.com/popovicialinc/gama/releases/latest)
 * [**Shizuku**](https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api)
-  * Alternatively, download straight from [Shizuku's official GitHub repository](https://github.com/RikkaApps/Shizuku/releases/latest
+  * Alternatively, download straight from [Shizuku's official GitHub repository](https://github.com/RikkaApps/Shizuku/releases/latest)
 
 ## 📦 **Installation & Usage**
 
