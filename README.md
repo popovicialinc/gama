@@ -48,10 +48,6 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 ## 📦 **Installation & Usage**
 
 * Install **Shizuku** on your device and [*start the service*](https://shizuku.rikka.app/guide/setup/#start-via-wireless-debugging)
-  * To enable Developer Options:
-    * Settings > About phone > Software information
-    * Tap **Build number** 7 times, input your password (if you have one), and then you'll be asked "Allow development settings?
-    * Tap OK
 * Install the latest **GAMA** APK on your device.
 * Open **GAMA**. The app will detect **Shizuku** and **request permission** to run commands - **grant permission**.
   * If **GAMA** displays "**Permission needed**⚠️"
@@ -71,7 +67,7 @@ As simple as that!
 
 ## 📷 **Photos**
 <div>
-  <table border=0>
+  <table border="0">
     <tr>
       <td align="center">
         <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_android_1.png" width="250"><br>
@@ -80,7 +76,8 @@ As simple as that!
       <td align="center">
         <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_android_2.png" width="250"><br>
         <sub>Settings / Dark Mode</sub>
-        <td align="center">
+      </td>
+      <td align="center">
         <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_android_3.png" width="250"><br>
         <sub>Settings / Light Mode</sub>
       </td>
@@ -97,6 +94,8 @@ As simple as that!
     </tr>
   </table>
 </div>
+
+
 
 <br>
 
