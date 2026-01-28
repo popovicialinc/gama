@@ -48,10 +48,6 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 ## 📦 **Installation & Usage**
 
 * Install **Shizuku** on your device and [*start the service*](https://shizuku.rikka.app/guide/setup/#start-via-wireless-debugging)
-  * To enable Developer Options:
-    * Settings > About phone > Software information
-    * Tap **Build number** 7 times, input your password (if you have one), and then you'll be asked "Allow development settings?
-    * Tap OK
 * Install the latest **GAMA** APK on your device.
 * Open **GAMA**. The app will detect **Shizuku** and **request permission** to run commands - **grant permission**.
   * If **GAMA** displays "**Permission needed**⚠️"
