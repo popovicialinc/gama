@@ -53,7 +53,7 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
     * Tap **Build number** 7 times, input your password (if you have one), and then you'll be asked "Allow development settings?
     * Tap OK
 * Install the latest **GAMA** APK on your device.
-)* Open **GAMA**. The app will detect **Shizuku** and **request permission** to run commands - **grant permission**.
+* Open **GAMA**. The app will detect **Shizuku** and **request permission** to run commands - **grant permission**.
   * If **GAMA** displays "**Permission needed**⚠️"
     * Open **Shizuku** and select the **second option** from the top labeled *Authorized Applications*
     * **Make sure the toggle next to **GAMA** is turned on**.
