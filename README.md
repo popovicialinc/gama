@@ -43,6 +43,7 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 * **Your Android device**
 * [**The latest .apk of GAMA**](https://github.com/popovicialinc/gama/releases/latest)
 * [**Shizuku**](https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api)
+  * Alternatively, download straight from [Shizuku's official GitHub repository](https://github.com/RikkaApps/Shizuku/releases/latest
 
 ## 📦 **Installation & Usage**
 
@@ -51,7 +52,7 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
     * Settings > About phone > Software information
     * Tap **Build number** 7 times until you see "Developer mode has been turned on".
 * Install the latest **GAMA** APK on your device.
-* Open **GAMA**. The app will detect **Shizuku** and **request permission** to run commands - **grant permission**.
+)* Open **GAMA**. The app will detect **Shizuku** and **request permission** to run commands - **grant permission**.
   * If **GAMA** displays "**Permission needed**⚠️"
     * Open **Shizuku** and select the **second option** from the top labeled *Authorized Applications*
     * **Make sure the toggle next to **GAMA** is turned on**.
