@@ -101,7 +101,9 @@ As simple as that!
 <br>
 
 
-# **GAMA for Windows (Batch) - DEPRECATED IN FAVOUR OF "**Gama** for Android"**
+# **GAMA for Windows (Batch)**
+
+*DEPRECATED IN FAVOUR OF "**Gama** for Android"*
 
 ## 🧩 **Prerequisites**
 * **A Windows PC**
