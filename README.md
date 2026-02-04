@@ -16,7 +16,7 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 * 🔓 **Zero Risk** - Root is not required, 100% Knox-safe.
 * 🛠️ **User Friendly** - Simple interface to toggle settings without complex terminal commands.
 
-Note: *GAMA **may** work with OneUI versions older than OneUI 7*
+Note: *GAMA **may** work with OneUI versions released before OneUI 7*
 
 ![Downloads](https://img.shields.io/github/downloads/popovicialinc/gama/total?style=flat&label=DOWNLOADS&labelColor=%23111111&color=%233b2f5b)
 
@@ -36,7 +36,7 @@ Note: *GAMA **may** work with OneUI versions older than OneUI 7*
 * 🤖 [**Android**](https://github.com/popovicialinc/gama/blob/main/README.md#gama-for-android)
 * 🖥️ [**Windows**](https://github.com/popovicialinc/gama/blob/main/README.md#gama-for-windows-batch)
 * 🐧 [**Linux**](https://github.com/Ameen-Sha-Cheerangan/s23-vulkan-support) (adapted by Ameen Sha Cheerangan)
-* 🍎 [**MacOS Version**](#) (Coming soon by bialobrzeskid)
+* 🍎 **MacOS Version**
 
 <br>
 
