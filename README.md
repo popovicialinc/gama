@@ -9,12 +9,14 @@
 
 **GPU API Manager for Android-based devices (GAMA) is an application that lets you switch the GPU rendering API on your Android device without requiring root access**
 
-While optimized for the Galaxy S23 lineup, this project is compatible with any Samsung device running One UI or newer and aims to provide:
+While optimized for the Galaxy S23 lineup, this project is compatible with any Samsung device running One UI 7 or newer and aims to provide:
 
 * ❄️ **Lower-Running Temps**
 * 🔋 **Better Battery Life**
 * 🔓 **Zero Risk** - Root is not required, 100% Knox-safe.
 * 🛠️ **User Friendly** - Simple interface to toggle settings without complex terminal commands.
+
+Note: *GAMA **may** work with OneUI versions older than OneUI 7*
 
 ![Downloads](https://img.shields.io/github/downloads/popovicialinc/gama/total?style=flat&label=DOWNLOADS&labelColor=%23111111&color=%233b2f5b)
 
