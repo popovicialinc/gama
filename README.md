@@ -36,7 +36,6 @@ Note: *GAMA **may** work with OneUI versions released before OneUI 7*
 * 🤖 [**Android**](https://github.com/popovicialinc/gama/blob/main/README.md#gama-for-android)
 * 🖥️ [**Windows**](https://github.com/popovicialinc/gama/blob/main/README.md#gama-for-windows-batch)
 * 🐧 [**Linux**](https://github.com/Ameen-Sha-Cheerangan/s23-vulkan-support) (adapted by Ameen Sha Cheerangan)
-* 🍎 **MacOS Version**
 
 <br>
 
