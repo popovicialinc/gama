@@ -1,23 +1,29 @@
+## Visual and Animation Enhancements
+- Introduced fully dynamic particle-based animated background system replacing the static gradient overlay
+- Added device rotation parallax effect with refined sensitivity and clamping for natural response
+- Implemented three background modes: standard upward particle flow, static star field, and smart time-based mode with day/night behavior
+- Added real-time sun and moon celestial animation with smooth parabolic arc trajectory synchronized to device clock
+- Overhauled motion system with comprehensive MotionTokens for durations, easings, springs, and scale values for consistent premium animations
+- Enhanced overall animation fidelity with improved damping, velocity clamping, and frame-rate normalization in particle physics
 
+## New Features
+- Added Excluded Apps management panel allowing users to selectively exclude applications from GPU API changes
+- Introduced detailed Aggressive Mode warning dialog with expanded side-effect explanations
+- Added GPUWatch confirmation dialog with custom terminal-style icon and direct navigation to Developer Options
+- Implemented test notification function for developer verification
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce at faucibus urna. Nullam condimentum sapien ex, ut interdum felis dapibus et. Donec dictum nisi id ligula vehicula hendrerit. Quisque non egestas lorem. Phasellus dictum scelerisque faucibus. Curabitur tellus dolor, mollis et efficitur sed, tristique sed massa. Curabitur tempor massa nunc, et dictum velit dapibus at.
+## Improvements
+- Added safe font loading fallback to system default if custom Quicksand fonts are unavailable
+- Introduced OLED mode support in buttons and dialogs for true-black compatibility
+- Refined particle update logic with better edge wrapping, momentum preservation, and mode-specific behavior
+- Improved celestial positioning with more natural sunrise/sunset and moonrise/moonset transitions
+- Updated various dialog layouts for better readability, spacing, and visual hierarchy
+- Expanded imports and dependencies to support advanced Compose features including graphicsLayer, lazy lists, and coroutine frame timing
 
-Suspendisse potenti. Curabitur ultrices sem lacus, non convallis erat molestie sit amet. Donec et dolor accumsan urna scelerisque fringilla. Nunc pulvinar odio nec tristique tempor. Nam vitae nulla non velit luctus vehicula eu at nunc. Fusce posuere, mi ac vehicula porta, lectus tellus auctor justo, nec bibendum urna nulla venenatis mi. Sed magna nisi, rutrum a ipsum tempus, tincidunt eleifend felis. Integer consequat odio eleifend efficitur suscipit. Aenean non purus leo. Ut lobortis eros nulla, ut imperdiet massa imperdiet quis. Aliquam porta nunc sed risus sodales, non interdum tellus consequat. Proin diam justo, pulvinar ut dignissim sed, elementum sit amet arcu. Cras vulputate malesuada libero pellentesque mollis. Interdum et malesuada fames ac ante ipsum primis in faucibus. Maecenas et velit vitae magna tristique rhoncus eget et tellus. Donec ut velit eros.
+## Under the Hood
+- Significantly expanded codebase with new data classes (ParticleState, CelestialState) and utility functions
+- Improved haptic feedback integration and back-handler consistency
+- Enhanced theme and color application across new components
+- General code organization and cleanup for maintainability
 
-Nullam gravida ullamcorper metus a tristique. Suspendisse potenti. Ut maximus metus ut nisi imperdiet sollicitudin sed in lectus. Donec nulla est, dictum ac pretium eget, rhoncus ut arcu. Nullam aliquam dictum augue nec pulvinar. Pellentesque dignissim, mi ut luctus dictum, ante mi ullamcorper dolor, vitae dictum diam urna eget ipsum. Donec convallis tempor vulputate. Morbi varius maximus purus vitae dignissim. Donec vel condimentum lorem. In sollicitudin arcu id pellentesque dapibus. Quisque et condimentum est. Curabitur fringilla magna id volutpat aliquam.
-
-Quisque elit orci, ultricies sit amet urna vel, bibendum interdum dolor. Integer ante felis, convallis vel condimentum tincidunt, vestibulum eget nunc. Etiam in ex cursus, aliquet nunc non, tincidunt nibh. Nunc lobortis felis vulputate augue pulvinar feugiat. Quisque et lobortis magna. Quisque vehicula mi id bibendum fringilla. Sed ornare, lorem semper condimentum posuere, nisl metus vulputate sem, a blandit tellus turpis sed quam. Vestibulum interdum eu nulla sed venenatis. Duis eu turpis at ante maximus pharetra eget in sem. Aliquam accumsan, magna sit amet tincidunt tristique, mi nibh ultricies turpis, vel rutrum neque quam interdum justo.
-
-In et accumsan diam, eget accumsan nisi. Pellentesque eleifend risus sollicitudin arcu rhoncus, sed vestibulum mi interdum. Nulla dapibus ipsum sodales, pulvinar augue a, convallis purus. Sed molestie, ipsum sit amet pretium tincidunt, quam ipsum pulvinar ipsum, id interdum felis sapien ut felis. Maecenas aliquam congue odio, at vestibulum justo bibendum a. Integer egestas arcu ut ligula consectetur sodales. In consequat ultricies ipsum, euismod tempus mauris dapibus dictum. Quisque a ipsum ac urna luctus convallis suscipit eu lectus. Nunc facilisis id magna at viverra. Nunc lacinia pulvinar massa non vulputate. Aliquam vel euismod justo, non lacinia dui. Curabitur pretium gravida condimentum.
-
-Donec congue velit quis justo efficitur ullamcorper. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Nulla porta molestie ante sed ullamcorper. Maecenas sed vulputate neque, tempor gravida urna. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Etiam elit enim, faucibus in faucibus non, facilisis eget nulla. Fusce ullamcorper, nisl nec congue posuere, mauris mi rhoncus mauris, vel ullamcorper mi lectus ac quam. Cras a magna ac quam dignissim consequat.
-
-Vivamus blandit nibh at ornare interdum. Phasellus condimentum sem eu lectus lacinia consectetur. Aenean rutrum est nunc, ac pharetra ligula imperdiet ac. Maecenas at sollicitudin ipsum. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Fusce ultrices massa sit amet lacus tempor, nec sollicitudin turpis viverra. Aliquam semper placerat ante ut finibus. Etiam porttitor dui ut pretium malesuada. Mauris non nisi mattis, porttitor magna et, ullamcorper mauris. Curabitur mollis ultricies porttitor. Morbi id tortor finibus, molestie orci vitae, suscipit diam. Sed rutrum elit ut porttitor dictum. Aliquam non euismod dui, id dapibus lacus.
-
-Maecenas auctor ut justo volutpat bibendum. Proin porta nulla ut tortor volutpat, euismod lobortis augue finibus. Maecenas viverra, dolor ut hendrerit porta, tellus justo luctus eros, et vulputate sem justo congue ex. Aliquam eleifend efficitur rutrum. Integer tempor vestibulum ullamcorper. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc sit amet massa velit. Integer mattis commodo ipsum. Aenean iaculis interdum euismod. Nulla vitae tristique ex, at malesuada nibh. In scelerisque, lacus id facilisis pulvinar, enim augue efficitur justo, at sagittis est quam in nunc. Donec quis ipsum ut dolor laoreet aliquam vitae vitae felis. Fusce vulputate eu sem id facilisis. Nam vitae elementum lorem. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Aenean volutpat enim ac urna tempor, quis rutrum sem venenatis.
-
-Pellentesque hendrerit iaculis pellentesque. Fusce nulla purus, vehicula et sollicitudin non, finibus nec nisi. Aliquam non ipsum ultricies, pharetra orci vel, gravida dolor. Suspendisse aliquet urna in massa varius, et finibus diam feugiat. Nam ac gravida lectus. Etiam commodo ac mauris id accumsan. Maecenas at elementum felis, et tincidunt purus. Donec ac viverra diam. Fusce sit amet sapien vitae est consequat aliquam in eget sem.
-
-Donec imperdiet magna id vulputate consequat. Donec accumsan magna id augue posuere facilisis. Donec eu odio at risus malesuada venenatis. Proin sit amet est ac ipsum ornare hendrerit sit amet bibendum felis. Praesent mi eros, fermentum eu ultrices sed, eleifend vel risus. In hac habitasse platea dictumst. Cras eleifend finibus est vel cursus. In ultrices et ante id malesuada. Maecenas vehicula auctor ipsum quis cursus. Nam tincidunt erat orci, ac pretium augue tincidunt ac. Vivamus a nibh quis justo mattis auctor vulputate in ligula. Praesent lobortis pulvinar dictum. Duis sollicitudin orci eu efficitur tristique.
-
-
+This release focuses on delivering a significantly more immersive and polished user experience while adding practical new functionality for advanced users.
