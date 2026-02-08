@@ -74,25 +74,20 @@ As simple as that!
     <tr>
       <td align="center">
         <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_android_1.png" width="250"><br>
-        <sub>Main Menu</sub>
       </td>
       <td align="center">
         <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_android_2.png" width="250"><br>
-        <sub>Settings / Dark Mode</sub>
       </td>
       <td align="center">
         <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_android_3.png" width="250"><br>
-        <sub>Settings / Light Mode</sub>
       </td>
     </tr>
     <tr>
       <td align="center">
         <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_android_4.png" width="250"><br>
-        <sub>Visual Effects</sub>
       </td>
       <td align="center">
         <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_android_5.png" width="250"><br>
-        <sub>SystemUI/other services will be stopped temporarily</sub>
       </td>
     </tr>
   </table>
