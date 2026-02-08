@@ -5,16 +5,20 @@
 <br>
 
 
-# ✅ **Overview**
+# **Overview**
 
 **GPU API Manager for Android-based devices (GAMA) is an application that lets you switch the GPU rendering API on your Android device without requiring root access**
 
-While optimized for the Galaxy S23 lineup, this project is compatible with any Samsung device running One UI or newer and aims to provide:
+While optimized for the Galaxy S23 lineup, this project is compatible with any Samsung device running One UI 7 or newer and aims to provide:
 
 * ❄️ **Lower-Running Temps**
 * 🔋 **Better Battery Life**
 * 🔓 **Zero Risk** - Root is not required, 100% Knox-safe.
 * 🛠️ **User Friendly** - Simple interface to toggle settings without complex terminal commands.
+
+Note: *GAMA **may** work with OneUI versions released before OneUI 7*
+
+![Downloads](https://img.shields.io/github/downloads/popovicialinc/gama/total?style=flat&label=DOWNLOADS&labelColor=%23111111&color=%233b2f5b)
 
 <br>
 
@@ -32,20 +36,19 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 * 🤖 [**Android**](https://github.com/popovicialinc/gama/blob/main/README.md#gama-for-android)
 * 🖥️ [**Windows**](https://github.com/popovicialinc/gama/blob/main/README.md#gama-for-windows-batch)
 * 🐧 [**Linux**](https://github.com/Ameen-Sha-Cheerangan/s23-vulkan-support) (adapted by Ameen Sha Cheerangan)
-* 🍎 [**MacOS Version**](#) (Coming soon by bialobrzeskid)
 
 <br>
 
 # **GAMA for Android**
 
-## 🧩 **Prerequisites**
+## **Prerequisites**
 
 * **Your Android device**
 * [**The latest .apk of GAMA**](https://github.com/popovicialinc/gama/releases/latest)
 * [**Shizuku**](https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api)
   * Alternatively, download straight from [Shizuku's official GitHub repository](https://github.com/RikkaApps/Shizuku/releases/latest)
 
-## 📦 **Installation & Usage**
+## **Installation & Usage**
 
 * Install **Shizuku** on your device and [*start the service*](https://shizuku.rikka.app/guide/setup/#start-via-wireless-debugging)
 * Install the latest **GAMA** APK on your device.
@@ -106,12 +109,12 @@ As simple as that!
 
 *DEPRECATED IN FAVOUR OF "**Gama** for Android"*
 
-## 🧩 **Prerequisites**
+## **Prerequisites**
 * **A Windows PC**
 * **Your Android device** ([with USB Debugging enabled](https://github.com/popovicialinc/gama/blob/main/README.md#to-enable-usb-debugging))
 * **The latest version of** [**GAMA**](https://github.com/popovicialinc/gama/releases/latest).
 
-## 📦 **Installation & Usage**
+## **Installation & Usage**
 * Extract the .zip archive of **GAMA** 
 * Connect your device via USB to your PC
   * Ensure [**USB Debugging**](https://github.com/popovicialinc/gama/tree/main?tab=readme-ov-file#to-enable-usb-debugging) is ON and only one device is connected.
@@ -131,7 +134,7 @@ As simple as that!
 
 You're ready to race!
 
-## 📷 **Photos**
+## **Photos**
 <div>
   <table border=0>
     <tr>
@@ -161,7 +164,7 @@ You're ready to race!
 
 <br>
 
-# ⚠️ Known Issues
+# Known Issues
 
 <details>
 <summary><b>🔸 Caused by Vulkan (App Compatibility)</b></summary>
@@ -175,11 +178,11 @@ You're ready to race!
 <details>
 <summary><b>🔸 Caused by **GAMA** (Batch "Aggressive" Profile Side Effects - Windows only)</b></summary>
 <br>
-  <p><b>⚠️ "Aggressive" Profile Warning</b></p>
+  <p><b>"Aggressive" Profile Warning</b></p>
   <p>Using the <b>Aggressive</b> profile for stopping background apps is nuclear. While 99% of users won't need this, be aware of the side effects:</p>
   <ul>
-    <li>🛑 <b>Resets Defaults:</b> Your default browser and keyboard will be reset.</li>
-    <li>📵 <b>Connectivity Loss:</b> Possible loss of WiFi-Calling/VoLTE capability.</li>
+    <li><b>Resets Defaults:</b> Your default browser and keyboard will be reset.</li>
+    <li><b>Connectivity Loss:</b> Possible loss of WiFi-Calling/VoLTE capability.</li>
     <li><b>The Fix:</b> Go to <i>Settings > Connections > SIM manager</i>, then toggle SIM 1/2 off and back on.</li>
   </ul>
   <p><i>(Thanks to Fun-Flight4427 and ActualMountain7899 for the fix)</i></p>

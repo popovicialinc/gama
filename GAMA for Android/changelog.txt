@@ -1,0 +1,54 @@
+## Visual Engine and Rendering
+- Implemented a completely custom particle physics engine via the ParticleState data class which manages individual particle coordinates, velocity, alpha, size, and phase properties
+- Added the ParticlesOverlay composable which handles the rendering loop for the new background system, supporting both standard circular particles and four-pointed star shapes depending on the active mode
+- Introduced a Time System that calculates celestial positions for the Sun and Moon based on the device real-time clock using the new calculateCelestialPosition function
+- Created custom drawing routines for the Sun object that renders eight directional rays with gradient transparency and a three-layer glow effect
+- Created custom drawing routines for the Moon object that includes a crater generation algorithm with shadow offsets and a dynamic crescent shadow overlay
+- Added a Parallax System that utilizes the device Rotation Vector sensor to shift particle positions based on device tilt, including a calibration routine to establish a zero-point on initialization
+- Added the GrainEffect composable which generates a monochromatic noise bitmap using a BitmapShader to overlay the entire screen and mitigate color banding on gradients
+- Defined the MotionTokens object to centralize animation constants, including specific durations (instant to epic), easing curves (emphasized, silk, butter), and spring physics configurations
+
+## Theming and Colors
+- Added the OLED Mode to the ThemeColors object, which forces the background and card colors to pure black (Hex 000000) and adjusts border rendering to use subtle 0.5dp outlines for visibility
+- Implemented Dynamic Color support (Monet) for Android 12+ devices, extracting system color resources (system_accent1_400, etc.) to theme the application based on the user wallpaper
+- Added the ColorCustomizationPanel to allow users to manually override the primary accent color, gradient start color, and gradient end color
+- Added properties for gradientStart and gradientEnd to the ThemeColors data class to support customizable background gradients
+- Replaced the hardcoded blue accent color with a dynamic variable that respects the user selection or system default
+
+## User Interface Components
+- Replaced the row of individual buttons for Theme and Quality selection with the new GlideOptionSelector component, which features a sliding background indicator powered by spring animations and gesture-based drag selection
+- Refactored FlatButton to support a maxLines parameter and integrated new logic for borders that dynamically adjusts based on the OLED mode state (always showing a thin border in OLED mode)
+- Created the SettingsNavigationCard component to standardize navigation entries within the new settings menus, featuring animated scale and alpha transitions on press
+- Added the ToggleCard component which combines a text label, description, and Switch composable into a unified, bordered card layout
+- Added the CompactColorPickerCard component for the color customization screen, allowing users to select from preset colors or see the current selection
+- Updated the BackArrowButton to be consistently positioned at the bottom-right of all panels and standardized its size and padding across different screen densities
+- Refactored the BouncyDialog component to support a fullScreen parameter and improved its enter/exit transitions using the new MotionTokens
+
+## Settings and Architecture
+- Modularized the settings screen into distinct panels: VisualEffectsPanel, FunctionalityPanel, ColorCustomizationPanel, OLEDPanel, ParticlesPanel, EffectsPanel, VerbosePanel, and AppSelectorPanel
+- Added a global UI Scale preference implemented via CompositionLocalProvider, allowing the user to scale the app density to 75%, 100%, or 125% independent of system settings
+- Implemented a Preferences Versioning system that checks a const integer (PREFS_VERSION) and clears shared preferences if the saved version is older to prevent data conflicts
+- - Wrapped font loading in a try-catch block to safely fallback to the system default font family if the custom Quicksand font fails to load
+Added Haptic Feedback helper functions (performSuccessHaptic, performErrorHaptic) to execute specific vibration patterns for different interaction types
+
+## New Features and Functionality
+- Added Aggressive Mode functionality which includes a warning dialog explaining potential side effects like keyboard resets and connectivity loss
+- Implemented the App Targeting system (AppSelectorPanel) which scans installed packages using PackageManager and allows users to exclude specific apps from Aggressive Mode operations
+- Added Verbose Mode which captures shell command output and displays it in a scrollable text field within the VerbosePanel for debugging
+- Added a Developer Menu containing tools to send test notifications and boot notifications to verify system permission states
+- Implemented GPUWatch integration which triggers an Intent to open specific system settings activities where the overlay can be enabled
+- Added a GitHub Changelog fetcher that retrieves raw text data from the repository, parses Markdown-style headers and bullet points, and renders them in the ChangelogDialog
+- Added a Time Offset control in the Developer Panel to manually shift the internal clock for testing the Sun/Moon cycle without changing the system time
+
+## Layout and Responsiveness
+- Refactored the main layout logic to explicitly handle Landscape orientation by splitting the UI into a two-column row (Title on left, Content on right) instead of a single vertical column
+- Added specific padding and arrangement logic for Tablet devices (screenWidth >= 600dp) to prevent UI elements from stretching too wide
+- Updated the TitleSection to include animated gradient bars on either side of the GAMA text
+- Changed the greeting logic to include the user name if set, and updated the time-based greeting text (Morning, Evening, Up late)
+- Moved the Version Number and Changelog button to the bottom of the screen and added a fade animation to hide them when panels are open
+
+## Removed
+- Removed the static background gradient definition in favor of the animated state variables
+- Removed the standalone font definitions for Regular and SemiBold weights in favor of a unified font family definition
+- Removed hardcoded animation duration integers in favor of the MotionTokens object
+- Removed the single-column settings list in favor of the new nested panel architecture
