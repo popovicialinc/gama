@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Main app theme -->
+    <style name="Theme.GAMA" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- This color is used BEFORE Compose draws -->
+        <item name="android:windowBackground">@color/app_background</item>
+    </style>
+
+    <!-- Splash / launch theme -->
+    <style name="Theme.GAMA.Splash" parent="Theme.SplashScreen">
+        <!-- Android 12+ -->
+        <item name="windowSplashScreenBackground">@color/app_background</item>
+
+        <!-- Android 11 and below -->
+        <item name="android:windowBackground">@color/app_background</item>
+
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/app_background</item>
+
+        <!-- Switches automatically to Theme.GAMA -->
+        <item name="postSplashScreenTheme">@style/Theme.GAMA</item>
+    </style>
+
+</resources>
