@@ -25,5 +25,3 @@
 - Improved haptic feedback integration and back-handler consistency
 - Enhanced theme and color application across new components
 - General code organization and cleanup for maintainability
-
-This release focuses on delivering a significantly more immersive and polished user experience while adding practical new functionality for advanced users.
