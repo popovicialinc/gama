@@ -4,8 +4,16 @@
 
 <br>
 
+<br>
 
 # **Overview**
+
+<p align="left">
+  <img src="https://img.shields.io/badge/Android-B3E5FC?style=for-the-badge&logo=android&logoColor=333" />
+  <img src="https://img.shields.io/badge/Galaxy_S23-C8E6C9?style=for-the-badge&logo=samsung&logoColor=333" />
+  <img src="https://img.shields.io/badge/One_UI_7-F8BBD0?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/No_Root-E1BEE7?style=for-the-badge" />
+</p>
 
 **GPU API Manager for Android-based devices (GAMA) is an application that lets you switch the GPU rendering API on your Android device without requiring root access**
 
@@ -20,13 +28,6 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 
 <br>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Android-B3E5FC?style=for-the-badge&logo=android&logoColor=333" />
-  <img src="https://img.shields.io/badge/Galaxy_S23-C8E6C9?style=for-the-badge&logo=samsung&logoColor=333" />
-  <img src="https://img.shields.io/badge/One_UI_7-F8BBD0?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/No_Root-E1BEE7?style=for-the-badge" />
-</p>
-
 <br>
 
 # **Get started on your platform**
@@ -34,42 +35,6 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 * 🤖 [**Android**](https://github.com/popovicialinc/gama/blob/main/README.md#gama-for-android)
 * 🖥️ [**Windows**](https://github.com/popovicialinc/gama/blob/main/README.md#gama-for-windows-batch)
 * 🐧 [**Linux**](https://github.com/Ameen-Sha-Cheerangan/s23-vulkan-support) (adapted by Ameen Sha Cheerangan)
-
-<br>
-
-# **How it works**
-
-GAMA uses Shizuku to gain permission to execute Android shell commands normally available via adb. Specifically, the app:
-
-* Executes renderer-related system commands
-* Modifies graphics API selection behavior at runtime
-* Does not modify the boot image or system partitions
-* Does not persist changes across factory resets
-
-All commands are executed only **after** explicit user permission is granted via Shizuku.
-
-<br>
-
-# **Privacy**
-
-GAMA:
-* Does not collect analytics
-* Does not track users
-* Does not send data to third-party servers
-* Does not require network access for core functionality
-* The update checker only checks public GitHub release metadata
-
-<br>
-
-# **Licence**
-
-Copyright (c) 2026 popovicialinc
-
-<br>
-
-# **Source code**
-
-Full source code is available at: https://github.com/popovicialinc/gama
 
 <br>
 
@@ -129,12 +94,9 @@ As simple as that!
   </table>
 </div>
 
-
-
 <br>
 
 <br>
-
 
 # **GAMA for Windows (Batch)**
 
@@ -207,7 +169,7 @@ You're ready to race!
 </details>
 
 <details>
-<summary><b>🔸 Caused by **GAMA** (Batch "Aggressive" Profile Side Effects - Windows only)</b></summary>
+<summary><b>🔸 Caused by GAMA* ("Aggressive" Profile Side Effects)</b></summary>
 <br>
   <p><b>"Aggressive" Profile Warning</b></p>
   <p>Using the <b>Aggressive</b> profile for stopping background apps is nuclear. While 99% of users won't need this, be aware of the side effects:</p>
