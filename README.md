@@ -14,9 +14,7 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 * ❄️ **Lower-Running Temps**
 * 🔋 **Better Battery Life**
 * 🔓 **Zero Risk** - Root is not required, 100% Knox-safe.
-* 🛠️ **User Friendly** - Simple interface to toggle settings without complex terminal commands.
-
-Note: *GAMA **may** work with OneUI versions released before OneUI 7*
+* 🛠️ **User Friendly** - Simple interface to toggle settings without complex terminal commands
 
 ![Downloads](https://img.shields.io/github/downloads/popovicialinc/gama/total?style=flat&label=DOWNLOADS&labelColor=%23111111&color=%233b2f5b)
 
