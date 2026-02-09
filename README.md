@@ -39,6 +39,44 @@ Note: *GAMA **may** work with OneUI versions released before OneUI 7*
 
 <br>
 
+# **How it works**
+
+GAMA uses Shizuku to gain permission to execute Android shell commands normally available via adb. Specifically, the app:
+
+* Executes renderer-related system commands
+* Modifies graphics API selection behavior at runtime
+* Does not modify the boot image or system partitions
+* Does not persist changes across factory resets
+
+All commands are executed only **after** explicit user permission is granted via Shizuku.
+
+<br>
+
+# **Privacy**
+
+GAMA:
+* Does not collect analytics
+* Does not track users
+* Does not send data to third-party servers
+* Does not require network access for core functionality
+* The update checker only checks public GitHub release metadata
+
+<br>
+
+# **Licence**
+
+Copyright (c) 2026 popovicialinc
+
+<br>
+
+# **Source code**
+
+Full source code is available at: https://github.com/popovicialinc/gama
+
+<br>
+
+<br>
+
 # **GAMA for Android**
 
 ## **Prerequisites**
