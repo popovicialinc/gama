@@ -62,10 +62,10 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 * Click on either:
   * **Vulkan** - Lower temps, Better battery
   * **OpenGL** - Fallback option
- 
-*In the bottom-left corner of the app, there’s a button with three dots - that’s the settings menu. From there, you can choose your preferred theme (Auto, Dark or Light mode) and toggle visual effects on or off, such blur or animations, to suit your preference.*
 
 **Note**: If prompted, allow installation from unknown sources. (Settings > Apps > (in the top-right corner) Press the 3-dot button > Special access > Install unknown apps > Allow for your browser or file manager).
+
+**Heads up: You’ll need to run this script after every phone reboot.**
 
 As simple as that!
 
