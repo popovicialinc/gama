@@ -24,7 +24,10 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 * 🔓 **Zero Risk** - Root is not required, 100% Knox-safe.
 * 🛠️ **User Friendly** - Simple interface to toggle settings without complex terminal commands
 
+[![Buy Me A Coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=popovicialinc&button_colour=FFDD00&font_colour=000000&font_family=Inter&outline_colour=000000&coffee_colour=ffffff)](https://buymeacoffee.com/popovicialinc)
+
 ![Downloads](https://img.shields.io/github/downloads/popovicialinc/gama/total?style=flat&label=DOWNLOADS&labelColor=%23111111&color=%233b2f5b)
+
 
 <br>
 
