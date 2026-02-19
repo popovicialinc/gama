@@ -20,7 +20,7 @@
 While optimized for the Galaxy S23 lineup, this project is compatible with any Samsung device running One UI 7 or newer and aims to provide:
 
 * ❄️ **Lower-Running Temps**
-* 🔋 **Better Battery Life**
+* 🔋 **An Improved Battery Life**
 * 🔓 **Zero Risk** - Root is not required, 100% Knox-safe.
 * 🛠️ **User Friendly** - Simple interface to toggle settings without complex terminal commands
 
