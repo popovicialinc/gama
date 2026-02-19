@@ -27,7 +27,8 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 ![Downloads](https://img.shields.io/github/downloads/popovicialinc/gama/total?style=flat&label=DOWNLOADS&labelColor=%23111111&color=%233b2f5b)
 
 **Extra resources**
-
+* 📱 [**Does Vulkan work on my device?**](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
+    * If your device is not listed, please kindly follow [this link](https://forms.gle/qYUHHhaQNLiY9i1MA) where you will be able to fill out a form - The relevant, collected data will be added to the [spreadsheet](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
 * 💡 [**Suggestion Box**](https://forms.gle/5vFWyMEsReFwPo489)
 * ☕ [**Buy me a Coffee!**](https://buymeacoffee.com/popovicialinc)
 
@@ -105,12 +106,12 @@ As simple as that!
 
 # **GAMA for Windows (Batch)**
 
-*DEPRECATED IN FAVOUR OF "**Gama** for Android"*
+*Deprecated in favour of [Gama for Android](https://github.com/popovicialinc/gama?tab=readme-ov-file#gama-for-android)*
 
 ## **Prerequisites**
 * **A Windows PC**
 * **Your Android device** ([with USB Debugging enabled](https://github.com/popovicialinc/gama/blob/main/README.md#to-enable-usb-debugging))
-* **The latest version of** [**GAMA**](https://github.com/popovicialinc/gama/releases/latest).
+* **The latest version of** [**GAMA for Windows**](https://github.com/popovicialinc/gama/releases/tag/v1.5.1).
 
 ## **Installation & Usage**
 * Extract the .zip archive of **GAMA** 
