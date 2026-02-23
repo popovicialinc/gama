@@ -15,19 +15,22 @@
   <img src="https://img.shields.io/badge/No_Root-E1BEE7?style=for-the-badge" />
 </p>
 
-**GPU API Manager for Android-based devices (GAMA) is an application that lets you switch the GPU rendering API on your Android device without requiring root access**
+**Graphics API Manager for Android (GAMA) is an application that lets you switch the GPU rendering API on your Android device without requiring root access**
 
 While optimized for the Galaxy S23 lineup, this project is compatible with any Samsung device running One UI 7 or newer and aims to provide:
 
 * ❄️ **Lower-Running Temps**
-* 🔋 **Better Battery Life**
+* 🔋 **An Improved Battery Life**
 * 🔓 **Zero Risk** - Root is not required, 100% Knox-safe.
 * 🛠️ **User Friendly** - Simple interface to toggle settings without complex terminal commands
 
-[![Buy Me A Coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=popovicialinc&button_colour=FFDD00&font_colour=000000&font_family=Inter&outline_colour=000000&coffee_colour=ffffff)](https://buymeacoffee.com/popovicialinc)
-
 ![Downloads](https://img.shields.io/github/downloads/popovicialinc/gama/total?style=flat&label=DOWNLOADS&labelColor=%23111111&color=%233b2f5b)
 
+**Extra resources**
+* 📱 [**Does Vulkan work on my device?**](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
+    * If your device is not listed, please kindly follow [this link](https://forms.gle/qYUHHhaQNLiY9i1MA) where you will be able to fill out a form - The relevant, collected data will be added to the [spreadsheet](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
+* 💡 [**Suggestion Box**](https://forms.gle/5vFWyMEsReFwPo489)
+* ☕ [**Buy me a Coffee!**](https://buymeacoffee.com/popovicialinc)
 
 <br>
 
@@ -43,7 +46,7 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 
 <br>
 
-# **GAMA for Android**
+# **GAMA on Android**
 
 ## **Prerequisites**
 
@@ -101,14 +104,14 @@ As simple as that!
 
 <br>
 
-# **GAMA for Windows (Batch)**
+# **GAMA on Windows (Batch)**
 
-*DEPRECATED IN FAVOUR OF "**Gama** for Android"*
+*Deprecated in favour of [Gama for Android](https://github.com/popovicialinc/gama?tab=readme-ov-file#gama-for-android)*
 
 ## **Prerequisites**
 * **A Windows PC**
 * **Your Android device** ([with USB Debugging enabled](https://github.com/popovicialinc/gama/blob/main/README.md#to-enable-usb-debugging))
-* **The latest version of** [**GAMA**](https://github.com/popovicialinc/gama/releases/latest).
+* **The latest version of** [**GAMA for Windows**](https://github.com/popovicialinc/gama/releases/tag/v1.5.1).
 
 ## **Installation & Usage**
 * Extract the .zip archive of **GAMA** 
