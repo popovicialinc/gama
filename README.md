@@ -29,7 +29,7 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
 **Extra resources**
 * 📱 [**Does Vulkan work on my device?**](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
     * If your device is not listed, please kindly follow [this link](https://forms.gle/qYUHHhaQNLiY9i1MA) where you will be able to fill out a form - The relevant, collected data will be added to the [spreadsheet](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
-    * In case your device is unresponsive or unstable under Vulkan, press and hold Power + Volume Down for 5-10 seconds to force a restart, after which your device will return to normal!
+    * In case your device is unstable or unresponsive under Vulkan, press and hold Power + Volume Down for 5-10 seconds to force a restart, after which your device will return to normal!
 * 💡 [**Suggestion Box**](https://forms.gle/5vFWyMEsReFwPo489)
 * ☕ [**Buy me a Coffee!**](https://buymeacoffee.com/popovicialinc)
 
