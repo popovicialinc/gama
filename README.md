@@ -17,7 +17,7 @@
 
 **Graphics API Manager for Android (GAMA) is an application that lets you switch the GPU rendering API on your Android device without requiring root access**
 
-While optimized for the Galaxy S23 lineup, this project is compatible with any Samsung device running One UI 7 or newer and aims to provide:
+While optimized for the Samsung Galaxy S23 lineup, this project is compatible with any Android device running One UI 7 or newer and aims to provide:
 
 * ❄️ **Lower-Running Temps**
 * 🔋 **An Improved Battery Life**
@@ -29,6 +29,7 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 **Extra resources**
 * 📱 [**Does Vulkan work on my device?**](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
     * If your device is not listed, please kindly follow [this link](https://forms.gle/qYUHHhaQNLiY9i1MA) where you will be able to fill out a form - The relevant, collected data will be added to the [spreadsheet](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
+    * In case your device is unresponsive or unstable under Vulkan, press and hold Power + Volume Down for 5-10 seconds to force a restart, after which your device will return to normal!
 * 💡 [**Suggestion Box**](https://forms.gle/5vFWyMEsReFwPo489)
 * ☕ [**Buy me a Coffee!**](https://buymeacoffee.com/popovicialinc)
 
