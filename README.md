@@ -17,9 +17,9 @@
 
 **Graphics API Manager for Android (GAMA) is an application that lets you switch the GPU rendering API on your Android device without requiring root access**
 
-While optimized for the Galaxy S23 lineup, this project is compatible with any Samsung device running One UI 7 or newer and aims to provide:
+While optimized for the Samsung Galaxy S23 lineup, this project is compatible with any modern Android device and aims to provide:
 
-* ❄️ **Lower-Running Temps**
+* ❄️ **Lower-running Temps**
 * 🔋 **An Improved Battery Life**
 * 🔓 **Zero Risk** - Root is not required, 100% Knox-safe.
 * 🛠️ **User Friendly** - Simple interface to toggle settings without complex terminal commands
@@ -29,8 +29,9 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 **Extra resources**
 * 📱 [**Does Vulkan work on my device?**](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
     * If your device is not listed, please kindly follow [this link](https://forms.gle/qYUHHhaQNLiY9i1MA) where you will be able to fill out a form - The relevant, collected data will be added to the [spreadsheet](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
+    * In case your device is unstable or unresponsive under Vulkan, press and hold Power + Volume Down for 5-10 seconds to force a restart, after which your device will return to normal!
 * 💡 [**Suggestion Box**](https://forms.gle/5vFWyMEsReFwPo489)
-* ☕ [**Buy me a Coffee!**](https://buymeacoffee.com/popovicialinc)
+* ☕ If you want to support the development of GAMA, [**consider donating**](https://buymeacoffee.com/popovicialinc)!
 
 <br>
 
@@ -64,7 +65,6 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
     * Open **Shizuku** and select the **second option** from the top labeled *Authorized Applications*
     * **Make sure the toggle next to **GAMA** is turned on**.
     * *Clear **GAMA** from your Recents menu* so the app can refresh and check for permissions again.
-    * Once completed, it should display "**Shizuku is running**✅".
 * Click on either:
   * **Vulkan** - Lower temps, Better battery
   * **OpenGL** - Fallback option
