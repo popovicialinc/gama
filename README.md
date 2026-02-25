@@ -65,7 +65,6 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
     * Open **Shizuku** and select the **second option** from the top labeled *Authorized Applications*
     * **Make sure the toggle next to **GAMA** is turned on**.
     * *Clear **GAMA** from your Recents menu* so the app can refresh and check for permissions again.
-    * Once completed, it should display "**Shizuku is running**✅".
 * Click on either:
   * **Vulkan** - Lower temps, Better battery
   * **OpenGL** - Fallback option
