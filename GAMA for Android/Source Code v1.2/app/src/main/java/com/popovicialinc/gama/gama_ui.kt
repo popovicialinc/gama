@@ -3664,65 +3664,65 @@ fun TitleSection(colors: ThemeColors, isSmallScreen: Boolean, isLandscape: Boole
     // ── Greeting pools per time period ───────────────────────────────────────
     val greetingPool: List<String> = when (currentHour) {
         in 0..5 -> if (userName.isNotEmpty()) listOf(
-            "Still up, $userName. 🌙",
+            "Still up, $userName? 🌙",
             "The world is quiet, $userName. 🌙",
             "Somewhere between today and tomorrow, $userName. 🌙",
             "The quiet hours, $userName. 🌙",
             "Some nights are for thinking, $userName. 🌙"
         ) else listOf(
-            "Still up. 🌙",
+            "Still up? 🌙",
             "The world is quiet. 🌙",
             "Somewhere between today and tomorrow. 🌙",
             "The quiet hours. 🌙",
             "Some nights are for thinking. 🌙"
         )
         in 6..11 -> if (userName.isNotEmpty()) listOf(
-            "Good morning, $userName. ☀️",
+            "Good morning, $userName! ☀️",
             "A fresh start, $userName. ☀️",
             "The world is quiet, $userName. ☀️",
             "The world can wait, $userName. ☀️",
-            "Up early, $userName. ☀️"
+            "Up early, $userName? ☀️"
         ) else listOf(
-            "Good morning. ☀️",
+            "Good morning! ☀️",
             "A fresh start. ☀️",
             "The world is quiet. ☀️",
             "The world can wait. ☀️",
-            "Up early. ☀️"
+            "Up early? ☀️"
         )
         in 12..16 -> if (userName.isNotEmpty()) listOf(
-            "Hey, $userName. 👋",
+            "Hey, $userName! 👋",
             "Welcome back, $userName. 👋",
             "The world can wait, $userName. 👋",
-            "Good afternoon, $userName. 👋",
-            "There you are, $userName. 👋"
+            "Good afternoon, $userName! 👋",
+            "There you are, $userName! 👋"
         ) else listOf(
-            "Hey. 👋",
+            "Hey! 👋",
             "Welcome back. 👋",
             "The world can wait. 👋",
-            "Good afternoon. 👋",
-            "There you are. 👋"
+            "Good afternoon! 👋",
+            "There you are! 👋"
         )
         in 17..22 -> if (userName.isNotEmpty()) listOf(
-            "Good evening, $userName. 🌙",
+            "Good evening, $userName! 🌙",
             "The world can wait, $userName. 🌙",
             "Winding down, $userName? 🌙",
             "The quiet hours, $userName. 🌙",
             "Some nights are for thinking, $userName. 🌙"
         ) else listOf(
-            "Good evening. 🌙",
+            "Good evening! 🌙",
             "The world can wait. 🌙",
             "Winding down? 🌙",
             "The quiet hours. 🌙",
             "Some nights are for thinking. 🌙"
         )
         else -> if (userName.isNotEmpty()) listOf(
-            "Still up, $userName. 🌙",
+            "Still up, $userName? 🌙",
             "The quiet hours, $userName. 🌙",
             "Somewhere between today and tomorrow, $userName. 🌙",
             "Some nights are for thinking, $userName. 🌙",
             "The world can wait, $userName. 🌙"
         ) else listOf(
-            "Still up. 🌙",
+            "Still up? 🌙",
             "The quiet hours. 🌙",
             "Somewhere between today and tomorrow. 🌙",
             "Some nights are for thinking. 🌙",
@@ -10164,10 +10164,10 @@ fun PanelBackButton(
     scrollState: ScrollState? = null,
     modifier: Modifier = Modifier
 ) {
-    // Hide the floating overlay when the content fits on screen — it would overlap
-    // the last card. The scroll state is known after first layout, so this correctly
-    // suppresses the button until a scroll is actually possible.
-    if (scrollState != null && scrollState.maxValue == 0) return
+    // scrollState is kept as a parameter for future use (e.g. auto-scroll-to-top on tap),
+    // but the back button is always rendered regardless of whether the content scrolls.
+    // Hiding it when content fits on screen caused panels to have no visible back button
+    // on larger displays or when panel content was short.
 
     val animLevel = LocalAnimationLevel.current
     val btnSize  = if (isSmallScreen) 48.dp else 52.dp
