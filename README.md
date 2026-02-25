@@ -73,7 +73,9 @@ While optimized for the Galaxy S23 lineup, this project is compatible with any S
 
 **Heads up: You’ll need to run this script after every phone reboot.**
 
-As simple as that!
+### Automation via Tasker
+
+* GAMA supports automation via Tasker. See the [setup guide](https://github.com/popovicialinc/gama/blob/main/GAMA%20for%20Android/GAMA_Tasker_Guide.pdf) to get started.
 
 ## 📷 **Photos**
 <div>
