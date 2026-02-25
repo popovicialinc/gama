@@ -17,7 +17,7 @@
 
 **Graphics API Manager for Android (GAMA) is an application that lets you switch the GPU rendering API on your Android device without requiring root access**
 
-While optimized for the Samsung Galaxy S23 lineup, this project is compatible with any Android device running One UI 7 or newer and aims to provide:
+While optimized for the Samsung Galaxy S23 lineup, this project is compatible with any modern Android device and aims to provide:
 
 * ❄️ **Lower-Running Temps**
 * 🔋 **An Improved Battery Life**
