@@ -78,9 +78,11 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
 * GAMA supports automation via Tasker. See the [setup guide](https://github.com/popovicialinc/gama/blob/main/GAMA%20for%20Android/GAMA_Tasker_Guide.pdf) to get started.
 
 ## 📷 **Photos**
-<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: flex-start;">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/0.png" style="width: 100%; max-width: 500px; height: auto;">
+<p align="center">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/0.png" width="750">
+</p>
 
+<p align="center">
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/1.png" width="250">
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/2.png" width="250">
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/3.png" width="250">
@@ -91,7 +93,7 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/8.png" width="250">
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/9.png" width="250">
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/10.png" width="250">
-</div>
+</p>
 
 <br>
 
