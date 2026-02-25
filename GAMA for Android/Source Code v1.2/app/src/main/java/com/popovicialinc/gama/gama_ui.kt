@@ -5264,7 +5264,7 @@ fun ShizukuHelpDialog(
             Text(
                 text = when (helpType) {
                     "not_running" -> "Shizuku needs to be running for GAMA to work.\n\n1. Open the Shizuku app\n2. Tap 'Start' to activate the service\n3. Return to GAMA\n\nIf Shizuku won't start, follow the wireless debugging instructions in the Shizuku app."
-                    "permission" -> "GAMA needs permission to use Shizuku.\n\n1. Open Shizuku\n2. Tap 'Authorized application'\n3. Find GAMA and enable it\n4. Close GAMA from your recents\n5. Reopen GAMA\n\nThe status should now show \"Shizuku is running ✅\""
+                    "permission" -> "GAMA needs permission to use Shizuku.\n\n1. Open Shizuku\n2. Tap 'Authorized application'\n3. Find GAMA and enable it\n4. Close GAMA from your recents\n5. Reopen GAMA\n"
                     else -> "Unknown error"
                 },
                 fontSize = ts.bodyLarge,
