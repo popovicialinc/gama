@@ -5823,168 +5823,42 @@ fun ResourcesPanel(
                     fontWeight = FontWeight.Bold
                 )
                 AnimatedElement(visible = visible, staggerIndex = 1,
-                    totalItems = 4) {
-                    if (isLandscape) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            SettingsNavigationCard(
-                                title = "GITHUB REPOSITORY",
-                                description = "Source code, releases & issue tracker",
-                                onClick = {
-                                    onLinkSelected(
-                                        "https://github.com/popovicialinc/gama",
-                                        "GitHub Repository",
-                                        "GAMA is open source. The repository has the full source code, release history, and an issue tracker where bugs get filed and discussed. If something is broken or you want to see how it works under the hood, this is the place."
-                                    )
-                                },
-                                isSmallScreen = isSmallScreen,
-                                colors = colors,
-                                cardBackground = cardBackground,
-                                enabled = true,
-                                oledMode = oledMode,
-                                modifier = Modifier.weight(1f)
+                    totalItems = 2) {
+                    SettingsNavigationCard(
+                        title = "GITHUB REPOSITORY",
+                        description = "Source code, releases & issue tracker",
+                        onClick = {
+                            onLinkSelected(
+                                "https://github.com/popovicialinc/gama",
+                                "GitHub Repository",
+                                "GAMA is open source. The repository has the full source code, release history, and an issue tracker where bugs get filed and discussed. If something is broken or you want to see how it works under the hood, this is the place."
                             )
-                            SettingsNavigationCard(
-                                title = "SUGGESTION BOX",
-                                description = "Have an idea? Tell us what you think",
-                                onClick = {
-                                    onLinkSelected(
-                                        "https://docs.google.com/forms/d/e/1FAIpQLSdQIm49RciDKQ0ese2wWonMBZpOEFD_f3Ki0hNrprZjjGSdKQ/viewform",
-                                        "Suggestion Box",
-                                        "Got a feature idea, something that feels off, or just an opinion about how GAMA works? This is a short form and every response actually gets read. No account needed."
-                                    )
-                                },
-                                isSmallScreen = isSmallScreen,
-                                colors = colors,
-                                cardBackground = cardBackground,
-                                enabled = true,
-                                oledMode = oledMode,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    } else {
-                        SettingsNavigationCard(
-                            title = "GITHUB REPOSITORY",
-                            description = "Source code, releases & issue tracker",
-                            onClick = {
-                                onLinkSelected(
-                                    "https://github.com/popovicialinc/gama",
-                                    "GitHub Repository",
-                                    "GAMA is open source. The repository has the full source code, release history, and an issue tracker where bugs get filed and discussed. If something is broken or you want to see how it works under the hood, this is the place."
-                                )
-                            },
-                            isSmallScreen = isSmallScreen,
-                            colors = colors,
-                            cardBackground = cardBackground,
-                            enabled = true,
-                            oledMode = oledMode
-                        )
-                    }
+                        },
+                        isSmallScreen = isSmallScreen,
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        enabled = true,
+                        oledMode = oledMode
+                    )
                 }
                 AnimatedElement(visible = visible, staggerIndex = 2,
-                    totalItems = 4) {
-                    if (isLandscape) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            SettingsNavigationCard(
-                                title = "VULKAN COMPATIBILITY",
-                                description = "Does Vulkan work on my device? 📱",
-                                onClick = {
-                                    onLinkSelected(
-                                        "https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?gid=242381638#gid=242381638",
-                                        "Vulkan Compatibility List",
-                                        "Vulkan doesn't behave the same on every Android device — some phones run it flawlessly, others see graphical glitches, crashes, or no improvement at all. This list documents known Vulkan behaviour across real devices so you know what to expect before switching renderers."
-                                    )
-                                },
-                                isSmallScreen = isSmallScreen,
-                                colors = colors,
-                                cardBackground = cardBackground,
-                                enabled = true,
-                                oledMode = oledMode,
-                                modifier = Modifier.weight(1f)
+                    totalItems = 2) {
+                    SettingsNavigationCard(
+                        title = "MY DEVICE REPORT 📋",
+                        description = "Something feels off? Tell us about it!",
+                        onClick = {
+                            onLinkSelected(
+                                "https://github.com/popovicialinc/gama/issues",
+                                "Device Report Form",
+                                "If Vulkan is crashing, causing visual glitches, or doing something unexpected on your device, reporting it adds your hardware to the known behaviour list. It takes two minutes and helps narrow down what actually works across different phones."
                             )
-                            SettingsNavigationCard(
-                                title = "MY DEVICE REPORT 📋",
-                                description = "Something feels off? Tell us about it!",
-                                onClick = {
-                                    onLinkSelected(
-                                        "https://docs.google.com/forms/d/e/1FAIpQLSf4rtIaJZCHFsgfiJDptRgG4wJAk6CReM85GXqHG_GyEKa5aA/viewform",
-                                        "Device Report Form",
-                                        "If Vulkan is crashing, causing visual glitches, or doing something unexpected on your device, reporting it adds your hardware to the known behaviour list. It takes two minutes and helps narrow down what actually works across different phones."
-                                    )
-                                },
-                                isSmallScreen = isSmallScreen,
-                                colors = colors,
-                                cardBackground = cardBackground,
-                                enabled = true,
-                                oledMode = oledMode,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    } else {
-                        SettingsNavigationCard(
-                            title = "SUGGESTION BOX",
-                            description = "Have an idea? Tell us what you think",
-                            onClick = {
-                                onLinkSelected(
-                                    "https://docs.google.com/forms/d/e/1FAIpQLSdQIm49RciDKQ0ese2wWonMBZpOEFD_f3Ki0hNrprZjjGSdKQ/viewform",
-                                    "Suggestion Box",
-                                    "Got a feature idea, something that feels off, or just an opinion about how GAMA works? This is a short form and every response actually gets read. No account needed."
-                                )
-                            },
-                            isSmallScreen = isSmallScreen,
-                            colors = colors,
-                            cardBackground = cardBackground,
-                            enabled = true,
-                            oledMode = oledMode
-                        )
-                    }
-                }
-                AnimatedElement(visible = visible, staggerIndex = 3,
-                    totalItems = 4) {
-                    if (!isLandscape) {
-                        SettingsNavigationCard(
-                            title = "VULKAN COMPATIBILITY",
-                            description = "Does Vulkan work on my device? 📱",
-                            onClick = {
-                                onLinkSelected(
-                                    "https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?gid=242381638#gid=242381638",
-                                    "Vulkan Compatibility List",
-                                    "Vulkan doesn't behave the same on every Android device — some phones run it flawlessly, others see graphical glitches, crashes, or no improvement at all. This list documents known Vulkan behaviour across real devices so you know what to expect before switching renderers."
-                                )
-                            },
-                            isSmallScreen = isSmallScreen,
-                            colors = colors,
-                            cardBackground = cardBackground,
-                            enabled = true,
-                            oledMode = oledMode
-                        )
-                    }
-                }
-                AnimatedElement(visible = visible, staggerIndex = 4,
-                    totalItems = 4) {
-                    if (!isLandscape) {
-                        SettingsNavigationCard(
-                            title = "MY DEVICE REPORT 📋",
-                            description = "Something feels off? Tell us about it!",
-                            onClick = {
-                                onLinkSelected(
-                                    "https://docs.google.com/forms/d/e/1FAIpQLSf4rtIaJZCHFsgfiJDptRgG4wJAk6CReM85GXqHG_GyEKa5aA/viewform",
-                                    "Device Report Form",
-                                    "If Vulkan is crashing, causing visual glitches, or doing something unexpected on your device, reporting it adds your hardware to the known behaviour list. It takes two minutes and helps narrow down what actually works across different phones."
-                                )
-                            },
-                            isSmallScreen = isSmallScreen,
-                            colors = colors,
-                            cardBackground = cardBackground,
-                            enabled = true,
-                            oledMode = oledMode
-                        )
-                    }
+                        },
+                        isSmallScreen = isSmallScreen,
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        enabled = true,
+                        oledMode = oledMode
+                    )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
             }
