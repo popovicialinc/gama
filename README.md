@@ -101,7 +101,7 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
 
 # **GAMA on Windows (Batch)**
 
-*Deprecated in favour of [Gama for Android](https://github.com/popovicialinc/gama?tab=readme-ov-file#gama-for-android)*
+*Deprecated in favour of [Gama on Android](https://github.com/popovicialinc/gama?tab=readme-ov-file#gama-for-android)*
 
 ## **Prerequisites**
 * **A Windows PC**
