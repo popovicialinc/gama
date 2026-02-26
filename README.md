@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/video/gama_title_video.gif" width="100%" alt="GAMA Ultra 4K Banner">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/video/gama_title_video.gif" width="100%" alt="GAMA Ultra 4K Banner">
 </p>
 
 <br>
@@ -39,8 +39,8 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
 
 # **Get started on your platform**
 
-* 🤖 [**Android**](https://github.com/popovicialinc/gama/blob/main/README.md#gama-for-android)
-* 🖥️ [**Windows**](https://github.com/popovicialinc/gama/blob/main/README.md#gama-for-windows-batch)
+* 🤖 [**Android**](https://github.com/popovicialinc/gama?tab=readme-ov-file#gama-on-android)
+* 🖥️ [**Windows**](https://github.com/popovicialinc/gama_windows?tab=readme-ov-file#gama-on-windows-batch)
 * 🐧 [**Linux**](https://github.com/Ameen-Sha-Cheerangan/s23-vulkan-support) (adapted by Ameen Sha Cheerangan)
 
 <br>
@@ -79,82 +79,23 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
 
 ## 📷 **Photos**
 <p align="center">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/0.png" width="750">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/0.png" width="750">
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/1.png" width="250">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/2.png" width="250">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/3.png" width="250">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/4.png" width="250">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/5.png" width="250">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/6.png" width="250">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/7.png" width="250">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/8.png" width="250">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/9.png" width="250">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/10.png" width="250">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/11.png" width="250">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/12.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/1.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/2.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/3.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/4.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/5.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/6.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/7.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/8.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/9.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/10.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/11.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/12.png" width="250">
 </p>
-
-<br>
-
-<br>
-
-# **GAMA on Windows (Batch)**
-
-*Deprecated in favour of [Gama on Android](https://github.com/popovicialinc/gama?tab=readme-ov-file#gama-for-android)*
-
-## **Prerequisites**
-* **A Windows PC**
-* **Your Android device** ([with USB Debugging enabled](https://github.com/popovicialinc/gama/blob/main/README.md#to-enable-usb-debugging))
-* **The latest version of** [**GAMA for Windows**](https://github.com/popovicialinc/gama/releases/tag/v1.5.1).
-
-## **Installation & Usage**
-* Extract the .zip archive of **GAMA** 
-* Connect your device via USB to your PC
-  * Ensure [**USB Debugging**](https://github.com/popovicialinc/gama/tree/main?tab=readme-ov-file#to-enable-usb-debugging) is ON and only one device is connected.
-* Run "GAMA.bat"
-  * A user-friendly main menu will pop up. Don't worry, everything is well-explained and designed to be simple-to-use. You can't break anything.
-  * TIP: Don't run "GAMA.bat" as administrator, it breaks the UI!
-* Enjoy!
-
-**Heads up: You’ll need to run this script after every phone reboot.**
-
-### How to enable USB Debugging
-
-1. Settings > About phone > Software information
-2. Tap **Build number** 7 times until you see "Developer mode has been turned on".
-3. Go back to **Settings** > **Developer options**.
-4. Scroll down, find **USB Debugging**, and toggle it **ON**.
-
-You're ready to race!
-
-## **Photos**
-<div>
-  <table border=0>
-    <tr>
-      <td align="center">
-        <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_main_menu.png" width="399"><br>
-        <sub>Main Menu</sub>
-      </td>
-      <td align="center">
-        <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/gama_settings_renderer_vulkan.png" width="350"><br>
-        <sub>Choosing Aggressiveness Profile</sub>
-      </td>
-    </tr>
-    <tr>
-      <td align="center">
-        <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/error.png" width="350"><br>
-        <sub>Error State</sub>
-      </td>
-      <td align="center">
-        <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/success.png" width="350"><br>
-        <sub>Success Message</sub>
-      </td>
-    </tr>
-  </table>
-</div>
 
 <br>
 
