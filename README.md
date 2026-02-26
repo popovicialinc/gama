@@ -19,10 +19,10 @@
 
 While optimized for the Samsung Galaxy S23 lineup, this project is compatible with any modern Android device and aims to provide:
 
-* ❄️ **Lower-running Temps**
-* 🔋 **An Improved Battery Life**
-* 🔓 **Zero Risk** - Root is not required, 100% Knox-safe.
-* 🛠️ **User Friendly** - Simple interface to toggle settings without complex terminal commands
+* ❄️ **Lower-running temps**
+* 🔋 **An improved battery life**
+* 🔓 **Zero risk** - Root is not required, 100% Knox-safe.
+* 🛠️ **User-friendliness** - Simple yet beautiful UI to switch APIs without complex terminal commands
 
 ![Downloads](https://img.shields.io/github/downloads/popovicialinc/gama/total?style=flat&label=DOWNLOADS&labelColor=%23111111&color=%233b2f5b)
 
@@ -78,9 +78,11 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
 * GAMA supports automation via Tasker. See the [setup guide](https://github.com/popovicialinc/gama/blob/main/GAMA%20for%20Android/GAMA_Tasker_Guide.pdf) to get started.
 
 ## 📷 **Photos**
-<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: flex-start;">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/0.png" style="width: 100%; max-width: 500px; height: auto;">
+<p align="center">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/0.png" width="750">
+</p>
 
+<p align="center">
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/1.png" width="250">
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/2.png" width="250">
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/3.png" width="250">
@@ -91,7 +93,9 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/8.png" width="250">
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/9.png" width="250">
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/10.png" width="250">
-</div>
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/11.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/12.png" width="250">
+</p>
 
 <br>
 
@@ -99,7 +103,7 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
 
 # **GAMA on Windows (Batch)**
 
-*Deprecated in favour of [Gama for Android](https://github.com/popovicialinc/gama?tab=readme-ov-file#gama-for-android)*
+*Deprecated in favour of [Gama on Android](https://github.com/popovicialinc/gama?tab=readme-ov-file#gama-for-android)*
 
 ## **Prerequisites**
 * **A Windows PC**
