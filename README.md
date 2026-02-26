@@ -93,6 +93,8 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/8.png" width="250">
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/9.png" width="250">
   <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/10.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/11.png" width="250">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/refs/heads/main/Repository%20Stuff/12.png" width="250">
 </p>
 
 <br>
