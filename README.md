@@ -19,10 +19,10 @@
 
 While optimized for the Samsung Galaxy S23 lineup, this project is compatible with any modern Android device and aims to provide:
 
-* ❄️ **Lower-running Temps**
-* 🔋 **An Improved Battery Life**
-* 🔓 **Zero Risk** - Root is not required, 100% Knox-safe.
-* 🛠️ **User Friendly** - Simple interface to toggle settings without complex terminal commands
+* ❄️ **Lower-running temps**
+* 🔋 **An improved battery life**
+* 🔓 **Zero risk** - Root is not required, 100% Knox-safe.
+* 🛠️ **User-friendliness** - Simple yet beautiful UI to switch APIs without complex terminal commands
 
 ![Downloads](https://img.shields.io/github/downloads/popovicialinc/gama/total?style=flat&label=DOWNLOADS&labelColor=%23111111&color=%233b2f5b)
 
