@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/video/gama_title_video.gif" width="100%" alt="GAMA Ultra 4K Banner">
+  <img src="https://raw.githubusercontent.com/popovicialinc/gama/main/!assets/Repository%20Stuff/gama_title_video.gif" width="100%" alt="GAMA Ultra 4K Banner">
 </p>
 
 <br>
