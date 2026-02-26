@@ -1,0 +1,2560 @@
+Folder PATH listing for volume Windows
+Volume serial number is 34AE-D450
+C:\USERS\POPOV\DOCUMENTS\GITHUB\GAMA
+|   .gitignore
+|   build.gradle.kts
+|   gradle.properties
+|   gradlew
+|   gradlew.bat
+|   LICENSE.txt
+|   local.properties
+|   README.md
+|   settings.gradle.kts
+|   structure.txt
+|   version_android.txt
+|   
++---!assets
+|   |   GAMA_Tasker_Guide.pdf
+|   |   
+|   +---GAMA for Windows
+|   |   |   version.txt
+|   |   |   
+|   |   +---GAMA v1.5.2
+|   |   |   |   GAMA.bat
+|   |   |   |   
+|   |   |   \---bin
+|   |   |           adb.exe
+|   |   |           AdbWinApi.dll
+|   |   |           AdbWinUsbApi.dll
+|   |   |           aggressive_profile_learn_more.bat
+|   |   |           launch_all_apps.bat
+|   |   |           set_renderer.bat
+|   |   |           shizuku.bat
+|   |   |           
+|   |   \---GAMA-Core
+|   |       +---GAMA-OpenGL
+|   |       |       adb.exe
+|   |       |       AdbWinApi.dll
+|   |       |       AdbWinUsbApi.dll
+|   |       |       gama-opengl.bat
+|   |       |       
+|   |       \---GAMA-Vulkan
+|   |               adb.exe
+|   |               AdbWinApi.dll
+|   |               AdbWinUsbApi.dll
+|   |               gama-vulkan.bat
+|   |               
+|   \---Repository Stuff
+|       |   0.png
+|       |   1.png
+|       |   10.png
+|       |   2.png
+|       |   3.png
+|       |   4.png
+|       |   5.png
+|       |   6.png
+|       |   7.png
+|       |   9.png
+|       |   error.png
+|       |   gama_main_menu.png
+|       |   gama_settings_renderer_vulkan.png
+|       |   success.png
+|       |   
+|       \---video
+|           |   !gama_title_video.wfp
+|           |   gama_title_video.gif
+|           |   gama_title_video.mp4
+|           |   
+|           \---old gama title video
+|                   v1_gama_title_video.gif
+|                   v1_gama_title_video_high_quality_uncompressed_v1.mp4
+|                   
++---.gradle
+|   |   config.properties
+|   |   file-system.probe
+|   |   
+|   +---9.1.0
+|   |   |   gc.properties
+|   |   |   
+|   |   +---checksums
+|   |   |       checksums.lock
+|   |   |       md5-checksums.bin
+|   |   |       sha1-checksums.bin
+|   |   |       
+|   |   +---executionHistory
+|   |   |       executionHistory.bin
+|   |   |       executionHistory.lock
+|   |   |       
+|   |   +---expanded
+|   |   +---fileChanges
+|   |   |       last-build.bin
+|   |   |       
+|   |   +---fileHashes
+|   |   |       fileHashes.bin
+|   |   |       fileHashes.lock
+|   |   |       resourceHashesCache.bin
+|   |   |       
+|   |   \---vcsMetadata
+|   +---buildOutputCleanup
+|   |       buildOutputCleanup.lock
+|   |       cache.properties
+|   |       outputFiles.bin
+|   |       
+|   +---kotlin
+|   |   \---errors
+|   \---vcs-1
+|           gc.properties
+|           
++---.idea
+|   |   .name
+|   |   AndroidProjectSystem.xml
+|   |   assetWizardSettings.xml
+|   |   compiler.xml
+|   |   deploymentTargetSelector.xml
+|   |   gradle.xml
+|   |   misc.xml
+|   |   runConfigurations.xml
+|   |   vcs.xml
+|   |   workspace.xml
+|   |   
+|   +---caches
+|   |       deviceStreaming.xml
+|   |       
+|   \---inspectionProfiles
+|           Project_Default.xml
+|           
++---.kotlin
+|   +---errors
+|   |       errors-1769554741892.log
+|   |       
+|   \---sessions
++---app
+|   |   .gitignore
+|   |   build.gradle.kts
+|   |   proguard-rules.pro
+|   |   
+|   +---build
+|   |   +---generated
+|   |   |   +---res
+|   |   |   |   \---pngs
+|   |   |   |       \---debug
+|   |   |   \---updated_navigation_xml
+|   |   |       +---debug
+|   |   |       \---debugAndroidTest
+|   |   +---intermediates
+|   |   |   +---aar_metadata_check
+|   |   |   |   +---debug
+|   |   |   |   |   \---checkDebugAarMetadata
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---checkDebugAndroidTestAarMetadata
+|   |   |   +---android_res_source_set_path_map
+|   |   |   |   +---debug
+|   |   |   |   |   \---mapDebugSourceSetPaths
+|   |   |   |   |           file-map.txt
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---mapDebugAndroidTestSourceSetPaths
+|   |   |   |               file-map.txt
+|   |   |   |               
+|   |   |   +---annotation_processor_list
+|   |   |   |   +---debug
+|   |   |   |   |   \---javaPreCompileDebug
+|   |   |   |   |           annotationProcessors.json
+|   |   |   |   |           
+|   |   |   |   +---debugAndroidTest
+|   |   |   |   |   \---javaPreCompileDebugAndroidTest
+|   |   |   |   |           annotationProcessors.json
+|   |   |   |   |           
+|   |   |   |   \---debugUnitTest
+|   |   |   |       \---javaPreCompileDebugUnitTest
+|   |   |   |               annotationProcessors.json
+|   |   |   |               
+|   |   |   +---apk
+|   |   |   |   \---debug
+|   |   |   |           app-debug.apk
+|   |   |   |           output-metadata.json
+|   |   |   |           
+|   |   |   +---apk_ide_redirect_file
+|   |   |   |   +---debug
+|   |   |   |   |   \---createDebugApkListingFileRedirect
+|   |   |   |   |           redirect.txt
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---createDebugAndroidTestApkListingFileRedirect
+|   |   |   |               redirect.txt
+|   |   |   |               
+|   |   |   +---app_metadata
+|   |   |   |   \---debug
+|   |   |   |       \---writeDebugAppMetadata
+|   |   |   |               app-metadata.properties
+|   |   |   |               
+|   |   |   +---assets
+|   |   |   |   +---debug
+|   |   |   |   |   \---mergeDebugAssets
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---mergeDebugAndroidTestAssets
+|   |   |   +---built_in_kotlinc
+|   |   |   |   \---debug
+|   |   |   |       \---compileDebugKotlin
+|   |   |   |           \---classes
+|   |   |   |               +---com
+|   |   |   |               |   \---popovicialinc
+|   |   |   |               |       \---gama
+|   |   |   |               |           |   AdaptiveTypeScale.class
+|   |   |   |               |           |   C.class
+|   |   |   |               |           |   CelestialState.class
+|   |   |   |               |           |   ComposableSingletons$GamaWidgetKt.class
+|   |   |   |               |           |   ComposableSingletons$Gama_uiKt.class
+|   |   |   |               |           |   ComposableSingletons$MainActivityKt.class
+|   |   |   |               |           |   GamaWidget$provideGlance$1.class
+|   |   |   |               |           |   GamaWidget.class
+|   |   |   |               |           |   GamaWidgetKt.class
+|   |   |   |               |           |   GamaWidgetReceiver.class
+|   |   |   |               |           |   Gama_uiKt$AggressiveWarningDialog$2$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$AnimatedElement$1$1.class
+|   |   |   |               |           |   Gama_uiKt$AppSelectorPanel$1$1.class
+|   |   |   |               |           |   Gama_uiKt$AppSelectorPanel$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$AppSelectorPanel$2$1.class
+|   |   |   |               |           |   Gama_uiKt$AppSelectorPanel$3$1$1.class
+|   |   |   |               |           |   Gama_uiKt$AppSelectorPanel$3$2$1$1$5$1$1$4$1$1.class
+|   |   |   |               |           |   Gama_uiKt$AppSelectorPanel$3$2$1$1$5$1$1$4$2$2$1.class
+|   |   |   |               |           |   Gama_uiKt$BackArrowButton$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$BackArrowButton$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$BouncyDialog$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$BouncyDialog$2$1$2.class
+|   |   |   |               |           |   Gama_uiKt$BouncyDialog$2$1.class
+|   |   |   |               |           |   Gama_uiKt$BouncyDialog$5$1.class
+|   |   |   |               |           |   Gama_uiKt$BouncyDialog$7$1$1$2.class
+|   |   |   |               |           |   Gama_uiKt$BouncyDialog$7$1$1$3.class
+|   |   |   |               |           |   Gama_uiKt$BouncyDialog$7$1$1$4.class
+|   |   |   |               |           |   Gama_uiKt$BouncyDialog$7$1$1.class
+|   |   |   |               |           |   Gama_uiKt$BouncyDialog$7$1.class
+|   |   |   |               |           |   Gama_uiKt$ChangelogDialog$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$ChangelogDialog$1$2$1.class
+|   |   |   |               |           |   Gama_uiKt$ChangelogDialog$1$3$1$1.class
+|   |   |   |               |           |   Gama_uiKt$ChangelogDialog$1$3$2$1$1$1$2$1$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$ChangelogDialog$1$3$2$2$3$1$1$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$ChangelogIconButton$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$ChangelogIconButton$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$CleanTitle$1$1.class
+|   |   |   |               |           |   Gama_uiKt$ColorCustomizationPanel$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$ColorCustomizationPanel$1$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$CompactColorBox$1$1.class
+|   |   |   |               |           |   Gama_uiKt$CompactColorPickerCard$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$CompactColorPickerCard$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$DeveloperMenuDialog$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$DeveloperPanel$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$DialogButton$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$DialogButton$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$EasterEggDialog$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$EffectsPanel$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$EffectsPanel$1$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$ExternalLinkConfirmDialog$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$fetchChangelog$2.class
+|   |   |   |               |           |   Gama_uiKt$FlatButton$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$FlatButton$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$FunctionalityPanel$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$FunctionalityPanel$1$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$25$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$26$1$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$26$1$2.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$26$1$3.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$26$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$27$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$28$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$29$2$17$1$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$29$2$2$1$2$1$2$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$29$2$27$1$5$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$29$2$27$1$5$1$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$29$2$6$1$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$29$2$65$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$29$2$66$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$29$2$67$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$29$2$79$1$1$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$29$2$79$1$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$29$2$79$3$1$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$29$2$79$3$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$performErrorHaptic$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$performSuccessHaptic$1.class
+|   |   |   |               |           |   Gama_uiKt$GamaUI$savePreferences$1.class
+|   |   |   |               |           |   Gama_uiKt$getAllInstalledPackages$$inlined$sortedBy$1.class
+|   |   |   |               |           |   Gama_uiKt$GitHubDialog$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$GlideOptionSelector$2$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$GlideOptionSelector$2$2$1.class
+|   |   |   |               |           |   Gama_uiKt$GlideOptionSelector$2$3$1.class
+|   |   |   |               |           |   Gama_uiKt$GlideOptionSelector$2$4$1.class
+|   |   |   |               |           |   Gama_uiKt$IllustratedButton$2$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$IllustratedButton$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$IntegrationInfoCard$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$IntegrationInfoCard$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$IntegrationsPanel$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$IntegrationsPanel$1$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$NotificationsPanel$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$NotificationsPanel$1$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$NotificationsPanel$1$2$2$2$1$1$1$1$2$1.class
+|   |   |   |               |           |   Gama_uiKt$NotificationsPanel$1$2$2$5$1$1$1$2$1.class
+|   |   |   |               |           |   Gama_uiKt$OLEDPanel$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$PanelBackButton$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$PanelBackButton$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$ParticlesOverlay$1$1$listener$1.class
+|   |   |   |               |           |   Gama_uiKt$ParticlesOverlay$2$1$2.class
+|   |   |   |               |           |   Gama_uiKt$ParticlesOverlay$2$1.class
+|   |   |   |               |           |   Gama_uiKt$ParticlesOverlay$3$1.class
+|   |   |   |               |           |   Gama_uiKt$ParticlesOverlay_KL_9NY8$lambda$30$lambda$29$$inlined$onDispose$1.class
+|   |   |   |               |           |   Gama_uiKt$ParticlesOverlay_KL_9NY8$lambda$30$lambda$29$$inlined$onDispose$2.class
+|   |   |   |               |           |   Gama_uiKt$ParticlesOverlay_KL_9NY8$lambda$30$lambda$29$$inlined$onDispose$3.class
+|   |   |   |               |           |   Gama_uiKt$ParticlesPanel$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$ParticlesPanel$1$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$RendererCard$1$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$RendererCard$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$ResourcesPanel$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$ResourcesPanel$1$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$SecondaryIconButton$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$SecondaryIconButton$1$1.class
+|   |   |   |               |           |   Gama_uiKt$SettingsNavigationCard$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$SettingsNavigationCard$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$SettingsNavigationCard$1$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$SettingsNavigationCard$1$2$1.class
+|   |   |   |               |           |   Gama_uiKt$SettingsPanel$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$SettingsPanel$1$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$SettingsPanel$1$2$3$1.class
+|   |   |   |               |           |   Gama_uiKt$ShizukuHelpDialog$1$1.class
+|   |   |   |               |           |   Gama_uiKt$SuccessDialog$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$TitleSection$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$TitleSection$1$2$1$2$1.class
+|   |   |   |               |           |   Gama_uiKt$ToggleCard$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$ToggleCard$1$1.class
+|   |   |   |               |           |   Gama_uiKt$VerbosePanel$1$1$1$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$VisualEffectsPanel$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$VisualEffectsPanel$1$2$1$1.class
+|   |   |   |               |           |   Gama_uiKt$VisualEffectsPanel$1$2$2$3$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt$VisualEffectsPanel$1$2$2$3$1$1.class
+|   |   |   |               |           |   Gama_uiKt$WarningDialog$1$1$1.class
+|   |   |   |               |           |   Gama_uiKt.class
+|   |   |   |               |           |   MainActivity.class
+|   |   |   |               |           |   MotionTokens$Duration.class
+|   |   |   |               |           |   MotionTokens$Easing.class
+|   |   |   |               |           |   MotionTokens$Scale.class
+|   |   |   |               |           |   MotionTokens$Springs$SpringConfig.class
+|   |   |   |               |           |   MotionTokens$Springs.class
+|   |   |   |               |           |   MotionTokens.class
+|   |   |   |               |           |   ParticleState.class
+|   |   |   |               |           |   RendererTileService$onClick$1.class
+|   |   |   |               |           |   RendererTileService.class
+|   |   |   |               |           |   ShizukuHelper$applyCustomRenderers$1.class
+|   |   |   |               |           |   ShizukuHelper$applyCustomRenderersSuspend$2$1.class
+|   |   |   |               |           |   ShizukuHelper$applyCustomRenderersSuspend$2$3.class
+|   |   |   |               |           |   ShizukuHelper$applyCustomRenderersSuspend$2.class
+|   |   |   |               |           |   ShizukuHelper$checkVersion$2.class
+|   |   |   |               |           |   ShizukuHelper$getCurrentRenderer$2.class
+|   |   |   |               |           |   ShizukuHelper$runOpenGL$1.class
+|   |   |   |               |           |   ShizukuHelper$runOpenGLSuspend$2$1.class
+|   |   |   |               |           |   ShizukuHelper$runOpenGLSuspend$2$6.class
+|   |   |   |               |           |   ShizukuHelper$runOpenGLSuspend$2.class
+|   |   |   |               |           |   ShizukuHelper$runVulkan$1.class
+|   |   |   |               |           |   ShizukuHelper$runVulkanSuspend$2$1.class
+|   |   |   |               |           |   ShizukuHelper$runVulkanSuspend$2$6.class
+|   |   |   |               |           |   ShizukuHelper$runVulkanSuspend$2.class
+|   |   |   |               |           |   ShizukuHelper.class
+|   |   |   |               |           |   TaskerReceiver$Companion.class
+|   |   |   |               |           |   TaskerReceiver$onReceive$1.class
+|   |   |   |               |           |   TaskerReceiver.class
+|   |   |   |               |           |   ThemeColors$Companion.class
+|   |   |   |               |           |   ThemeColors.class
+|   |   |   |               |           |   WidgetActionCallback$onAction$3.class
+|   |   |   |               |           |   WidgetActionCallback.class
+|   |   |   |               |           |   
+|   |   |   |               |           \---ui
+|   |   |   |               |               \---theme
+|   |   |   |               |                       ColorKt.class
+|   |   |   |               |                       ThemeKt.class
+|   |   |   |               |                       
+|   |   |   |               \---META-INF
+|   |   |   |                       app.kotlin_module
+|   |   |   |                       
+|   |   |   +---compatible_screen_manifest
+|   |   |   |   \---debug
+|   |   |   |       \---createDebugCompatibleScreenManifests
+|   |   |   |               output-metadata.json
+|   |   |   |               
+|   |   |   +---compiled_navigation_res
+|   |   |   |   +---debug
+|   |   |   |   |   \---compileDebugNavigationResources
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---compileDebugAndroidTestNavigationResources
+|   |   |   +---compile_and_runtime_r_class_jar
+|   |   |   |   +---debug
+|   |   |   |   |   \---processDebugResources
+|   |   |   |   |           R.jar
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---processDebugAndroidTestResources
+|   |   |   |               R.jar
+|   |   |   |               
+|   |   |   +---compile_app_classes_jar
+|   |   |   |   \---debug
+|   |   |   |       \---bundleDebugClassesToCompileJar
+|   |   |   |               classes.jar
+|   |   |   |               
+|   |   |   +---compile_r_class_jar
+|   |   |   |   +---debug
+|   |   |   |   |   \---generateDebugRFile
+|   |   |   |   |           R.jar
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---generateDebugAndroidTestRFile
+|   |   |   |               R.jar
+|   |   |   |               
+|   |   |   +---compile_symbol_list
+|   |   |   |   +---debug
+|   |   |   |   |   \---generateDebugRFile
+|   |   |   |   |           R.txt
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---generateDebugAndroidTestRFile
+|   |   |   |               R.txt
+|   |   |   |               
+|   |   |   +---compressed_assets
+|   |   |   |   +---debug
+|   |   |   |   |   \---compressDebugAssets
+|   |   |   |   |       \---out
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---compressDebugAndroidTestAssets
+|   |   |   |           \---out
+|   |   |   +---data_binding_layout_info_type_merge
+|   |   |   |   +---debug
+|   |   |   |   |   \---mergeDebugResources
+|   |   |   |   |       \---out
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---mergeDebugAndroidTestResources
+|   |   |   |           \---out
+|   |   |   +---data_binding_layout_info_type_package
+|   |   |   |   +---debug
+|   |   |   |   |   \---packageDebugResources
+|   |   |   |   |       \---out
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---packageDebugAndroidTestResources
+|   |   |   |           \---out
+|   |   |   +---desugar_graph
+|   |   |   |   +---debug
+|   |   |   |   |   \---dexBuilderDebug
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---dexBuilderDebugAndroidTest
+|   |   |   |           \---out
+|   |   |   |               +---currentProject
+|   |   |   |               +---externalLibs
+|   |   |   |               +---mixedScopes
+|   |   |   |               \---otherProjects
+|   |   |   +---dex
+|   |   |   |   +---debug
+|   |   |   |   |   +---mergeExtDexDebug
+|   |   |   |   |   |       classes.dex
+|   |   |   |   |   |       classes2.dex
+|   |   |   |   |   |       classes3.dex
+|   |   |   |   |   |       
+|   |   |   |   |   +---mergeLibDexDebug
+|   |   |   |   |   |   +---0
+|   |   |   |   |   |   +---1
+|   |   |   |   |   |   +---10
+|   |   |   |   |   |   +---11
+|   |   |   |   |   |   +---12
+|   |   |   |   |   |   +---13
+|   |   |   |   |   |   +---14
+|   |   |   |   |   |   +---15
+|   |   |   |   |   |   +---2
+|   |   |   |   |   |   +---3
+|   |   |   |   |   |   +---4
+|   |   |   |   |   |   +---5
+|   |   |   |   |   |   +---6
+|   |   |   |   |   |   +---7
+|   |   |   |   |   |   +---8
+|   |   |   |   |   |   \---9
+|   |   |   |   |   \---mergeProjectDexDebug
+|   |   |   |   |       +---0
+|   |   |   |   |       |       classes.dex
+|   |   |   |   |       |       
+|   |   |   |   |       +---1
+|   |   |   |   |       |       classes.dex
+|   |   |   |   |       |       
+|   |   |   |   |       +---10
+|   |   |   |   |       +---11
+|   |   |   |   |       +---12
+|   |   |   |   |       +---13
+|   |   |   |   |       +---14
+|   |   |   |   |       +---15
+|   |   |   |   |       +---2
+|   |   |   |   |       +---3
+|   |   |   |   |       +---4
+|   |   |   |   |       +---5
+|   |   |   |   |       +---6
+|   |   |   |   |       +---7
+|   |   |   |   |       +---8
+|   |   |   |   |       \---9
+|   |   |   |   |               classes.dex
+|   |   |   |   |               
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       +---mergeExtDexDebugAndroidTest
+|   |   |   |       +---mergeLibDexDebugAndroidTest
+|   |   |   |       |   +---0
+|   |   |   |       |   +---1
+|   |   |   |       |   +---10
+|   |   |   |       |   +---11
+|   |   |   |       |   +---12
+|   |   |   |       |   +---13
+|   |   |   |       |   +---14
+|   |   |   |       |   +---15
+|   |   |   |       |   +---2
+|   |   |   |       |   +---3
+|   |   |   |       |   +---4
+|   |   |   |       |   +---5
+|   |   |   |       |   +---6
+|   |   |   |       |   +---7
+|   |   |   |       |   +---8
+|   |   |   |       |   \---9
+|   |   |   |       \---mergeProjectDexDebugAndroidTest
+|   |   |   |           +---0
+|   |   |   |           |       classes.dex
+|   |   |   |           |       
+|   |   |   |           +---1
+|   |   |   |           +---10
+|   |   |   |           +---11
+|   |   |   |           +---12
+|   |   |   |           +---13
+|   |   |   |           +---14
+|   |   |   |           +---15
+|   |   |   |           +---2
+|   |   |   |           +---3
+|   |   |   |           +---4
+|   |   |   |           +---5
+|   |   |   |           +---6
+|   |   |   |           +---7
+|   |   |   |           +---8
+|   |   |   |           \---9
+|   |   |   +---dex_archive_input_jar_hashes
+|   |   |   |   +---debug
+|   |   |   |   |   \---dexBuilderDebug
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---dexBuilderDebugAndroidTest
+|   |   |   |               out
+|   |   |   |               
+|   |   |   +---dex_number_of_buckets_file
+|   |   |   |   +---debug
+|   |   |   |   |   \---dexBuilderDebug
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---dexBuilderDebugAndroidTest
+|   |   |   |               out
+|   |   |   |               
+|   |   |   +---duplicate_classes_check
+|   |   |   |   +---debug
+|   |   |   |   |   \---checkDebugDuplicateClasses
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---checkDebugAndroidTestDuplicateClasses
+|   |   |   +---external_file_lib_dex_archives
+|   |   |   |   +---debug
+|   |   |   |   |   \---desugarDebugFileDependencies
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---desugarDebugAndroidTestFileDependencies
+|   |   |   +---external_libs_dex_archive
+|   |   |   |   +---debug
+|   |   |   |   |   \---dexBuilderDebug
+|   |   |   |   |       \---out
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---dexBuilderDebugAndroidTest
+|   |   |   |           \---out
+|   |   |   +---external_libs_dex_archive_with_artifact_transforms
+|   |   |   |   +---debug
+|   |   |   |   |   \---dexBuilderDebug
+|   |   |   |   |       \---out
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---dexBuilderDebugAndroidTest
+|   |   |   |           \---out
+|   |   |   +---incremental
+|   |   |   |   +---debug
+|   |   |   |   |   +---mergeDebugResources
+|   |   |   |   |   |   |   compile-file-map.properties
+|   |   |   |   |   |   |   merger.xml
+|   |   |   |   |   |   |   
+|   |   |   |   |   |   +---merged.dir
+|   |   |   |   |   |   \---stripped.dir
+|   |   |   |   |   \---packageDebugResources
+|   |   |   |   |       |   compile-file-map.properties
+|   |   |   |   |       |   merger.xml
+|   |   |   |   |       |   
+|   |   |   |   |       +---merged.dir
+|   |   |   |   |       \---stripped.dir
+|   |   |   |   +---debug-mergeJavaRes
+|   |   |   |   |   |   merge-state
+|   |   |   |   |   |   
+|   |   |   |   |   \---zip-cache
+|   |   |   |   |           +4+ew5JCLJ+tit46DZa0cw==
+|   |   |   |   |           +ezgRpV4mBxOdVOxgFQPig==
+|   |   |   |   |           +pUjym1Ro2HFAHQS2rYgBQ==
+|   |   |   |   |           07vuLzuBcRmqU+adH1aimQ==
+|   |   |   |   |           10aZkkg3QueFop8cVUD8rA==
+|   |   |   |   |           1kJ7kPbbKOIgcmSyW6gK9A==
+|   |   |   |   |           1NynBBtjFRyPPPe3WTNjAg==
+|   |   |   |   |           21KWf9WOsfEUDARbsh62uw==
+|   |   |   |   |           2LZmbXMnkjfetLwpIKZOhQ==
+|   |   |   |   |           2vbaZhg9B8gq6UDcHKvJwQ==
+|   |   |   |   |           3Bf9dr1oMMGFi2P4D4TDYg==
+|   |   |   |   |           3BMlvgcLeU+yFsL5Za2z3Q==
+|   |   |   |   |           3dPXAGCht3BqJWVfh23+iA==
+|   |   |   |   |           3laQInuvX4X8+JhmjqF8gw==
+|   |   |   |   |           3PP6rPX+aWVfNsMNNBNUhA==
+|   |   |   |   |           3PPaXpx9O7tBVPeAOWrhaQ==
+|   |   |   |   |           6CN0tDZicvuwIVghsvAwpw==
+|   |   |   |   |           6qY7ztJkg4s63tkjLnVQMQ==
+|   |   |   |   |           716Rkjoa7itvTNN+BUu6Lw==
+|   |   |   |   |           7Gdtifb5OvJ_mxqNY5rs0g==
+|   |   |   |   |           7oQ0AXayFUOGjXZCMbNGdQ==
+|   |   |   |   |           963i3GaCTkLJ9YxoK8_9Bg==
+|   |   |   |   |           9UCqunBnP3juBsLbRRrehg==
+|   |   |   |   |           aa7FBIOiomP7cW9xDNvMaw==
+|   |   |   |   |           ABJ8NAd4SJLO_2DqXwmAWQ==
+|   |   |   |   |           AmGzK8jIsYCC0n0wi3uVIA==
+|   |   |   |   |           aQrkcjNDnoaoRNp9gC00cQ==
+|   |   |   |   |           AvU1KwBLMQz9FtE+8I8w9Q==
+|   |   |   |   |           awZsCE9FQ1IoQ6KDMNO55Q==
+|   |   |   |   |           B73R5LBuJHBi2WlP_jub8A==
+|   |   |   |   |           b8xmKPi36aJq2EZK0jrf1A==
+|   |   |   |   |           bhOAe2aKgPDnh_ZgVhwB8Q==
+|   |   |   |   |           bwH0tAqLQuoZVw5Z1f4ibQ==
+|   |   |   |   |           CUpuMWutk1oCbN1CuuF06g==
+|   |   |   |   |           cwaHNOEmd8AY5hYU01GH7Q==
+|   |   |   |   |           db0jk7P2aheGMmfynTjBhw==
+|   |   |   |   |           dH0pmSjGTyeebCTgAe+BEw==
+|   |   |   |   |           dOkRUx+erJZYLalVpE0OQg==
+|   |   |   |   |           DrJR3WmkqhuSkulCQMvNyQ==
+|   |   |   |   |           E0goAPP765V8iygyJvoFLA==
+|   |   |   |   |           f1xpzrB2Sag342GJNq+BcQ==
+|   |   |   |   |           fej+JCMBa3zLfKSWuogYBg==
+|   |   |   |   |           FgmihRmgPtZh8uR0TLYaRA==
+|   |   |   |   |           Fhu24VJtGKQjs7QgCCKwxQ==
+|   |   |   |   |           FKLfPaSaFal8T5W4ilwVeg==
+|   |   |   |   |           GJFWcOwNem09QBKdQaKqOA==
+|   |   |   |   |           gZ9_TlIg649AquO9ocZVvQ==
+|   |   |   |   |           hBweqR7s_1Ilo4jqxN6EoA==
+|   |   |   |   |           HeILL6pFuDzU9Rr2b7BO0A==
+|   |   |   |   |           hEUgmbRWoVVb88_NFcXy_g==
+|   |   |   |   |           hwtV8+N8u_xTlP1WWOWQSw==
+|   |   |   |   |           HzsefSHoBr4_rpA4KtBlcg==
+|   |   |   |   |           IBv3OSG7ckniRRv8i3ogHA==
+|   |   |   |   |           J5SJPSJnEskD+PF12TtVtA==
+|   |   |   |   |           jnfvVOA7nfdHiJe7Bqybvg==
+|   |   |   |   |           KIJQZlbK_aY1nBNyoAbnBQ==
+|   |   |   |   |           kweoI0sc0Bhk4LxUCA5ptA==
+|   |   |   |   |           kWHqWRX3pZ386xi0e2nBDQ==
+|   |   |   |   |           L20O1DplghezDoJ5MADciw==
+|   |   |   |   |           lBYH4jmcHtHxz1Y85AiLSQ==
+|   |   |   |   |           lHW1XHuo_FG7e0yRzf20PA==
+|   |   |   |   |           LLqzZ6WbC8CZy03lyiYraQ==
+|   |   |   |   |           Lm1W9HVpRgLf01qA89oL_A==
+|   |   |   |   |           LusVY9lsTNk4mW34trnHLg==
+|   |   |   |   |           Mzz_xIw4DmeRtTDd3nyzLQ==
+|   |   |   |   |           NaIAX2xTc8vJqZXYciHPQw==
+|   |   |   |   |           njDrhxabX8RGAd_gWK_grg==
+|   |   |   |   |           NMXZP2NfZL2BqlSNDVMhEQ==
+|   |   |   |   |           No7Up4dH+UdqGEG8JG1sQg==
+|   |   |   |   |           nOcrEBXwG1gAgtavF3cqcQ==
+|   |   |   |   |           o+3zpT1Uk7MjTlDnJY8aXA==
+|   |   |   |   |           o1zb9qSCijQ+Bku3a7rafw==
+|   |   |   |   |           O2Mf1vaJkCYAzTXmWn2s5w==
+|   |   |   |   |           oHKLue6RasSiJwqiVmEpSw==
+|   |   |   |   |           omAaZNuR3xUYwx8dKbF+2Q==
+|   |   |   |   |           ouLf2dzcAVKDFAQSVZ6+tw==
+|   |   |   |   |           OyHkjDpT727nSpSdjQtFkA==
+|   |   |   |   |           pD0luCMyPJJEkISu9JM3lw==
+|   |   |   |   |           pgnSFDhshz2z60HjZ2NhfQ==
+|   |   |   |   |           Pivf_1h35PrcOJzNTX46iA==
+|   |   |   |   |           PnLynVovH2saFA10z3+8cg==
+|   |   |   |   |           pt1Iq4YQ2+6JAUwC8BpOMg==
+|   |   |   |   |           qBD9qIH0_dlyjXEXCDF4Dg==
+|   |   |   |   |           qq1trBuZl_apIJBxE1YV0w==
+|   |   |   |   |           QSQ3716YiQXPToLTmSM4NA==
+|   |   |   |   |           QuumI9Mqw663uO3mNBA3hQ==
+|   |   |   |   |           qWvbF1N3jK+xDeNh7jueSw==
+|   |   |   |   |           r+bkCWMwQK8GRqTyytf+PQ==
+|   |   |   |   |           RgaB0MLnp5m1UBTc49mVcA==
+|   |   |   |   |           Rkm8oMcRwpFQk2Y0n4QR3Q==
+|   |   |   |   |           rT4rSIvq2kwCjG66433bvA==
+|   |   |   |   |           rtQIp5xcm75XgJomr_q7LA==
+|   |   |   |   |           sc_yXZ7Ldhwygwn484XvGw==
+|   |   |   |   |           sI9xFWhzKvVaYFpCL9flTw==
+|   |   |   |   |           slPDw08tv1Ux9IOkmJTALg==
+|   |   |   |   |           tDmNTaxLvI+XSWyAYBTrwg==
+|   |   |   |   |           tMAXVSwyiPQG2Tm_ojyKuw==
+|   |   |   |   |           TVcZ12AI4AOkEjkJ3lJalw==
+|   |   |   |   |           twwifJ2ysabYRlbtlsNYkg==
+|   |   |   |   |           t_RTcZ4Rk2FDAF+_A3eH+A==
+|   |   |   |   |           UQ+HItlY28d+EDgbUc4OXQ==
+|   |   |   |   |           uTBPmPcLzctvYM2X2k7p+A==
+|   |   |   |   |           uuitjg+6bSINTgHNMkPIJw==
+|   |   |   |   |           uXmkDVfLBFzAyG8OSsJ3iA==
+|   |   |   |   |           vYeh2XmdBo8EUxx6mnBRVw==
+|   |   |   |   |           X2unvaAwh4SxI_aTRFv8QA==
+|   |   |   |   |           x3fgJEDqS0XgmrXcWaZaJQ==
+|   |   |   |   |           xcjjk4O5J0aTz5Gl1i74YA==
+|   |   |   |   |           Xmpr0e+4lvKDkcw1+3s5wg==
+|   |   |   |   |           XVQ9c8A+9cyivtma_7X0Aw==
+|   |   |   |   |           Y1lNjBtZxxLPx6VrBA74pA==
+|   |   |   |   |           y6pMCiYcog8hkXo4Sdsrzg==
+|   |   |   |   |           y8NgS8IZ9MWNJsDLEmZoNQ==
+|   |   |   |   |           ycFZ9aVsru2MnYXmBVtsxA==
+|   |   |   |   |           zcS_kETk5WZk4j_t71nB9g==
+|   |   |   |   |           ZOvSuNfZRvsFPJ1W0uDB7g==
+|   |   |   |   |           zt4_bx04UhPIZ7WPsnS7dA==
+|   |   |   |   |           _hMXKp86xAdjtnXoQYggMw==
+|   |   |   |   |           _JyU2Ucy0Nm71AmLfeiqRQ==
+|   |   |   |   |           _oAM8zw9qeszf7qBUiNfDQ==
+|   |   |   |   |           
+|   |   |   |   +---debugAndroidTest
+|   |   |   |   |   +---mergeDebugAndroidTestResources
+|   |   |   |   |   |   |   compile-file-map.properties
+|   |   |   |   |   |   |   merger.xml
+|   |   |   |   |   |   |   
+|   |   |   |   |   |   +---merged.dir
+|   |   |   |   |   |   \---stripped.dir
+|   |   |   |   |   \---packageDebugAndroidTestResources
+|   |   |   |   |       |   compile-file-map.properties
+|   |   |   |   |       |   merger.xml
+|   |   |   |   |       |   
+|   |   |   |   |       +---merged.dir
+|   |   |   |   |       \---stripped.dir
+|   |   |   |   +---debugAndroidTest-mergeJavaRes
+|   |   |   |   |   |   merge-state
+|   |   |   |   |   |   
+|   |   |   |   |   \---zip-cache
+|   |   |   |   +---mergeDebugAndroidTestAssets
+|   |   |   |   |       merger.xml
+|   |   |   |   |       
+|   |   |   |   +---mergeDebugAndroidTestJniLibFolders
+|   |   |   |   |       merger.xml
+|   |   |   |   |       
+|   |   |   |   +---mergeDebugAssets
+|   |   |   |   |       merger.xml
+|   |   |   |   |       
+|   |   |   |   +---mergeDebugJniLibFolders
+|   |   |   |   |       merger.xml
+|   |   |   |   |       
+|   |   |   |   +---packageDebug
+|   |   |   |   |   \---tmp
+|   |   |   |   |       \---debug
+|   |   |   |   |           |   dex-renamer-state.txt
+|   |   |   |   |           |   
+|   |   |   |   |           \---zip-cache
+|   |   |   |   |                   androidResources
+|   |   |   |   |                   javaResources0
+|   |   |   |   |                   
+|   |   |   |   \---packageDebugAndroidTest
+|   |   |   |       \---tmp
+|   |   |   |           \---debugAndroidTest
+|   |   |   |               |   dex-renamer-state.txt
+|   |   |   |               |   
+|   |   |   |               \---zip-cache
+|   |   |   |                       androidResources
+|   |   |   |                       javaResources0
+|   |   |   |                       
+|   |   |   +---java_res
+|   |   |   |   \---debug
+|   |   |   |       \---processDebugJavaRes
+|   |   |   |           \---out
+|   |   |   |               +---com
+|   |   |   |               |   \---popovicialinc
+|   |   |   |               |       \---gama
+|   |   |   |               |           \---ui
+|   |   |   |               |               \---theme
+|   |   |   |               \---META-INF
+|   |   |   |                       app.kotlin_module
+|   |   |   |                       
+|   |   |   +---linked_resources_binary_format
+|   |   |   |   +---debug
+|   |   |   |   |   \---processDebugResources
+|   |   |   |   |           linked-resources-binary-format-debug.ap_
+|   |   |   |   |           output-metadata.json
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---processDebugAndroidTestResources
+|   |   |   |               linked-resources-binary-format.ap_
+|   |   |   |               output-metadata.json
+|   |   |   |               
+|   |   |   +---local_only_symbol_list
+|   |   |   |   +---debug
+|   |   |   |   |   \---parseDebugLocalResources
+|   |   |   |   |           R-def.txt
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---parseDebugAndroidTestLocalResources
+|   |   |   |               R-def.txt
+|   |   |   |               
+|   |   |   +---manifest_merge_blame_file
+|   |   |   |   +---debug
+|   |   |   |   |   \---processDebugMainManifest
+|   |   |   |   |           manifest-merger-blame-debug-report.txt
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---processDebugAndroidTestManifest
+|   |   |   |               manifest-merger-blame-debug-androidTest-report.txt
+|   |   |   |               
+|   |   |   +---merged_java_res
+|   |   |   |   +---debug
+|   |   |   |   |   \---mergeDebugJavaResource
+|   |   |   |   |           base.jar
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---mergeDebugAndroidTestJavaResource
+|   |   |   |               feature-app.jar
+|   |   |   |               
+|   |   |   +---merged_jni_libs
+|   |   |   |   +---debug
+|   |   |   |   |   \---mergeDebugJniLibFolders
+|   |   |   |   |       \---out
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---mergeDebugAndroidTestJniLibFolders
+|   |   |   |           \---out
+|   |   |   +---merged_manifest
+|   |   |   |   \---debug
+|   |   |   |       \---processDebugMainManifest
+|   |   |   |               AndroidManifest.xml
+|   |   |   |               
+|   |   |   +---merged_manifests
+|   |   |   |   \---debug
+|   |   |   |       \---processDebugManifest
+|   |   |   |               AndroidManifest.xml
+|   |   |   |               output-metadata.json
+|   |   |   |               
+|   |   |   +---merged_native_libs
+|   |   |   |   \---debug
+|   |   |   |       \---mergeDebugNativeLibs
+|   |   |   |           \---out
+|   |   |   |               \---lib
+|   |   |   |                   +---arm64-v8a
+|   |   |   |                   |       libandroidx.graphics.path.so
+|   |   |   |                   |       
+|   |   |   |                   +---armeabi-v7a
+|   |   |   |                   |       libandroidx.graphics.path.so
+|   |   |   |                   |       
+|   |   |   |                   +---x86
+|   |   |   |                   |       libandroidx.graphics.path.so
+|   |   |   |                   |       
+|   |   |   |                   \---x86_64
+|   |   |   |                           libandroidx.graphics.path.so
+|   |   |   |                           
+|   |   |   +---merged_res
+|   |   |   |   +---debug
+|   |   |   |   |   \---mergeDebugResources
+|   |   |   |   |           drawable_ic_launcher_background.xml.flat
+|   |   |   |   |           drawable_ic_launcher_foreground.xml.flat
+|   |   |   |   |           drawable_ic_tile.xml.flat
+|   |   |   |   |           drawable_widget_bg_default.xml.flat
+|   |   |   |   |           drawable_widget_bg_opengl.xml.flat
+|   |   |   |   |           drawable_widget_bg_vulkan.xml.flat
+|   |   |   |   |           drawable_widget_btn_idle.xml.flat
+|   |   |   |   |           drawable_widget_btn_opengl_active.xml.flat
+|   |   |   |   |           drawable_widget_btn_vulkan_active.xml.flat
+|   |   |   |   |           drawable_widget_chip.xml.flat
+|   |   |   |   |           drawable_widget_inner_card.xml.flat
+|   |   |   |   |           font_quicksand_bold.ttf.flat
+|   |   |   |   |           layout_widget_initial_layout.xml.flat
+|   |   |   |   |           mipmap-anydpi-v26_ic_launcher.xml.flat
+|   |   |   |   |           mipmap-anydpi-v26_ic_launcher_round.xml.flat
+|   |   |   |   |           mipmap-hdpi_ic_launcher.webp.flat
+|   |   |   |   |           mipmap-hdpi_ic_launcher_foreground.webp.flat
+|   |   |   |   |           mipmap-hdpi_ic_launcher_round.webp.flat
+|   |   |   |   |           mipmap-mdpi_ic_launcher.webp.flat
+|   |   |   |   |           mipmap-mdpi_ic_launcher_foreground.webp.flat
+|   |   |   |   |           mipmap-mdpi_ic_launcher_round.webp.flat
+|   |   |   |   |           mipmap-xhdpi_ic_launcher.webp.flat
+|   |   |   |   |           mipmap-xhdpi_ic_launcher_foreground.webp.flat
+|   |   |   |   |           mipmap-xhdpi_ic_launcher_round.webp.flat
+|   |   |   |   |           mipmap-xxhdpi_ic_launcher.webp.flat
+|   |   |   |   |           mipmap-xxhdpi_ic_launcher_foreground.webp.flat
+|   |   |   |   |           mipmap-xxhdpi_ic_launcher_round.webp.flat
+|   |   |   |   |           mipmap-xxxhdpi_ic_launcher.webp.flat
+|   |   |   |   |           mipmap-xxxhdpi_ic_launcher_foreground.webp.flat
+|   |   |   |   |           mipmap-xxxhdpi_ic_launcher_round.webp.flat
+|   |   |   |   |           values-af_values-af.arsc.flat
+|   |   |   |   |           values-am_values-am.arsc.flat
+|   |   |   |   |           values-ar_values-ar.arsc.flat
+|   |   |   |   |           values-as_values-as.arsc.flat
+|   |   |   |   |           values-az_values-az.arsc.flat
+|   |   |   |   |           values-b+es+419_values-b+es+419.arsc.flat
+|   |   |   |   |           values-b+sr+Latn_values-b+sr+Latn.arsc.flat
+|   |   |   |   |           values-be_values-be.arsc.flat
+|   |   |   |   |           values-bg_values-bg.arsc.flat
+|   |   |   |   |           values-bn_values-bn.arsc.flat
+|   |   |   |   |           values-bs_values-bs.arsc.flat
+|   |   |   |   |           values-ca_values-ca.arsc.flat
+|   |   |   |   |           values-cs_values-cs.arsc.flat
+|   |   |   |   |           values-da_values-da.arsc.flat
+|   |   |   |   |           values-de_values-de.arsc.flat
+|   |   |   |   |           values-el_values-el.arsc.flat
+|   |   |   |   |           values-en-rAU_values-en-rAU.arsc.flat
+|   |   |   |   |           values-en-rCA_values-en-rCA.arsc.flat
+|   |   |   |   |           values-en-rGB_values-en-rGB.arsc.flat
+|   |   |   |   |           values-en-rIN_values-en-rIN.arsc.flat
+|   |   |   |   |           values-en-rXC_values-en-rXC.arsc.flat
+|   |   |   |   |           values-es-rUS_values-es-rUS.arsc.flat
+|   |   |   |   |           values-es_values-es.arsc.flat
+|   |   |   |   |           values-et_values-et.arsc.flat
+|   |   |   |   |           values-eu_values-eu.arsc.flat
+|   |   |   |   |           values-fa_values-fa.arsc.flat
+|   |   |   |   |           values-fi_values-fi.arsc.flat
+|   |   |   |   |           values-fr-rCA_values-fr-rCA.arsc.flat
+|   |   |   |   |           values-fr_values-fr.arsc.flat
+|   |   |   |   |           values-gl_values-gl.arsc.flat
+|   |   |   |   |           values-gu_values-gu.arsc.flat
+|   |   |   |   |           values-h320dp-port-v13_values-h320dp-port-v13.arsc.flat
+|   |   |   |   |           values-h360dp-land-v13_values-h360dp-land-v13.arsc.flat
+|   |   |   |   |           values-h480dp-land-v13_values-h480dp-land-v13.arsc.flat
+|   |   |   |   |           values-h550dp-port-v13_values-h550dp-port-v13.arsc.flat
+|   |   |   |   |           values-h720dp-v13_values-h720dp-v13.arsc.flat
+|   |   |   |   |           values-hdpi-v4_values-hdpi-v4.arsc.flat
+|   |   |   |   |           values-hi_values-hi.arsc.flat
+|   |   |   |   |           values-hr_values-hr.arsc.flat
+|   |   |   |   |           values-hu_values-hu.arsc.flat
+|   |   |   |   |           values-hy_values-hy.arsc.flat
+|   |   |   |   |           values-in_values-in.arsc.flat
+|   |   |   |   |           values-is_values-is.arsc.flat
+|   |   |   |   |           values-it_values-it.arsc.flat
+|   |   |   |   |           values-iw_values-iw.arsc.flat
+|   |   |   |   |           values-ja_values-ja.arsc.flat
+|   |   |   |   |           values-ka_values-ka.arsc.flat
+|   |   |   |   |           values-kk_values-kk.arsc.flat
+|   |   |   |   |           values-km_values-km.arsc.flat
+|   |   |   |   |           values-kn_values-kn.arsc.flat
+|   |   |   |   |           values-ko_values-ko.arsc.flat
+|   |   |   |   |           values-ky_values-ky.arsc.flat
+|   |   |   |   |           values-land_values-land.arsc.flat
+|   |   |   |   |           values-large-v4_values-large-v4.arsc.flat
+|   |   |   |   |           values-ldltr-v21_values-ldltr-v21.arsc.flat
+|   |   |   |   |           values-ldrtl-v17_values-ldrtl-v17.arsc.flat
+|   |   |   |   |           values-lo_values-lo.arsc.flat
+|   |   |   |   |           values-lt_values-lt.arsc.flat
+|   |   |   |   |           values-lv_values-lv.arsc.flat
+|   |   |   |   |           values-mk_values-mk.arsc.flat
+|   |   |   |   |           values-ml_values-ml.arsc.flat
+|   |   |   |   |           values-mn_values-mn.arsc.flat
+|   |   |   |   |           values-mr_values-mr.arsc.flat
+|   |   |   |   |           values-ms_values-ms.arsc.flat
+|   |   |   |   |           values-my_values-my.arsc.flat
+|   |   |   |   |           values-nb_values-nb.arsc.flat
+|   |   |   |   |           values-ne_values-ne.arsc.flat
+|   |   |   |   |           values-night-v31_values-night-v31.arsc.flat
+|   |   |   |   |           values-night-v8_values-night-v8.arsc.flat
+|   |   |   |   |           values-nl_values-nl.arsc.flat
+|   |   |   |   |           values-or_values-or.arsc.flat
+|   |   |   |   |           values-pa_values-pa.arsc.flat
+|   |   |   |   |           values-pl_values-pl.arsc.flat
+|   |   |   |   |           values-port_values-port.arsc.flat
+|   |   |   |   |           values-pt-rBR_values-pt-rBR.arsc.flat
+|   |   |   |   |           values-pt-rPT_values-pt-rPT.arsc.flat
+|   |   |   |   |           values-pt_values-pt.arsc.flat
+|   |   |   |   |           values-ro_values-ro.arsc.flat
+|   |   |   |   |           values-ru_values-ru.arsc.flat
+|   |   |   |   |           values-si_values-si.arsc.flat
+|   |   |   |   |           values-sk_values-sk.arsc.flat
+|   |   |   |   |           values-sl_values-sl.arsc.flat
+|   |   |   |   |           values-small-v4_values-small-v4.arsc.flat
+|   |   |   |   |           values-sq_values-sq.arsc.flat
+|   |   |   |   |           values-sr_values-sr.arsc.flat
+|   |   |   |   |           values-sv_values-sv.arsc.flat
+|   |   |   |   |           values-sw600dp-v13_values-sw600dp-v13.arsc.flat
+|   |   |   |   |           values-sw_values-sw.arsc.flat
+|   |   |   |   |           values-ta_values-ta.arsc.flat
+|   |   |   |   |           values-te_values-te.arsc.flat
+|   |   |   |   |           values-th_values-th.arsc.flat
+|   |   |   |   |           values-tl_values-tl.arsc.flat
+|   |   |   |   |           values-tr_values-tr.arsc.flat
+|   |   |   |   |           values-uk_values-uk.arsc.flat
+|   |   |   |   |           values-ur_values-ur.arsc.flat
+|   |   |   |   |           values-uz_values-uz.arsc.flat
+|   |   |   |   |           values-v16_values-v16.arsc.flat
+|   |   |   |   |           values-v17_values-v17.arsc.flat
+|   |   |   |   |           values-v18_values-v18.arsc.flat
+|   |   |   |   |           values-v21_values-v21.arsc.flat
+|   |   |   |   |           values-v22_values-v22.arsc.flat
+|   |   |   |   |           values-v23_values-v23.arsc.flat
+|   |   |   |   |           values-v24_values-v24.arsc.flat
+|   |   |   |   |           values-v25_values-v25.arsc.flat
+|   |   |   |   |           values-v26_values-v26.arsc.flat
+|   |   |   |   |           values-v27_values-v27.arsc.flat
+|   |   |   |   |           values-v28_values-v28.arsc.flat
+|   |   |   |   |           values-v29_values-v29.arsc.flat
+|   |   |   |   |           values-v30_values-v30.arsc.flat
+|   |   |   |   |           values-v31_values-v31.arsc.flat
+|   |   |   |   |           values-v34_values-v34.arsc.flat
+|   |   |   |   |           values-vi_values-vi.arsc.flat
+|   |   |   |   |           values-w320dp-land-v13_values-w320dp-land-v13.arsc.flat
+|   |   |   |   |           values-w360dp-port-v13_values-w360dp-port-v13.arsc.flat
+|   |   |   |   |           values-w400dp-port-v13_values-w400dp-port-v13.arsc.flat
+|   |   |   |   |           values-w600dp-land-v13_values-w600dp-land-v13.arsc.flat
+|   |   |   |   |           values-watch-v20_values-watch-v20.arsc.flat
+|   |   |   |   |           values-watch-v21_values-watch-v21.arsc.flat
+|   |   |   |   |           values-xlarge-v4_values-xlarge-v4.arsc.flat
+|   |   |   |   |           values-zh-rCN_values-zh-rCN.arsc.flat
+|   |   |   |   |           values-zh-rHK_values-zh-rHK.arsc.flat
+|   |   |   |   |           values-zh-rTW_values-zh-rTW.arsc.flat
+|   |   |   |   |           values-zu_values-zu.arsc.flat
+|   |   |   |   |           values_values.arsc.flat
+|   |   |   |   |           xml_backup_rules.xml.flat
+|   |   |   |   |           xml_data_extraction_rules.xml.flat
+|   |   |   |   |           xml_gama_widget_info.xml.flat
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---mergeDebugAndroidTestResources
+|   |   |   +---merged_res_blame_folder
+|   |   |   |   +---debug
+|   |   |   |   |   \---mergeDebugResources
+|   |   |   |   |       \---out
+|   |   |   |   |           +---multi-v2
+|   |   |   |   |           |       mergeDebugResources.json
+|   |   |   |   |           |       values-af.json
+|   |   |   |   |           |       values-am.json
+|   |   |   |   |           |       values-ar.json
+|   |   |   |   |           |       values-as.json
+|   |   |   |   |           |       values-az.json
+|   |   |   |   |           |       values-b+es+419.json
+|   |   |   |   |           |       values-b+sr+Latn.json
+|   |   |   |   |           |       values-be.json
+|   |   |   |   |           |       values-bg.json
+|   |   |   |   |           |       values-bn.json
+|   |   |   |   |           |       values-bs.json
+|   |   |   |   |           |       values-ca.json
+|   |   |   |   |           |       values-cs.json
+|   |   |   |   |           |       values-da.json
+|   |   |   |   |           |       values-de.json
+|   |   |   |   |           |       values-el.json
+|   |   |   |   |           |       values-en-rAU.json
+|   |   |   |   |           |       values-en-rCA.json
+|   |   |   |   |           |       values-en-rGB.json
+|   |   |   |   |           |       values-en-rIN.json
+|   |   |   |   |           |       values-en-rXC.json
+|   |   |   |   |           |       values-es-rUS.json
+|   |   |   |   |           |       values-es.json
+|   |   |   |   |           |       values-et.json
+|   |   |   |   |           |       values-eu.json
+|   |   |   |   |           |       values-fa.json
+|   |   |   |   |           |       values-fi.json
+|   |   |   |   |           |       values-fr-rCA.json
+|   |   |   |   |           |       values-fr.json
+|   |   |   |   |           |       values-gl.json
+|   |   |   |   |           |       values-gu.json
+|   |   |   |   |           |       values-h320dp-port-v13.json
+|   |   |   |   |           |       values-h360dp-land-v13.json
+|   |   |   |   |           |       values-h480dp-land-v13.json
+|   |   |   |   |           |       values-h550dp-port-v13.json
+|   |   |   |   |           |       values-h720dp-v13.json
+|   |   |   |   |           |       values-hdpi-v4.json
+|   |   |   |   |           |       values-hi.json
+|   |   |   |   |           |       values-hr.json
+|   |   |   |   |           |       values-hu.json
+|   |   |   |   |           |       values-hy.json
+|   |   |   |   |           |       values-in.json
+|   |   |   |   |           |       values-is.json
+|   |   |   |   |           |       values-it.json
+|   |   |   |   |           |       values-iw.json
+|   |   |   |   |           |       values-ja.json
+|   |   |   |   |           |       values-ka.json
+|   |   |   |   |           |       values-kk.json
+|   |   |   |   |           |       values-km.json
+|   |   |   |   |           |       values-kn.json
+|   |   |   |   |           |       values-ko.json
+|   |   |   |   |           |       values-ky.json
+|   |   |   |   |           |       values-land.json
+|   |   |   |   |           |       values-large-v4.json
+|   |   |   |   |           |       values-ldltr-v21.json
+|   |   |   |   |           |       values-ldrtl-v17.json
+|   |   |   |   |           |       values-lo.json
+|   |   |   |   |           |       values-lt.json
+|   |   |   |   |           |       values-lv.json
+|   |   |   |   |           |       values-mk.json
+|   |   |   |   |           |       values-ml.json
+|   |   |   |   |           |       values-mn.json
+|   |   |   |   |           |       values-mr.json
+|   |   |   |   |           |       values-ms.json
+|   |   |   |   |           |       values-my.json
+|   |   |   |   |           |       values-nb.json
+|   |   |   |   |           |       values-ne.json
+|   |   |   |   |           |       values-night-v31.json
+|   |   |   |   |           |       values-night-v8.json
+|   |   |   |   |           |       values-nl.json
+|   |   |   |   |           |       values-or.json
+|   |   |   |   |           |       values-pa.json
+|   |   |   |   |           |       values-pl.json
+|   |   |   |   |           |       values-port.json
+|   |   |   |   |           |       values-pt-rBR.json
+|   |   |   |   |           |       values-pt-rPT.json
+|   |   |   |   |           |       values-pt.json
+|   |   |   |   |           |       values-ro.json
+|   |   |   |   |           |       values-ru.json
+|   |   |   |   |           |       values-si.json
+|   |   |   |   |           |       values-sk.json
+|   |   |   |   |           |       values-sl.json
+|   |   |   |   |           |       values-small-v4.json
+|   |   |   |   |           |       values-sq.json
+|   |   |   |   |           |       values-sr.json
+|   |   |   |   |           |       values-sv.json
+|   |   |   |   |           |       values-sw.json
+|   |   |   |   |           |       values-sw600dp-v13.json
+|   |   |   |   |           |       values-ta.json
+|   |   |   |   |           |       values-te.json
+|   |   |   |   |           |       values-th.json
+|   |   |   |   |           |       values-tl.json
+|   |   |   |   |           |       values-tr.json
+|   |   |   |   |           |       values-uk.json
+|   |   |   |   |           |       values-ur.json
+|   |   |   |   |           |       values-uz.json
+|   |   |   |   |           |       values-v16.json
+|   |   |   |   |           |       values-v17.json
+|   |   |   |   |           |       values-v18.json
+|   |   |   |   |           |       values-v21.json
+|   |   |   |   |           |       values-v22.json
+|   |   |   |   |           |       values-v23.json
+|   |   |   |   |           |       values-v24.json
+|   |   |   |   |           |       values-v25.json
+|   |   |   |   |           |       values-v26.json
+|   |   |   |   |           |       values-v27.json
+|   |   |   |   |           |       values-v28.json
+|   |   |   |   |           |       values-v29.json
+|   |   |   |   |           |       values-v30.json
+|   |   |   |   |           |       values-v31.json
+|   |   |   |   |           |       values-v34.json
+|   |   |   |   |           |       values-vi.json
+|   |   |   |   |           |       values-w320dp-land-v13.json
+|   |   |   |   |           |       values-w360dp-port-v13.json
+|   |   |   |   |           |       values-w400dp-port-v13.json
+|   |   |   |   |           |       values-w600dp-land-v13.json
+|   |   |   |   |           |       values-watch-v20.json
+|   |   |   |   |           |       values-watch-v21.json
+|   |   |   |   |           |       values-xlarge-v4.json
+|   |   |   |   |           |       values-zh-rCN.json
+|   |   |   |   |           |       values-zh-rHK.json
+|   |   |   |   |           |       values-zh-rTW.json
+|   |   |   |   |           |       values-zu.json
+|   |   |   |   |           |       values.json
+|   |   |   |   |           |       
+|   |   |   |   |           \---single
+|   |   |   |   |                   mergeDebugResources.json
+|   |   |   |   |                   
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---mergeDebugAndroidTestResources
+|   |   |   |           \---out
+|   |   |   +---merged_test_only_native_libs
+|   |   |   |   \---debug
+|   |   |   |       \---mergeDebugNativeLibs
+|   |   |   |           \---out
+|   |   |   +---mixed_scope_dex_archive
+|   |   |   |   +---debug
+|   |   |   |   |   \---dexBuilderDebug
+|   |   |   |   |       \---out
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---dexBuilderDebugAndroidTest
+|   |   |   |           \---out
+|   |   |   +---navigation_json
+|   |   |   |   \---debug
+|   |   |   |       \---extractDeepLinksDebug
+|   |   |   |               navigation.json
+|   |   |   |               
+|   |   |   +---nested_resources_validation_report
+|   |   |   |   +---debug
+|   |   |   |   |   \---generateDebugResources
+|   |   |   |   |           nestedResourcesValidationReport.txt
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---generateDebugAndroidTestResources
+|   |   |   |               nestedResourcesValidationReport.txt
+|   |   |   |               
+|   |   |   +---packaged_manifests
+|   |   |   |   +---debug
+|   |   |   |   |   \---processDebugManifestForPackage
+|   |   |   |   |           AndroidManifest.xml
+|   |   |   |   |           output-metadata.json
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---processDebugAndroidTestManifest
+|   |   |   |               AndroidManifest.xml
+|   |   |   |               output-metadata.json
+|   |   |   |               
+|   |   |   +---packaged_res
+|   |   |   |   +---debug
+|   |   |   |   |   \---packageDebugResources
+|   |   |   |   |       +---drawable
+|   |   |   |   |       |       ic_launcher_background.xml
+|   |   |   |   |       |       ic_launcher_foreground.xml
+|   |   |   |   |       |       ic_tile.xml
+|   |   |   |   |       |       widget_bg_default.xml
+|   |   |   |   |       |       widget_bg_opengl.xml
+|   |   |   |   |       |       widget_bg_vulkan.xml
+|   |   |   |   |       |       widget_btn_idle.xml
+|   |   |   |   |       |       widget_btn_opengl_active.xml
+|   |   |   |   |       |       widget_btn_vulkan_active.xml
+|   |   |   |   |       |       widget_chip.xml
+|   |   |   |   |       |       widget_inner_card.xml
+|   |   |   |   |       |       
+|   |   |   |   |       +---font
+|   |   |   |   |       |       quicksand_bold.ttf
+|   |   |   |   |       |       
+|   |   |   |   |       +---layout
+|   |   |   |   |       |       widget_initial_layout.xml
+|   |   |   |   |       |       
+|   |   |   |   |       +---mipmap-anydpi-v26
+|   |   |   |   |       |       ic_launcher.xml
+|   |   |   |   |       |       ic_launcher_round.xml
+|   |   |   |   |       |       
+|   |   |   |   |       +---mipmap-hdpi-v4
+|   |   |   |   |       |       ic_launcher.webp
+|   |   |   |   |       |       ic_launcher_foreground.webp
+|   |   |   |   |       |       ic_launcher_round.webp
+|   |   |   |   |       |       
+|   |   |   |   |       +---mipmap-mdpi-v4
+|   |   |   |   |       |       ic_launcher.webp
+|   |   |   |   |       |       ic_launcher_foreground.webp
+|   |   |   |   |       |       ic_launcher_round.webp
+|   |   |   |   |       |       
+|   |   |   |   |       +---mipmap-xhdpi-v4
+|   |   |   |   |       |       ic_launcher.webp
+|   |   |   |   |       |       ic_launcher_foreground.webp
+|   |   |   |   |       |       ic_launcher_round.webp
+|   |   |   |   |       |       
+|   |   |   |   |       +---mipmap-xxhdpi-v4
+|   |   |   |   |       |       ic_launcher.webp
+|   |   |   |   |       |       ic_launcher_foreground.webp
+|   |   |   |   |       |       ic_launcher_round.webp
+|   |   |   |   |       |       
+|   |   |   |   |       +---mipmap-xxxhdpi-v4
+|   |   |   |   |       |       ic_launcher.webp
+|   |   |   |   |       |       ic_launcher_foreground.webp
+|   |   |   |   |       |       ic_launcher_round.webp
+|   |   |   |   |       |       
+|   |   |   |   |       +---values
+|   |   |   |   |       |       values.xml
+|   |   |   |   |       |       
+|   |   |   |   |       \---xml
+|   |   |   |   |               backup_rules.xml
+|   |   |   |   |               data_extraction_rules.xml
+|   |   |   |   |               gama_widget_info.xml
+|   |   |   |   |               
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---packageDebugAndroidTestResources
+|   |   |   +---project_dex_archive
+|   |   |   |   +---debug
+|   |   |   |   |   \---dexBuilderDebug
+|   |   |   |   |       \---out
+|   |   |   |   |           |   e4e184d24fb955021647ae5a0521727029502ea68b19201b27c1f38b33702de4_0.jar
+|   |   |   |   |           |   e4e184d24fb955021647ae5a0521727029502ea68b19201b27c1f38b33702de4_1.jar
+|   |   |   |   |           |   e4e184d24fb955021647ae5a0521727029502ea68b19201b27c1f38b33702de4_2.jar
+|   |   |   |   |           |   e4e184d24fb955021647ae5a0521727029502ea68b19201b27c1f38b33702de4_3.jar
+|   |   |   |   |           |   e4e184d24fb955021647ae5a0521727029502ea68b19201b27c1f38b33702de4_4.jar
+|   |   |   |   |           |   e4e184d24fb955021647ae5a0521727029502ea68b19201b27c1f38b33702de4_5.jar
+|   |   |   |   |           |   
+|   |   |   |   |           \---com
+|   |   |   |   |               \---popovicialinc
+|   |   |   |   |                   \---gama
+|   |   |   |   |                       |   AdaptiveTypeScale.dex
+|   |   |   |   |                       |   C.dex
+|   |   |   |   |                       |   CelestialState.dex
+|   |   |   |   |                       |   ComposableSingletons$GamaWidgetKt.dex
+|   |   |   |   |                       |   ComposableSingletons$Gama_uiKt.dex
+|   |   |   |   |                       |   ComposableSingletons$MainActivityKt.dex
+|   |   |   |   |                       |   GamaWidget$provideGlance$1.dex
+|   |   |   |   |                       |   GamaWidget.dex
+|   |   |   |   |                       |   GamaWidgetKt.dex
+|   |   |   |   |                       |   GamaWidgetReceiver.dex
+|   |   |   |   |                       |   Gama_uiKt$AggressiveWarningDialog$2$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$AnimatedElement$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$AppSelectorPanel$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$AppSelectorPanel$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$AppSelectorPanel$2$1.dex
+|   |   |   |   |                       |   Gama_uiKt$AppSelectorPanel$3$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$AppSelectorPanel$3$2$1$1$5$1$1$4$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$AppSelectorPanel$3$2$1$1$5$1$1$4$2$2$1.dex
+|   |   |   |   |                       |   Gama_uiKt$BackArrowButton$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$BackArrowButton$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$BouncyDialog$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$BouncyDialog$2$1$2.dex
+|   |   |   |   |                       |   Gama_uiKt$BouncyDialog$2$1.dex
+|   |   |   |   |                       |   Gama_uiKt$BouncyDialog$5$1.dex
+|   |   |   |   |                       |   Gama_uiKt$BouncyDialog$7$1$1$2.dex
+|   |   |   |   |                       |   Gama_uiKt$BouncyDialog$7$1$1$3.dex
+|   |   |   |   |                       |   Gama_uiKt$BouncyDialog$7$1$1$4.dex
+|   |   |   |   |                       |   Gama_uiKt$BouncyDialog$7$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$BouncyDialog$7$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ChangelogDialog$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ChangelogDialog$1$2$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ChangelogDialog$1$3$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ChangelogDialog$1$3$2$1$1$1$2$1$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ChangelogDialog$1$3$2$2$3$1$1$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ChangelogIconButton$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ChangelogIconButton$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$CleanTitle$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ColorCustomizationPanel$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ColorCustomizationPanel$1$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$CompactColorBox$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$CompactColorPickerCard$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$CompactColorPickerCard$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$DeveloperMenuDialog$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$DeveloperPanel$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$DialogButton$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$DialogButton$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$EasterEggDialog$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$EffectsPanel$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$EffectsPanel$1$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ExternalLinkConfirmDialog$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$fetchChangelog$2.dex
+|   |   |   |   |                       |   Gama_uiKt$FlatButton$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$FlatButton$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$FunctionalityPanel$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$FunctionalityPanel$1$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$25$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$26$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$26$1$2.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$26$1$3.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$26$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$27$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$28$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$29$2$17$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$29$2$2$1$2$1$2$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$29$2$27$1$5$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$29$2$27$1$5$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$29$2$6$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$29$2$65$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$29$2$66$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$29$2$67$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$29$2$79$1$1$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$29$2$79$1$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$29$2$79$3$1$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$29$2$79$3$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$performErrorHaptic$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$performSuccessHaptic$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GamaUI$savePreferences$1.dex
+|   |   |   |   |                       |   Gama_uiKt$getAllInstalledPackages$$inlined$sortedBy$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GitHubDialog$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GlideOptionSelector$2$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GlideOptionSelector$2$2$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GlideOptionSelector$2$3$1.dex
+|   |   |   |   |                       |   Gama_uiKt$GlideOptionSelector$2$4$1.dex
+|   |   |   |   |                       |   Gama_uiKt$IllustratedButton$2$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$IllustratedButton$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$IntegrationInfoCard$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$IntegrationInfoCard$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$IntegrationsPanel$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$IntegrationsPanel$1$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$NotificationsPanel$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$NotificationsPanel$1$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$NotificationsPanel$1$2$2$2$1$1$1$1$2$1.dex
+|   |   |   |   |                       |   Gama_uiKt$NotificationsPanel$1$2$2$5$1$1$1$2$1.dex
+|   |   |   |   |                       |   Gama_uiKt$OLEDPanel$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$PanelBackButton$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$PanelBackButton$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ParticlesOverlay$1$1$listener$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ParticlesOverlay$2$1$2.dex
+|   |   |   |   |                       |   Gama_uiKt$ParticlesOverlay$2$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ParticlesOverlay$3$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ParticlesOverlay_KL_9NY8$lambda$30$lambda$29$$inlined$onDispose$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ParticlesOverlay_KL_9NY8$lambda$30$lambda$29$$inlined$onDispose$2.dex
+|   |   |   |   |                       |   Gama_uiKt$ParticlesOverlay_KL_9NY8$lambda$30$lambda$29$$inlined$onDispose$3.dex
+|   |   |   |   |                       |   Gama_uiKt$ParticlesPanel$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ParticlesPanel$1$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$RendererCard$1$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$RendererCard$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ResourcesPanel$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ResourcesPanel$1$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$SecondaryIconButton$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$SecondaryIconButton$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$SettingsNavigationCard$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$SettingsNavigationCard$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$SettingsNavigationCard$1$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$SettingsNavigationCard$1$2$1.dex
+|   |   |   |   |                       |   Gama_uiKt$SettingsPanel$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$SettingsPanel$1$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$SettingsPanel$1$2$3$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ShizukuHelpDialog$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$SuccessDialog$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$TitleSection$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$TitleSection$1$2$1$2$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ToggleCard$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$ToggleCard$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$VerbosePanel$1$1$1$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$VisualEffectsPanel$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$VisualEffectsPanel$1$2$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$VisualEffectsPanel$1$2$2$3$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$VisualEffectsPanel$1$2$2$3$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt$WarningDialog$1$1$1.dex
+|   |   |   |   |                       |   Gama_uiKt.dex
+|   |   |   |   |                       |   MainActivity.dex
+|   |   |   |   |                       |   MotionTokens$Duration.dex
+|   |   |   |   |                       |   MotionTokens$Easing.dex
+|   |   |   |   |                       |   MotionTokens$Scale.dex
+|   |   |   |   |                       |   MotionTokens$Springs$SpringConfig.dex
+|   |   |   |   |                       |   MotionTokens$Springs.dex
+|   |   |   |   |                       |   MotionTokens.dex
+|   |   |   |   |                       |   ParticleState.dex
+|   |   |   |   |                       |   RendererTileService$onClick$1.dex
+|   |   |   |   |                       |   RendererTileService.dex
+|   |   |   |   |                       |   ShizukuHelper$applyCustomRenderers$1.dex
+|   |   |   |   |                       |   ShizukuHelper$applyCustomRenderersSuspend$2$1.dex
+|   |   |   |   |                       |   ShizukuHelper$applyCustomRenderersSuspend$2$3.dex
+|   |   |   |   |                       |   ShizukuHelper$applyCustomRenderersSuspend$2.dex
+|   |   |   |   |                       |   ShizukuHelper$checkVersion$2.dex
+|   |   |   |   |                       |   ShizukuHelper$getCurrentRenderer$2.dex
+|   |   |   |   |                       |   ShizukuHelper$runOpenGL$1.dex
+|   |   |   |   |                       |   ShizukuHelper$runOpenGLSuspend$2$1.dex
+|   |   |   |   |                       |   ShizukuHelper$runOpenGLSuspend$2$6.dex
+|   |   |   |   |                       |   ShizukuHelper$runOpenGLSuspend$2.dex
+|   |   |   |   |                       |   ShizukuHelper$runVulkan$1.dex
+|   |   |   |   |                       |   ShizukuHelper$runVulkanSuspend$2$1.dex
+|   |   |   |   |                       |   ShizukuHelper$runVulkanSuspend$2$6.dex
+|   |   |   |   |                       |   ShizukuHelper$runVulkanSuspend$2.dex
+|   |   |   |   |                       |   ShizukuHelper.dex
+|   |   |   |   |                       |   TaskerReceiver$Companion.dex
+|   |   |   |   |                       |   TaskerReceiver$onReceive$1.dex
+|   |   |   |   |                       |   TaskerReceiver.dex
+|   |   |   |   |                       |   ThemeColors$Companion.dex
+|   |   |   |   |                       |   ThemeColors.dex
+|   |   |   |   |                       |   WidgetActionCallback$onAction$3.dex
+|   |   |   |   |                       |   WidgetActionCallback.dex
+|   |   |   |   |                       |   
+|   |   |   |   |                       \---ui
+|   |   |   |   |                           \---theme
+|   |   |   |   |                                   ColorKt.dex
+|   |   |   |   |                                   ThemeKt.dex
+|   |   |   |   |                                   
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---dexBuilderDebugAndroidTest
+|   |   |   |           \---out
+|   |   |   |                   98195d0a6e2c9d9ad4af1a1f5e36ac1f31c99de12bdaed030bf6ec1d40a359fd_4.jar
+|   |   |   |                   
+|   |   |   +---runtime_symbol_list
+|   |   |   |   +---debug
+|   |   |   |   |   \---processDebugResources
+|   |   |   |   |           R.txt
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---processDebugAndroidTestResources
+|   |   |   |               R.txt
+|   |   |   |               
+|   |   |   +---signing_config_versions
+|   |   |   |   +---debug
+|   |   |   |   |   \---writeDebugSigningConfigVersions
+|   |   |   |   |           signing-config-versions.json
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---writeDebugAndroidTestSigningConfigVersions
+|   |   |   |               signing-config-versions.json
+|   |   |   |               
+|   |   |   +---stable_resource_ids_file
+|   |   |   |   +---debug
+|   |   |   |   |   \---processDebugResources
+|   |   |   |   |           stableIds.txt
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---processDebugAndroidTestResources
+|   |   |   |               stableIds.txt
+|   |   |   |               
+|   |   |   +---stripped_native_libs
+|   |   |   |   \---debug
+|   |   |   |       \---stripDebugDebugSymbols
+|   |   |   |           \---out
+|   |   |   |               \---lib
+|   |   |   |                   +---arm64-v8a
+|   |   |   |                   |       libandroidx.graphics.path.so
+|   |   |   |                   |       
+|   |   |   |                   +---armeabi-v7a
+|   |   |   |                   |       libandroidx.graphics.path.so
+|   |   |   |                   |       
+|   |   |   |                   +---x86
+|   |   |   |                   |       libandroidx.graphics.path.so
+|   |   |   |                   |       
+|   |   |   |                   \---x86_64
+|   |   |   |                           libandroidx.graphics.path.so
+|   |   |   |                           
+|   |   |   +---sub_project_dex_archive
+|   |   |   |   +---debug
+|   |   |   |   |   \---dexBuilderDebug
+|   |   |   |   |       \---out
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---dexBuilderDebugAndroidTest
+|   |   |   |           \---out
+|   |   |   +---symbol_list_with_package_name
+|   |   |   |   +---debug
+|   |   |   |   |   \---generateDebugRFile
+|   |   |   |   |           package-aware-r.txt
+|   |   |   |   |           
+|   |   |   |   \---debugAndroidTest
+|   |   |   |       \---generateDebugAndroidTestRFile
+|   |   |   |               package-aware-r.txt
+|   |   |   |               
+|   |   |   +---tmp
+|   |   |   |   \---manifest
+|   |   |   |       \---androidTest
+|   |   |   |           \---debug
+|   |   |   \---validate_signing_config
+|   |   |       +---debug
+|   |   |       |   \---validateSigningDebug
+|   |   |       \---debugAndroidTest
+|   |   |           \---validateSigningDebugAndroidTest
+|   |   +---kotlin
+|   |   |   \---compileDebugKotlin
+|   |   |       +---cacheable
+|   |   |       \---classpath-snapshot
+|   |   \---outputs
+|   |       +---apk
+|   |       |   +---androidTest
+|   |       |   |   \---debug
+|   |       |   |           app-debug-androidTest.apk
+|   |       |   |           output-metadata.json
+|   |       |   |           
+|   |       |   \---debug
+|   |       |           GAMA v1.2.apk
+|   |       |           output-metadata.json
+|   |       |           
+|   |       \---logs
+|   |               manifest-merger-debug-report.txt
+|   |               
+|   \---src
+|       \---main
+|           |   AndroidManifest.xml
+|           |   ic_launcher-playstore.png
+|           |   
+|           +---java
+|           |   \---com
+|           |       \---popovicialinc
+|           |           \---gama
+|           |               |   GamaWidget.kt
+|           |               |   gama_ui.kt
+|           |               |   MainActivity.kt
+|           |               |   RendererTileService.kt
+|           |               |   ShizukuHelper.kt
+|           |               |   TaskerReceiver.kt
+|           |               |   
+|           |               \---ui
+|           |                   \---theme
+|           |                           Color.kt
+|           |                           Theme.kt
+|           |                           Type.kt
+|           |                           
+|           \---res
+|               +---drawable
+|               |       ic_launcher_background.xml
+|               |       ic_launcher_foreground.xml
+|               |       ic_tile.xml
+|               |       widget_bg_default.xml
+|               |       widget_bg_opengl.xml
+|               |       widget_bg_vulkan.xml
+|               |       widget_btn_idle.xml
+|               |       widget_btn_opengl_active.xml
+|               |       widget_btn_vulkan_active.xml
+|               |       widget_chip.xml
+|               |       widget_inner_card.xml
+|               |       
+|               +---font
+|               |       quicksand_bold.ttf
+|               |       
+|               +---layout
+|               |       widget_initial_layout.xml
+|               |       
+|               +---mipmap-anydpi-v26
+|               |       ic_launcher.xml
+|               |       ic_launcher_round.xml
+|               |       
+|               +---mipmap-hdpi
+|               |       ic_launcher.webp
+|               |       ic_launcher_foreground.webp
+|               |       ic_launcher_round.webp
+|               |       
+|               +---mipmap-mdpi
+|               |       ic_launcher.webp
+|               |       ic_launcher_foreground.webp
+|               |       ic_launcher_round.webp
+|               |       
+|               +---mipmap-xhdpi
+|               |       ic_launcher.webp
+|               |       ic_launcher_foreground.webp
+|               |       ic_launcher_round.webp
+|               |       
+|               +---mipmap-xxhdpi
+|               |       ic_launcher.webp
+|               |       ic_launcher_foreground.webp
+|               |       ic_launcher_round.webp
+|               |       
+|               +---mipmap-xxxhdpi
+|               |       ic_launcher.webp
+|               |       ic_launcher_foreground.webp
+|               |       ic_launcher_round.webp
+|               |       
+|               +---values
+|               |       colors.xml
+|               |       dimens.xml
+|               |       ic_launcher_background.xml
+|               |       strings.xml
+|               |       themes.xml
+|               |       
+|               \---xml
+|                       backup_rules.xml
+|                       data_extraction_rules.xml
+|                       gama_widget_info.xml
+|                       
++---build
+|   +---generated
+|   |   +---res
+|   |   |   \---pngs
+|   |   |       \---debug
+|   |   \---updated_navigation_xml
+|   |       \---debug
+|   +---intermediates
+|   |   +---aar_metadata_check
+|   |   |   \---debug
+|   |   |       \---checkDebugAarMetadata
+|   |   +---android_res_source_set_path_map
+|   |   |   \---debug
+|   |   |       \---mapDebugSourceSetPaths
+|   |   |               file-map.txt
+|   |   |               
+|   |   +---annotation_processor_list
+|   |   |   \---debug
+|   |   |       \---javaPreCompileDebug
+|   |   |               annotationProcessors.json
+|   |   |               
+|   |   +---app_metadata
+|   |   |   \---debug
+|   |   |       \---writeDebugAppMetadata
+|   |   |               app-metadata.properties
+|   |   |               
+|   |   +---assets
+|   |   |   \---debug
+|   |   |       \---mergeDebugAssets
+|   |   +---compatible_screen_manifest
+|   |   |   \---debug
+|   |   |       \---createDebugCompatibleScreenManifests
+|   |   |               output-metadata.json
+|   |   |               
+|   |   +---compiled_navigation_res
+|   |   |   \---debug
+|   |   |       \---compileDebugNavigationResources
+|   |   +---compile_r_class_jar
+|   |   |   \---debug
+|   |   |       \---generateDebugRFile
+|   |   |               R.jar
+|   |   |               
+|   |   +---compile_symbol_list
+|   |   |   \---debug
+|   |   |       \---generateDebugRFile
+|   |   |               R.txt
+|   |   |               
+|   |   +---compressed_assets
+|   |   |   \---debug
+|   |   |       \---compressDebugAssets
+|   |   |           \---out
+|   |   +---data_binding_layout_info_type_merge
+|   |   |   \---debug
+|   |   |       \---mergeDebugResources
+|   |   |           \---out
+|   |   +---data_binding_layout_info_type_package
+|   |   |   \---debug
+|   |   |       \---packageDebugResources
+|   |   |           \---out
+|   |   +---dex
+|   |   |   \---debug
+|   |   |       +---mergeExtDexDebug
+|   |   |       |       classes.dex
+|   |   |       |       classes2.dex
+|   |   |       |       classes3.dex
+|   |   |       |       
+|   |   |       \---mergeLibDexDebug
+|   |   |           +---0
+|   |   |           +---1
+|   |   |           +---10
+|   |   |           +---11
+|   |   |           +---12
+|   |   |           +---13
+|   |   |           +---14
+|   |   |           +---15
+|   |   |           +---2
+|   |   |           +---3
+|   |   |           +---4
+|   |   |           +---5
+|   |   |           +---6
+|   |   |           +---7
+|   |   |           +---8
+|   |   |           \---9
+|   |   +---duplicate_classes_check
+|   |   |   \---debug
+|   |   |       \---checkDebugDuplicateClasses
+|   |   +---external_file_lib_dex_archives
+|   |   |   \---debug
+|   |   |       \---desugarDebugFileDependencies
+|   |   +---incremental
+|   |   |   +---debug
+|   |   |   |   +---mergeDebugResources
+|   |   |   |   |   |   compile-file-map.properties
+|   |   |   |   |   |   merger.xml
+|   |   |   |   |   |   
+|   |   |   |   |   +---merged.dir
+|   |   |   |   |   |   +---values
+|   |   |   |   |   |   |       values.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-af
+|   |   |   |   |   |   |       values-af.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-am
+|   |   |   |   |   |   |       values-am.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ar
+|   |   |   |   |   |   |       values-ar.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-as
+|   |   |   |   |   |   |       values-as.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-az
+|   |   |   |   |   |   |       values-az.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-b+es+419
+|   |   |   |   |   |   |       values-b+es+419.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-b+sr+Latn
+|   |   |   |   |   |   |       values-b+sr+Latn.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-be
+|   |   |   |   |   |   |       values-be.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-bg
+|   |   |   |   |   |   |       values-bg.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-bn
+|   |   |   |   |   |   |       values-bn.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-bs
+|   |   |   |   |   |   |       values-bs.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ca
+|   |   |   |   |   |   |       values-ca.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-cs
+|   |   |   |   |   |   |       values-cs.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-da
+|   |   |   |   |   |   |       values-da.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-de
+|   |   |   |   |   |   |       values-de.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-el
+|   |   |   |   |   |   |       values-el.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-en-rAU
+|   |   |   |   |   |   |       values-en-rAU.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-en-rCA
+|   |   |   |   |   |   |       values-en-rCA.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-en-rGB
+|   |   |   |   |   |   |       values-en-rGB.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-en-rIN
+|   |   |   |   |   |   |       values-en-rIN.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-en-rXC
+|   |   |   |   |   |   |       values-en-rXC.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-es
+|   |   |   |   |   |   |       values-es.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-es-rUS
+|   |   |   |   |   |   |       values-es-rUS.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-et
+|   |   |   |   |   |   |       values-et.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-eu
+|   |   |   |   |   |   |       values-eu.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-fa
+|   |   |   |   |   |   |       values-fa.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-fi
+|   |   |   |   |   |   |       values-fi.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-fr
+|   |   |   |   |   |   |       values-fr.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-fr-rCA
+|   |   |   |   |   |   |       values-fr-rCA.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-gl
+|   |   |   |   |   |   |       values-gl.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-gu
+|   |   |   |   |   |   |       values-gu.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-h320dp-port-v13
+|   |   |   |   |   |   |       values-h320dp-port-v13.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-h360dp-land-v13
+|   |   |   |   |   |   |       values-h360dp-land-v13.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-h480dp-land-v13
+|   |   |   |   |   |   |       values-h480dp-land-v13.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-h550dp-port-v13
+|   |   |   |   |   |   |       values-h550dp-port-v13.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-h720dp-v13
+|   |   |   |   |   |   |       values-h720dp-v13.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-hdpi-v4
+|   |   |   |   |   |   |       values-hdpi-v4.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-hi
+|   |   |   |   |   |   |       values-hi.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-hr
+|   |   |   |   |   |   |       values-hr.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-hu
+|   |   |   |   |   |   |       values-hu.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-hy
+|   |   |   |   |   |   |       values-hy.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-in
+|   |   |   |   |   |   |       values-in.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-is
+|   |   |   |   |   |   |       values-is.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-it
+|   |   |   |   |   |   |       values-it.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-iw
+|   |   |   |   |   |   |       values-iw.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ja
+|   |   |   |   |   |   |       values-ja.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ka
+|   |   |   |   |   |   |       values-ka.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-kk
+|   |   |   |   |   |   |       values-kk.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-km
+|   |   |   |   |   |   |       values-km.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-kn
+|   |   |   |   |   |   |       values-kn.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ko
+|   |   |   |   |   |   |       values-ko.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ky
+|   |   |   |   |   |   |       values-ky.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-land
+|   |   |   |   |   |   |       values-land.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-large-v4
+|   |   |   |   |   |   |       values-large-v4.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ldltr-v21
+|   |   |   |   |   |   |       values-ldltr-v21.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ldrtl-v17
+|   |   |   |   |   |   |       values-ldrtl-v17.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-lo
+|   |   |   |   |   |   |       values-lo.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-lt
+|   |   |   |   |   |   |       values-lt.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-lv
+|   |   |   |   |   |   |       values-lv.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-mk
+|   |   |   |   |   |   |       values-mk.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ml
+|   |   |   |   |   |   |       values-ml.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-mn
+|   |   |   |   |   |   |       values-mn.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-mr
+|   |   |   |   |   |   |       values-mr.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ms
+|   |   |   |   |   |   |       values-ms.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-my
+|   |   |   |   |   |   |       values-my.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-nb
+|   |   |   |   |   |   |       values-nb.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ne
+|   |   |   |   |   |   |       values-ne.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-night-v31
+|   |   |   |   |   |   |       values-night-v31.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-night-v8
+|   |   |   |   |   |   |       values-night-v8.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-nl
+|   |   |   |   |   |   |       values-nl.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-or
+|   |   |   |   |   |   |       values-or.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-pa
+|   |   |   |   |   |   |       values-pa.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-pl
+|   |   |   |   |   |   |       values-pl.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-port
+|   |   |   |   |   |   |       values-port.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-pt
+|   |   |   |   |   |   |       values-pt.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-pt-rBR
+|   |   |   |   |   |   |       values-pt-rBR.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-pt-rPT
+|   |   |   |   |   |   |       values-pt-rPT.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ro
+|   |   |   |   |   |   |       values-ro.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ru
+|   |   |   |   |   |   |       values-ru.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-si
+|   |   |   |   |   |   |       values-si.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-sk
+|   |   |   |   |   |   |       values-sk.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-sl
+|   |   |   |   |   |   |       values-sl.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-small-v4
+|   |   |   |   |   |   |       values-small-v4.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-sq
+|   |   |   |   |   |   |       values-sq.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-sr
+|   |   |   |   |   |   |       values-sr.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-sv
+|   |   |   |   |   |   |       values-sv.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-sw
+|   |   |   |   |   |   |       values-sw.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-sw600dp-v13
+|   |   |   |   |   |   |       values-sw600dp-v13.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ta
+|   |   |   |   |   |   |       values-ta.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-te
+|   |   |   |   |   |   |       values-te.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-th
+|   |   |   |   |   |   |       values-th.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-tl
+|   |   |   |   |   |   |       values-tl.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-tr
+|   |   |   |   |   |   |       values-tr.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-uk
+|   |   |   |   |   |   |       values-uk.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-ur
+|   |   |   |   |   |   |       values-ur.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-uz
+|   |   |   |   |   |   |       values-uz.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v16
+|   |   |   |   |   |   |       values-v16.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v17
+|   |   |   |   |   |   |       values-v17.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v18
+|   |   |   |   |   |   |       values-v18.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v21
+|   |   |   |   |   |   |       values-v21.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v22
+|   |   |   |   |   |   |       values-v22.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v23
+|   |   |   |   |   |   |       values-v23.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v24
+|   |   |   |   |   |   |       values-v24.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v25
+|   |   |   |   |   |   |       values-v25.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v26
+|   |   |   |   |   |   |       values-v26.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v27
+|   |   |   |   |   |   |       values-v27.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v28
+|   |   |   |   |   |   |       values-v28.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v29
+|   |   |   |   |   |   |       values-v29.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v30
+|   |   |   |   |   |   |       values-v30.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v31
+|   |   |   |   |   |   |       values-v31.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-v34
+|   |   |   |   |   |   |       values-v34.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-vi
+|   |   |   |   |   |   |       values-vi.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-w320dp-land-v13
+|   |   |   |   |   |   |       values-w320dp-land-v13.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-w360dp-port-v13
+|   |   |   |   |   |   |       values-w360dp-port-v13.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-w400dp-port-v13
+|   |   |   |   |   |   |       values-w400dp-port-v13.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-w600dp-land-v13
+|   |   |   |   |   |   |       values-w600dp-land-v13.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-watch-v20
+|   |   |   |   |   |   |       values-watch-v20.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-watch-v21
+|   |   |   |   |   |   |       values-watch-v21.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-xlarge-v4
+|   |   |   |   |   |   |       values-xlarge-v4.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-zh-rCN
+|   |   |   |   |   |   |       values-zh-rCN.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-zh-rHK
+|   |   |   |   |   |   |       values-zh-rHK.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   +---values-zh-rTW
+|   |   |   |   |   |   |       values-zh-rTW.xml
+|   |   |   |   |   |   |       
+|   |   |   |   |   |   \---values-zu
+|   |   |   |   |   |           values-zu.xml
+|   |   |   |   |   |           
+|   |   |   |   |   \---stripped.dir
+|   |   |   |   \---packageDebugResources
+|   |   |   |       |   compile-file-map.properties
+|   |   |   |       |   merger.xml
+|   |   |   |       |   
+|   |   |   |       +---merged.dir
+|   |   |   |       \---stripped.dir
+|   |   |   +---debug-mergeJavaRes
+|   |   |   |   |   merge-state
+|   |   |   |   |   
+|   |   |   |   \---zip-cache
+|   |   |   |           +4+ew5JCLJ+tit46DZa0cw==
+|   |   |   |           +ezgRpV4mBxOdVOxgFQPig==
+|   |   |   |           +pUjym1Ro2HFAHQS2rYgBQ==
+|   |   |   |           07vuLzuBcRmqU+adH1aimQ==
+|   |   |   |           10aZkkg3QueFop8cVUD8rA==
+|   |   |   |           1kJ7kPbbKOIgcmSyW6gK9A==
+|   |   |   |           1NynBBtjFRyPPPe3WTNjAg==
+|   |   |   |           21KWf9WOsfEUDARbsh62uw==
+|   |   |   |           2LZmbXMnkjfetLwpIKZOhQ==
+|   |   |   |           2vbaZhg9B8gq6UDcHKvJwQ==
+|   |   |   |           3Bf9dr1oMMGFi2P4D4TDYg==
+|   |   |   |           3BMlvgcLeU+yFsL5Za2z3Q==
+|   |   |   |           3dPXAGCht3BqJWVfh23+iA==
+|   |   |   |           3laQInuvX4X8+JhmjqF8gw==
+|   |   |   |           3PP6rPX+aWVfNsMNNBNUhA==
+|   |   |   |           3PPaXpx9O7tBVPeAOWrhaQ==
+|   |   |   |           6CN0tDZicvuwIVghsvAwpw==
+|   |   |   |           6qY7ztJkg4s63tkjLnVQMQ==
+|   |   |   |           716Rkjoa7itvTNN+BUu6Lw==
+|   |   |   |           7Gdtifb5OvJ_mxqNY5rs0g==
+|   |   |   |           7oQ0AXayFUOGjXZCMbNGdQ==
+|   |   |   |           9UCqunBnP3juBsLbRRrehg==
+|   |   |   |           aa7FBIOiomP7cW9xDNvMaw==
+|   |   |   |           ABJ8NAd4SJLO_2DqXwmAWQ==
+|   |   |   |           AmGzK8jIsYCC0n0wi3uVIA==
+|   |   |   |           aQrkcjNDnoaoRNp9gC00cQ==
+|   |   |   |           AvU1KwBLMQz9FtE+8I8w9Q==
+|   |   |   |           awZsCE9FQ1IoQ6KDMNO55Q==
+|   |   |   |           B73R5LBuJHBi2WlP_jub8A==
+|   |   |   |           b8xmKPi36aJq2EZK0jrf1A==
+|   |   |   |           bhOAe2aKgPDnh_ZgVhwB8Q==
+|   |   |   |           bIvYqXYndlU2OVLv4OxY4w==
+|   |   |   |           bwH0tAqLQuoZVw5Z1f4ibQ==
+|   |   |   |           CUpuMWutk1oCbN1CuuF06g==
+|   |   |   |           cwaHNOEmd8AY5hYU01GH7Q==
+|   |   |   |           db0jk7P2aheGMmfynTjBhw==
+|   |   |   |           dH0pmSjGTyeebCTgAe+BEw==
+|   |   |   |           dOkRUx+erJZYLalVpE0OQg==
+|   |   |   |           DrJR3WmkqhuSkulCQMvNyQ==
+|   |   |   |           E0goAPP765V8iygyJvoFLA==
+|   |   |   |           f1xpzrB2Sag342GJNq+BcQ==
+|   |   |   |           fej+JCMBa3zLfKSWuogYBg==
+|   |   |   |           FgmihRmgPtZh8uR0TLYaRA==
+|   |   |   |           Fhu24VJtGKQjs7QgCCKwxQ==
+|   |   |   |           FKLfPaSaFal8T5W4ilwVeg==
+|   |   |   |           fTBa4oz_1DAW7vfTYcktbA==
+|   |   |   |           GJFWcOwNem09QBKdQaKqOA==
+|   |   |   |           gZ9_TlIg649AquO9ocZVvQ==
+|   |   |   |           hBweqR7s_1Ilo4jqxN6EoA==
+|   |   |   |           HeILL6pFuDzU9Rr2b7BO0A==
+|   |   |   |           hEUgmbRWoVVb88_NFcXy_g==
+|   |   |   |           hwtV8+N8u_xTlP1WWOWQSw==
+|   |   |   |           HzsefSHoBr4_rpA4KtBlcg==
+|   |   |   |           IBv3OSG7ckniRRv8i3ogHA==
+|   |   |   |           J5SJPSJnEskD+PF12TtVtA==
+|   |   |   |           jnfvVOA7nfdHiJe7Bqybvg==
+|   |   |   |           KIJQZlbK_aY1nBNyoAbnBQ==
+|   |   |   |           kweoI0sc0Bhk4LxUCA5ptA==
+|   |   |   |           kWHqWRX3pZ386xi0e2nBDQ==
+|   |   |   |           L20O1DplghezDoJ5MADciw==
+|   |   |   |           lBYH4jmcHtHxz1Y85AiLSQ==
+|   |   |   |           lHW1XHuo_FG7e0yRzf20PA==
+|   |   |   |           LLqzZ6WbC8CZy03lyiYraQ==
+|   |   |   |           Lm1W9HVpRgLf01qA89oL_A==
+|   |   |   |           LusVY9lsTNk4mW34trnHLg==
+|   |   |   |           Mzz_xIw4DmeRtTDd3nyzLQ==
+|   |   |   |           NaIAX2xTc8vJqZXYciHPQw==
+|   |   |   |           njDrhxabX8RGAd_gWK_grg==
+|   |   |   |           NMXZP2NfZL2BqlSNDVMhEQ==
+|   |   |   |           No7Up4dH+UdqGEG8JG1sQg==
+|   |   |   |           nOcrEBXwG1gAgtavF3cqcQ==
+|   |   |   |           o1zb9qSCijQ+Bku3a7rafw==
+|   |   |   |           O2Mf1vaJkCYAzTXmWn2s5w==
+|   |   |   |           oHKLue6RasSiJwqiVmEpSw==
+|   |   |   |           omAaZNuR3xUYwx8dKbF+2Q==
+|   |   |   |           ouLf2dzcAVKDFAQSVZ6+tw==
+|   |   |   |           pD0luCMyPJJEkISu9JM3lw==
+|   |   |   |           pgnSFDhshz2z60HjZ2NhfQ==
+|   |   |   |           Pivf_1h35PrcOJzNTX46iA==
+|   |   |   |           PnLynVovH2saFA10z3+8cg==
+|   |   |   |           pt1Iq4YQ2+6JAUwC8BpOMg==
+|   |   |   |           qBD9qIH0_dlyjXEXCDF4Dg==
+|   |   |   |           qq1trBuZl_apIJBxE1YV0w==
+|   |   |   |           QSQ3716YiQXPToLTmSM4NA==
+|   |   |   |           QuumI9Mqw663uO3mNBA3hQ==
+|   |   |   |           qWvbF1N3jK+xDeNh7jueSw==
+|   |   |   |           r+bkCWMwQK8GRqTyytf+PQ==
+|   |   |   |           RgaB0MLnp5m1UBTc49mVcA==
+|   |   |   |           Rkm8oMcRwpFQk2Y0n4QR3Q==
+|   |   |   |           rT4rSIvq2kwCjG66433bvA==
+|   |   |   |           rtQIp5xcm75XgJomr_q7LA==
+|   |   |   |           sc_yXZ7Ldhwygwn484XvGw==
+|   |   |   |           sI9xFWhzKvVaYFpCL9flTw==
+|   |   |   |           slPDw08tv1Ux9IOkmJTALg==
+|   |   |   |           tDmNTaxLvI+XSWyAYBTrwg==
+|   |   |   |           ThtzHVv6u5wq_WhoxYL4wA==
+|   |   |   |           tMAXVSwyiPQG2Tm_ojyKuw==
+|   |   |   |           TVcZ12AI4AOkEjkJ3lJalw==
+|   |   |   |           twwifJ2ysabYRlbtlsNYkg==
+|   |   |   |           t_RTcZ4Rk2FDAF+_A3eH+A==
+|   |   |   |           UQ+HItlY28d+EDgbUc4OXQ==
+|   |   |   |           uuitjg+6bSINTgHNMkPIJw==
+|   |   |   |           uXmkDVfLBFzAyG8OSsJ3iA==
+|   |   |   |           vYeh2XmdBo8EUxx6mnBRVw==
+|   |   |   |           X2unvaAwh4SxI_aTRFv8QA==
+|   |   |   |           x3fgJEDqS0XgmrXcWaZaJQ==
+|   |   |   |           xcjjk4O5J0aTz5Gl1i74YA==
+|   |   |   |           Xmpr0e+4lvKDkcw1+3s5wg==
+|   |   |   |           XVQ9c8A+9cyivtma_7X0Aw==
+|   |   |   |           Y1lNjBtZxxLPx6VrBA74pA==
+|   |   |   |           y6pMCiYcog8hkXo4Sdsrzg==
+|   |   |   |           y8NgS8IZ9MWNJsDLEmZoNQ==
+|   |   |   |           zcS_kETk5WZk4j_t71nB9g==
+|   |   |   |           ZOvSuNfZRvsFPJ1W0uDB7g==
+|   |   |   |           zt4_bx04UhPIZ7WPsnS7dA==
+|   |   |   |           _hMXKp86xAdjtnXoQYggMw==
+|   |   |   |           _JyU2Ucy0Nm71AmLfeiqRQ==
+|   |   |   |           _oAM8zw9qeszf7qBUiNfDQ==
+|   |   |   |           _UoYO3WMMS__jaGEpJhkbQ==
+|   |   |   |           
+|   |   |   +---mergeDebugAssets
+|   |   |   |       merger.xml
+|   |   |   |       
+|   |   |   \---mergeDebugJniLibFolders
+|   |   |           merger.xml
+|   |   |           
+|   |   +---local_only_symbol_list
+|   |   |   \---debug
+|   |   |       \---parseDebugLocalResources
+|   |   |               R-def.txt
+|   |   |               
+|   |   +---merged_java_res
+|   |   |   \---debug
+|   |   |       \---mergeDebugJavaResource
+|   |   |               base.jar
+|   |   |               
+|   |   +---merged_jni_libs
+|   |   |   \---debug
+|   |   |       \---mergeDebugJniLibFolders
+|   |   |           \---out
+|   |   +---merged_native_libs
+|   |   |   \---debug
+|   |   |       \---mergeDebugNativeLibs
+|   |   |           \---out
+|   |   |               \---lib
+|   |   |                   +---arm64-v8a
+|   |   |                   |       libandroidx.graphics.path.so
+|   |   |                   |       
+|   |   |                   +---armeabi-v7a
+|   |   |                   |       libandroidx.graphics.path.so
+|   |   |                   |       
+|   |   |                   +---x86
+|   |   |                   |       libandroidx.graphics.path.so
+|   |   |                   |       
+|   |   |                   \---x86_64
+|   |   |                           libandroidx.graphics.path.so
+|   |   |                           
+|   |   +---merged_res
+|   |   |   \---debug
+|   |   |       \---mergeDebugResources
+|   |   |               values-af_values-af.arsc.flat
+|   |   |               values-am_values-am.arsc.flat
+|   |   |               values-ar_values-ar.arsc.flat
+|   |   |               values-as_values-as.arsc.flat
+|   |   |               values-az_values-az.arsc.flat
+|   |   |               values-b+es+419_values-b+es+419.arsc.flat
+|   |   |               values-b+sr+Latn_values-b+sr+Latn.arsc.flat
+|   |   |               values-be_values-be.arsc.flat
+|   |   |               values-bg_values-bg.arsc.flat
+|   |   |               values-bn_values-bn.arsc.flat
+|   |   |               values-bs_values-bs.arsc.flat
+|   |   |               values-ca_values-ca.arsc.flat
+|   |   |               values-cs_values-cs.arsc.flat
+|   |   |               values-da_values-da.arsc.flat
+|   |   |               values-de_values-de.arsc.flat
+|   |   |               values-el_values-el.arsc.flat
+|   |   |               values-en-rAU_values-en-rAU.arsc.flat
+|   |   |               values-en-rCA_values-en-rCA.arsc.flat
+|   |   |               values-en-rGB_values-en-rGB.arsc.flat
+|   |   |               values-en-rIN_values-en-rIN.arsc.flat
+|   |   |               values-en-rXC_values-en-rXC.arsc.flat
+|   |   |               values-es-rUS_values-es-rUS.arsc.flat
+|   |   |               values-es_values-es.arsc.flat
+|   |   |               values-et_values-et.arsc.flat
+|   |   |               values-eu_values-eu.arsc.flat
+|   |   |               values-fa_values-fa.arsc.flat
+|   |   |               values-fi_values-fi.arsc.flat
+|   |   |               values-fr-rCA_values-fr-rCA.arsc.flat
+|   |   |               values-fr_values-fr.arsc.flat
+|   |   |               values-gl_values-gl.arsc.flat
+|   |   |               values-gu_values-gu.arsc.flat
+|   |   |               values-h320dp-port-v13_values-h320dp-port-v13.arsc.flat
+|   |   |               values-h360dp-land-v13_values-h360dp-land-v13.arsc.flat
+|   |   |               values-h480dp-land-v13_values-h480dp-land-v13.arsc.flat
+|   |   |               values-h550dp-port-v13_values-h550dp-port-v13.arsc.flat
+|   |   |               values-h720dp-v13_values-h720dp-v13.arsc.flat
+|   |   |               values-hdpi-v4_values-hdpi-v4.arsc.flat
+|   |   |               values-hi_values-hi.arsc.flat
+|   |   |               values-hr_values-hr.arsc.flat
+|   |   |               values-hu_values-hu.arsc.flat
+|   |   |               values-hy_values-hy.arsc.flat
+|   |   |               values-in_values-in.arsc.flat
+|   |   |               values-is_values-is.arsc.flat
+|   |   |               values-it_values-it.arsc.flat
+|   |   |               values-iw_values-iw.arsc.flat
+|   |   |               values-ja_values-ja.arsc.flat
+|   |   |               values-ka_values-ka.arsc.flat
+|   |   |               values-kk_values-kk.arsc.flat
+|   |   |               values-km_values-km.arsc.flat
+|   |   |               values-kn_values-kn.arsc.flat
+|   |   |               values-ko_values-ko.arsc.flat
+|   |   |               values-ky_values-ky.arsc.flat
+|   |   |               values-land_values-land.arsc.flat
+|   |   |               values-large-v4_values-large-v4.arsc.flat
+|   |   |               values-ldltr-v21_values-ldltr-v21.arsc.flat
+|   |   |               values-ldrtl-v17_values-ldrtl-v17.arsc.flat
+|   |   |               values-lo_values-lo.arsc.flat
+|   |   |               values-lt_values-lt.arsc.flat
+|   |   |               values-lv_values-lv.arsc.flat
+|   |   |               values-mk_values-mk.arsc.flat
+|   |   |               values-ml_values-ml.arsc.flat
+|   |   |               values-mn_values-mn.arsc.flat
+|   |   |               values-mr_values-mr.arsc.flat
+|   |   |               values-ms_values-ms.arsc.flat
+|   |   |               values-my_values-my.arsc.flat
+|   |   |               values-nb_values-nb.arsc.flat
+|   |   |               values-ne_values-ne.arsc.flat
+|   |   |               values-night-v31_values-night-v31.arsc.flat
+|   |   |               values-night-v8_values-night-v8.arsc.flat
+|   |   |               values-nl_values-nl.arsc.flat
+|   |   |               values-or_values-or.arsc.flat
+|   |   |               values-pa_values-pa.arsc.flat
+|   |   |               values-pl_values-pl.arsc.flat
+|   |   |               values-port_values-port.arsc.flat
+|   |   |               values-pt-rBR_values-pt-rBR.arsc.flat
+|   |   |               values-pt-rPT_values-pt-rPT.arsc.flat
+|   |   |               values-pt_values-pt.arsc.flat
+|   |   |               values-ro_values-ro.arsc.flat
+|   |   |               values-ru_values-ru.arsc.flat
+|   |   |               values-si_values-si.arsc.flat
+|   |   |               values-sk_values-sk.arsc.flat
+|   |   |               values-sl_values-sl.arsc.flat
+|   |   |               values-small-v4_values-small-v4.arsc.flat
+|   |   |               values-sq_values-sq.arsc.flat
+|   |   |               values-sr_values-sr.arsc.flat
+|   |   |               values-sv_values-sv.arsc.flat
+|   |   |               values-sw600dp-v13_values-sw600dp-v13.arsc.flat
+|   |   |               values-sw_values-sw.arsc.flat
+|   |   |               values-ta_values-ta.arsc.flat
+|   |   |               values-te_values-te.arsc.flat
+|   |   |               values-th_values-th.arsc.flat
+|   |   |               values-tl_values-tl.arsc.flat
+|   |   |               values-tr_values-tr.arsc.flat
+|   |   |               values-uk_values-uk.arsc.flat
+|   |   |               values-ur_values-ur.arsc.flat
+|   |   |               values-uz_values-uz.arsc.flat
+|   |   |               values-v16_values-v16.arsc.flat
+|   |   |               values-v17_values-v17.arsc.flat
+|   |   |               values-v18_values-v18.arsc.flat
+|   |   |               values-v21_values-v21.arsc.flat
+|   |   |               values-v22_values-v22.arsc.flat
+|   |   |               values-v23_values-v23.arsc.flat
+|   |   |               values-v24_values-v24.arsc.flat
+|   |   |               values-v25_values-v25.arsc.flat
+|   |   |               values-v26_values-v26.arsc.flat
+|   |   |               values-v27_values-v27.arsc.flat
+|   |   |               values-v28_values-v28.arsc.flat
+|   |   |               values-v29_values-v29.arsc.flat
+|   |   |               values-v30_values-v30.arsc.flat
+|   |   |               values-v31_values-v31.arsc.flat
+|   |   |               values-v34_values-v34.arsc.flat
+|   |   |               values-vi_values-vi.arsc.flat
+|   |   |               values-w320dp-land-v13_values-w320dp-land-v13.arsc.flat
+|   |   |               values-w360dp-port-v13_values-w360dp-port-v13.arsc.flat
+|   |   |               values-w400dp-port-v13_values-w400dp-port-v13.arsc.flat
+|   |   |               values-w600dp-land-v13_values-w600dp-land-v13.arsc.flat
+|   |   |               values-watch-v20_values-watch-v20.arsc.flat
+|   |   |               values-watch-v21_values-watch-v21.arsc.flat
+|   |   |               values-xlarge-v4_values-xlarge-v4.arsc.flat
+|   |   |               values-zh-rCN_values-zh-rCN.arsc.flat
+|   |   |               values-zh-rHK_values-zh-rHK.arsc.flat
+|   |   |               values-zh-rTW_values-zh-rTW.arsc.flat
+|   |   |               values-zu_values-zu.arsc.flat
+|   |   |               values_values.arsc.flat
+|   |   |               
+|   |   +---merged_res_blame_folder
+|   |   |   \---debug
+|   |   |       \---mergeDebugResources
+|   |   |           \---out
+|   |   |               \---multi-v2
+|   |   |                       mergeDebugResources.json
+|   |   |                       values-af.json
+|   |   |                       values-am.json
+|   |   |                       values-ar.json
+|   |   |                       values-as.json
+|   |   |                       values-az.json
+|   |   |                       values-b+es+419.json
+|   |   |                       values-b+sr+Latn.json
+|   |   |                       values-be.json
+|   |   |                       values-bg.json
+|   |   |                       values-bn.json
+|   |   |                       values-bs.json
+|   |   |                       values-ca.json
+|   |   |                       values-cs.json
+|   |   |                       values-da.json
+|   |   |                       values-de.json
+|   |   |                       values-el.json
+|   |   |                       values-en-rAU.json
+|   |   |                       values-en-rCA.json
+|   |   |                       values-en-rGB.json
+|   |   |                       values-en-rIN.json
+|   |   |                       values-en-rXC.json
+|   |   |                       values-es-rUS.json
+|   |   |                       values-es.json
+|   |   |                       values-et.json
+|   |   |                       values-eu.json
+|   |   |                       values-fa.json
+|   |   |                       values-fi.json
+|   |   |                       values-fr-rCA.json
+|   |   |                       values-fr.json
+|   |   |                       values-gl.json
+|   |   |                       values-gu.json
+|   |   |                       values-h320dp-port-v13.json
+|   |   |                       values-h360dp-land-v13.json
+|   |   |                       values-h480dp-land-v13.json
+|   |   |                       values-h550dp-port-v13.json
+|   |   |                       values-h720dp-v13.json
+|   |   |                       values-hdpi-v4.json
+|   |   |                       values-hi.json
+|   |   |                       values-hr.json
+|   |   |                       values-hu.json
+|   |   |                       values-hy.json
+|   |   |                       values-in.json
+|   |   |                       values-is.json
+|   |   |                       values-it.json
+|   |   |                       values-iw.json
+|   |   |                       values-ja.json
+|   |   |                       values-ka.json
+|   |   |                       values-kk.json
+|   |   |                       values-km.json
+|   |   |                       values-kn.json
+|   |   |                       values-ko.json
+|   |   |                       values-ky.json
+|   |   |                       values-land.json
+|   |   |                       values-large-v4.json
+|   |   |                       values-ldltr-v21.json
+|   |   |                       values-ldrtl-v17.json
+|   |   |                       values-lo.json
+|   |   |                       values-lt.json
+|   |   |                       values-lv.json
+|   |   |                       values-mk.json
+|   |   |                       values-ml.json
+|   |   |                       values-mn.json
+|   |   |                       values-mr.json
+|   |   |                       values-ms.json
+|   |   |                       values-my.json
+|   |   |                       values-nb.json
+|   |   |                       values-ne.json
+|   |   |                       values-night-v31.json
+|   |   |                       values-night-v8.json
+|   |   |                       values-nl.json
+|   |   |                       values-or.json
+|   |   |                       values-pa.json
+|   |   |                       values-pl.json
+|   |   |                       values-port.json
+|   |   |                       values-pt-rBR.json
+|   |   |                       values-pt-rPT.json
+|   |   |                       values-pt.json
+|   |   |                       values-ro.json
+|   |   |                       values-ru.json
+|   |   |                       values-si.json
+|   |   |                       values-sk.json
+|   |   |                       values-sl.json
+|   |   |                       values-small-v4.json
+|   |   |                       values-sq.json
+|   |   |                       values-sr.json
+|   |   |                       values-sv.json
+|   |   |                       values-sw.json
+|   |   |                       values-sw600dp-v13.json
+|   |   |                       values-ta.json
+|   |   |                       values-te.json
+|   |   |                       values-th.json
+|   |   |                       values-tl.json
+|   |   |                       values-tr.json
+|   |   |                       values-uk.json
+|   |   |                       values-ur.json
+|   |   |                       values-uz.json
+|   |   |                       values-v16.json
+|   |   |                       values-v17.json
+|   |   |                       values-v18.json
+|   |   |                       values-v21.json
+|   |   |                       values-v22.json
+|   |   |                       values-v23.json
+|   |   |                       values-v24.json
+|   |   |                       values-v25.json
+|   |   |                       values-v26.json
+|   |   |                       values-v27.json
+|   |   |                       values-v28.json
+|   |   |                       values-v29.json
+|   |   |                       values-v30.json
+|   |   |                       values-v31.json
+|   |   |                       values-v34.json
+|   |   |                       values-vi.json
+|   |   |                       values-w320dp-land-v13.json
+|   |   |                       values-w360dp-port-v13.json
+|   |   |                       values-w400dp-port-v13.json
+|   |   |                       values-w600dp-land-v13.json
+|   |   |                       values-watch-v20.json
+|   |   |                       values-watch-v21.json
+|   |   |                       values-xlarge-v4.json
+|   |   |                       values-zh-rCN.json
+|   |   |                       values-zh-rHK.json
+|   |   |                       values-zh-rTW.json
+|   |   |                       values-zu.json
+|   |   |                       values.json
+|   |   |                       
+|   |   +---merged_test_only_native_libs
+|   |   |   \---debug
+|   |   |       \---mergeDebugNativeLibs
+|   |   |           \---out
+|   |   +---navigation_json
+|   |   |   \---debug
+|   |   |       \---extractDeepLinksDebug
+|   |   |               navigation.json
+|   |   |               
+|   |   +---nested_resources_validation_report
+|   |   |   \---debug
+|   |   |       \---generateDebugResources
+|   |   |               nestedResourcesValidationReport.txt
+|   |   |               
+|   |   +---packaged_res
+|   |   |   \---debug
+|   |   |       \---packageDebugResources
+|   |   +---signing_config_versions
+|   |   |   \---debug
+|   |   |       \---writeDebugSigningConfigVersions
+|   |   |               signing-config-versions.json
+|   |   |               
+|   |   +---stripped_native_libs
+|   |   |   \---debug
+|   |   |       \---stripDebugDebugSymbols
+|   |   |           \---out
+|   |   |               \---lib
+|   |   |                   +---arm64-v8a
+|   |   |                   |       libandroidx.graphics.path.so
+|   |   |                   |       
+|   |   |                   +---armeabi-v7a
+|   |   |                   |       libandroidx.graphics.path.so
+|   |   |                   |       
+|   |   |                   +---x86
+|   |   |                   |       libandroidx.graphics.path.so
+|   |   |                   |       
+|   |   |                   \---x86_64
+|   |   |                           libandroidx.graphics.path.so
+|   |   |                           
+|   |   +---symbol_list_with_package_name
+|   |   |   \---debug
+|   |   |       \---generateDebugRFile
+|   |   |               package-aware-r.txt
+|   |   |               
+|   |   \---validate_signing_config
+|   |       \---debug
+|   |           \---validateSigningDebug
+|   \---reports
+|       \---problems
+|               problems-report.html
+|               
++---fastlane
+|   \---metadata
+|       \---android
+|           \---en-US
+|                   long_description.txt
+|                   short_description.txt
+|                   title.txt
+|                   
++---GAMA for Android
+|       changelog.txt
+|       
+\---gradle
+    |   libs.versions.toml
+    |   
+    \---wrapper
+            gradle-wrapper.jar
+            gradle-wrapper.properties
+            

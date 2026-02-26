@@ -1,0 +1,1 @@
+A specialized utility to manage and switch GPU rendering APIs via Shizuku

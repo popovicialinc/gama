@@ -1,0 +1,10 @@
+GAMA (Graphics API Manager for Android) gives you control over your device's GPU rendering API without requiring root access. Whether you are looking to optimize performance or extend your hardware's lifespan, GAMA makes it simple to switch between Vulkan and OpenGL.
+
+Key Features:
+• ❄️ Lower Temperatures: Reduce heat by optimizing GPU overhead.
+• 🔋 Improved Battery Life: Enhance efficiency through smart rendering choices.
+• 🔓 Zero Risk: 100% Knox-safe and no root required—uses Shizuku for secure command execution.
+• 🛠️ User-Friendly: A beautiful UI designed to replace complex terminal commands.
+• 🤖 Automation: Supports Tasker for automated API switching.
+
+Whilst optimised for the Samsung Galaxy S23 lineup, GAMA is compatible with any modern Android device.
