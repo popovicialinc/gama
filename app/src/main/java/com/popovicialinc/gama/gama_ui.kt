@@ -1924,7 +1924,7 @@ fun GamaUI(
             showVerbosePanel || showAppSelector || showAggressiveWarning || showGPUWatchConfirm ||
             showDeveloper || showEasterEgg || showNotifications
 
-    val currentVersion = "1.2"
+    val currentVersion = "1.2.1"
 
     // Gradient "Come Alive" Animation on Startup
     val gradientStartupAlpha = remember { Animatable(0f) }

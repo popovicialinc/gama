@@ -16,8 +16,8 @@ android {
         applicationId = "com.popovicialinc.gama"
         minSdk = 29
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.2.1"
 
         vectorDrawables.useSupportLibrary = true
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -104,7 +104,6 @@ dependencies {
 
     // Other
     implementation("androidx.core:core-splashscreen:1.1.0-rc01")
-    implementation("com.google.android.material:material:1.11.0")
 
     // Shizuku
     implementation("dev.rikka.shizuku:api:${shizukuVersion}")
