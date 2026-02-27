@@ -104,6 +104,7 @@ dependencies {
 
     // Other
     implementation("androidx.core:core-splashscreen:1.1.0-rc01")
+    implementation("com.google.android.material:material:1.11.0")
 
     // Shizuku
     implementation("dev.rikka.shizuku:api:${shizukuVersion}")

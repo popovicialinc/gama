@@ -83,59 +83,6 @@ object ShizukuHelper {
         }
     }
 
-    suspend fun checkVersion(currentVersion: String): String {
-        return withContext(Dispatchers.IO) {
-            try {
-                val url = java.net.URL("https://raw.githubusercontent.com/popovicialinc/gama/main/version_android.txt")
-                val connection = url.openConnection()
-                connection.connectTimeout = 5000
-                connection.readTimeout = 5000
-
-                val latestVersion = connection.getInputStream().bufferedReader().use {
-                    it.readText().trim()
-                }
-
-                if (latestVersion.isEmpty()) {
-                    return@withContext "Unable to check version"
-                }
-
-                val current = parseVersion(currentVersion)
-                val latest = parseVersion(latestVersion)
-
-                val majorComparison = current.first.compareTo(latest.first)
-                val minorComparison = current.second.compareTo(latest.second)
-                val patchComparison = current.third.compareTo(latest.third)
-
-                val result = when {
-                    majorComparison != 0 -> majorComparison
-                    minorComparison != 0 -> minorComparison
-                    else -> patchComparison
-                }
-
-                when (result) {
-                    -1 -> "Update available: v$latestVersion"
-                    1 -> "You're ahead of release!"
-                    else -> "You're up to date ✓"
-                }
-            } catch (e: Exception) {
-                "Unable to check version: ${e.message}"
-            }
-        }
-    }
-
-    private fun parseVersion(version: String): Triple<Int, Int, Int> {
-        return try {
-            val parts = version.split(".")
-            Triple(
-                parts.getOrNull(0)?.toIntOrNull() ?: 0,
-                parts.getOrNull(1)?.toIntOrNull() ?: 0,
-                parts.getOrNull(2)?.toIntOrNull() ?: 0
-            )
-        } catch (e: Exception) {
-            Triple(0, 0, 0)
-        }
-    }
-
     // ============================================================================
     // SUSPEND IMPLEMENTATIONS
     // These do the actual work and can be awaited properly by any caller,
