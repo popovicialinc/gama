@@ -12,13 +12,13 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK }}
           username: "GAMA Engine"
-          avatar_url: "https://github.com/popovicialinc/gama/raw/main/icon.png"
+          # pointed to the raw usercontent link so discord can actually see it
+          avatar_url: "https://raw.githubusercontent.com/popovicialinc/gama/main/%21assets/icon.png"
           color: "#5865F2"
           message: |
-            🚀 **A new version of gama is live!**
+            # 🚀 **A new version of GAMA is live!**
             
-            **Version:** ${{ github.event.release.tag_name }}
-            **What's new:** ${{ github.event.release.body }}
+            📱 **Version:** `${{ github.event.release.tag_name }}`
             
-            📥 **Download it here:**
+            📥 **Download the update here:**
             ${{ github.event.release.html_url }}
