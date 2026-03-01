@@ -1,0 +1,24 @@
+name: announce release
+on:
+  release:
+    types: [published]
+
+jobs:
+  discord-announcement:
+    runs-on: ubuntu-latest
+    steps:
+      - name: notify discord
+        uses: appleboy/discord-action@master
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK }}
+          username: "GAMA Engine"
+          avatar_url: "https://github.com/popovicialinc/gama/raw/main/icon.png"
+          color: "#5865F2"
+          message: |
+            🚀 **A new version of gama is live!**
+            
+            **Version:** ${{ github.event.release.tag_name }}
+            **What's new:** ${{ github.event.release.body }}
+            
+            📥 **Download it here:**
+            ${{ github.event.release.html_url }}
