@@ -11,7 +11,7 @@ jobs:
         uses: appleboy/discord-action@master
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK }}
-          username: "gama engine"
+          username: "GAMA Engine"
           avatar_url: "https://raw.githubusercontent.com/popovicialinc/gama/main/%21assets/icon.png"
           color: "#5865F2"
           message: |
