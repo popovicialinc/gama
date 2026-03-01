@@ -2,6 +2,7 @@ name: announce release
 on:
   release:
     types: [published]
+    workflow_dispatch: #
 
 jobs:
   discord-announcement:
