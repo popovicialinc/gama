@@ -15,9 +15,9 @@ jobs:
           avatar_url: "https://raw.githubusercontent.com/popovicialinc/gama/main/%21assets/icon.png"
           color: "#5865F2"
           message: |
-            # 🚀 a new version of gama is live!
+            # 🚀 A new version of GAMA is live!
 
-            📱 **version:** `${{ github.event.release.tag_name }}`
+            📱 **Version:** `${{ github.event.release.tag_name }}`
 
-            📥 **download the update here:**
+            📥 **Download the update here:**
             ${{ github.event.release.html_url }}
