@@ -2,7 +2,6 @@ name: announce release
 on:
   release:
     types: [published]
-    workflow_dispatch: #
 
 jobs:
   discord-announcement:
@@ -16,9 +15,9 @@ jobs:
           avatar_url: "https://raw.githubusercontent.com/popovicialinc/gama/main/%21assets/icon.png"
           color: "#5865F2"
           message: |
-            # 🚀 A new version of GAMA is live!
+            # 🚀 a new version of gama is live!
 
-            📱 **Version:** `${{ github.event.release.tag_name }}`
+            📱 **version:** `${{ github.event.release.tag_name }}`
 
-            📥 **Download the update here:**
+            📥 **download the update here:**
             ${{ github.event.release.html_url }}
