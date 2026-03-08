@@ -24,13 +24,15 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
 * 🔓 **Zero risk** - Root is not required, 100% Knox-safe.
 * 🛠️ **User-friendliness** - Simple yet beautiful UI to switch APIs without complex terminal commands
 
+Vulkan may not run smoothly across EVERY Android phone, there's simply too much variation between Android skins and hardware
+
 ![Downloads](https://img.shields.io/github/downloads/popovicialinc/gama/total?style=flat&label=DOWNLOADS&labelColor=%23111111&color=%233b2f5b)
 
 **Extra resources**
+* 🛜 [**The GAMA Discord Server**](https://discord.gg/Kh8ajAVUGx)
 * 📱 [**Does Vulkan work on my device?**](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
+    * Vulkan support can vary between Android devices and One UI versions, so performance may differ, especially on versions below One UI 7 (Android 15). You’re always welcome to give it a try though! If something doesn’t work as expected, a quick reboot will bring everything back to normal.
     * If your device is not listed, please kindly follow [this link](https://forms.gle/qYUHHhaQNLiY9i1MA) where you will be able to fill out a form - The relevant, collected data will be added to the [spreadsheet](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
-    * In case your device is unstable or unresponsive under Vulkan, press and hold Power + Volume Down for 5-10 seconds to force a restart, after which your device will return to normal!
-* 💡 [**Suggestion Box**](https://forms.gle/5vFWyMEsReFwPo489)
 * ☕ If you want to support the development of GAMA, [**consider donating**](https://buymeacoffee.com/popovicialinc)!
 
 <br>
@@ -116,7 +118,7 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
 <summary><b>🔸 Caused by GAMA* ("Aggressive" Profile Side Effects)</b></summary>
 <br>
   <p><b>"Aggressive" Profile Warning</b></p>
-  <p>Using the <b>Aggressive</b> profile for stopping background apps is nuclear. While 99% of users won't need this, be aware of the side effects:</p>
+  <p>Using the <b>Aggressive</b> profile for stopping background apps is nuclear. While 99% of users won't use this, be aware of the side effects:</p>
   <ul>
     <li><b>Resets Defaults:</b> Your default browser and keyboard will be reset.</li>
     <li><b>Connectivity Loss:</b> Possible loss of WiFi-Calling/VoLTE capability.</li>
