@@ -47,41 +47,44 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 private val KEY_ACTION = ActionParameters.Key<String>("widget_action")
 
+/**
+ * Minimalist glass palette.
+ * Everything is expressed as white-with-alpha so the widget reads cleanly
+ * against ANY wallpaper, dark or light.  Accent colours are kept soft so
+ * they feel luminous rather than garish.
+ */
 private object C {
-    // Text
-    val white      = Color(0xFFFFFFFF)
-    val grey1      = Color(0xFFCCCCCC)   // primary secondary
-    val grey2      = Color(0xFF888888)   // tertiary
-    val grey3      = Color(0xFF444444)   // dimmed labels
+    val white80     = Color(0xCCFFFFFF)
+    val white60     = Color(0x99FFFFFF)
+    val white30     = Color(0x4DFFFFFF)
+    val white10     = Color(0x1AFFFFFF)
 
-    // Accents
-    val purple     = Color(0xFF9B8FFF)   // Vulkan
-    val purpleDim  = Color(0xFF6B5FCC)
-    val green      = Color(0xFF3ECFA0)   // OpenGL
-    val greenDim   = Color(0xFF2A9970)
-    val amber      = Color(0xFFFFCC44)   // warning
+    // Renderer accents — intentionally muted, not neon
+    val vulkan      = Color(0xFFB39DFF)   // soft lavender
+    val opengl      = Color(0xFF5DEFC4)   // soft mint
+    val error       = Color(0xFFFF6B6B)
 
-    // Surfaces (used only where Image drawables can't be used)
-    val innerCard  = Color(0xCC0D0D10)
-    val pillIdle   = Color(0x28FFFFFF)
+    val amber       = Color(0xFFFFD060)
+
+    // Glass surface
+    val glass       = Color(0x26FFFFFF)
 }
 
-private fun cp(c: Color)  = ColorProvider(c)
-private fun sp(v: Float)  = TextUnit(v, TextUnitType.Sp)
+private fun cp(c: Color) = ColorProvider(c)
+private fun sp(v: Float) = TextUnit(v, TextUnitType.Sp)
 
 private fun rendererColor(r: String) = when (r) {
-    "Vulkan" -> C.purple
-    "OpenGL" -> C.green
-    else     -> C.grey2
+    "Vulkan" -> C.vulkan
+    "OpenGL" -> C.opengl
+    else     -> C.white60
 }
 
 private fun bgDrawable(r: String) = when (r) {
@@ -113,7 +116,6 @@ class GamaWidget : GlanceAppWidget() {
     )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        // Read state — everything in safe try/catch with sane defaults
         var renderer     = "OpenGL"
         var shizukuReady = false
 
@@ -161,45 +163,24 @@ private fun WidgetRoot(renderer: String, shizukuReady: Boolean) {
 // Shared micro-components
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Coloured status dot */
+/** Tiny glowing status dot */
 @Composable
-private fun Dot(ready: Boolean, sizeDp: Int = 7) {
+private fun Dot(ready: Boolean, sizeDp: Int = 6) {
     Box(
         modifier = GlanceModifier
             .size(sizeDp.dp)
-            .background(if (ready) C.green else Color(0xFFFF6B6B))
+            .background(if (ready) C.opengl else C.error)
             .cornerRadius(R.dimen.widget_corner_radius_dot)
     ) {}
 }
 
-/** Small "VULKAN" / "OPENGL" badge */
-@Composable
-private fun RendererBadge(renderer: String, fontSize: Float = 10f) {
-    Box(
-        modifier = GlanceModifier
-            .background(rendererColor(renderer).copy(alpha = 0.20f))
-            .cornerRadius(R.dimen.widget_corner_radius_small)
-            .padding(horizontal = 8.dp, vertical = 3.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            renderer.uppercase(),
-            style = TextStyle(
-                color = cp(rendererColor(renderer)),
-                fontSize = sp(fontSize),
-                fontWeight = FontWeight.Bold
-            )
-        )
-    }
-}
-
 /**
- * A switch button that uses a gradient XML drawable for the active state
- * and a flat idle drawable for the inactive state — much richer than a
- * plain background colour.
+ * Clean pill button.
+ * Active = gradient drawable (branded).
+ * Idle   = subtle frosted glass pill (near-invisible, very minimal).
  */
 @Composable
-private fun SwitchBtn(
+private fun PillBtn(
     label: String,
     active: Boolean,
     action: String,
@@ -217,50 +198,10 @@ private fun SwitchBtn(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalAlignment   = Alignment.CenterVertically
-        ) {
-            Text(
-                label,
-                style = TextStyle(
-                    color      = cp(if (active) C.white else C.grey1),
-                    fontSize   = sp(13f),
-                    fontWeight = FontWeight.Bold,
-                    textAlign  = TextAlign.Center
-                )
-            )
-            if (active) {
-                Spacer(GlanceModifier.height(1.dp))
-                Text(
-                    "● active",
-                    style = TextStyle(
-                        color     = cp(if (action == "vulkan") C.purple else C.green),
-                        fontSize  = sp(8f),
-                        textAlign = TextAlign.Center
-                    )
-                )
-            }
-        }
-    }
-}
-
-/** Shizuku warning bar — tapping opens the app */
-@Composable
-private fun ShizukuWarning(launchApp: androidx.glance.action.Action, height: Int = 40) {
-    Box(
-        modifier = GlanceModifier
-            .fillMaxWidth()
-            .height(height.dp)
-            .background(C.amber.copy(alpha = 0.14f))
-            .cornerRadius(R.dimen.widget_corner_radius_pill)
-            .clickable(launchApp),
-        contentAlignment = Alignment.Center
-    ) {
         Text(
-            "⚠  Open GAMA to enable Shizuku",
+            label.uppercase(),
             style = TextStyle(
-                color      = cp(C.amber),
+                color      = cp(if (active) Color(0xFFFFFFFF) else C.white60),
                 fontSize   = sp(11f),
                 fontWeight = FontWeight.Bold,
                 textAlign  = TextAlign.Center
@@ -269,8 +210,32 @@ private fun ShizukuWarning(launchApp: androidx.glance.action.Action, height: Int
     }
 }
 
+/** Amber "needs Shizuku" warning — tap opens app */
+@Composable
+private fun ShizukuPill(launchApp: androidx.glance.action.Action, heightDp: Int = 36) {
+    Box(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .height(heightDp.dp)
+            .background(C.amber.copy(alpha = 0.14f))
+            .cornerRadius(R.dimen.widget_corner_radius_pill)
+            .clickable(launchApp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            "⚠  Shizuku needed  —  tap to open",
+            style = TextStyle(
+                color      = cp(C.amber),
+                fontSize   = sp(10f),
+                fontWeight = FontWeight.Bold,
+                textAlign  = TextAlign.Center
+            )
+        )
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// 2 × 1  ── ultra-compact pill
+// 2 × 1  ── pill  (ultra-compact: just the renderer name)
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun Pill(renderer: String, shizukuReady: Boolean, open: androidx.glance.action.Action) {
@@ -280,24 +245,26 @@ private fun Pill(renderer: String, shizukuReady: Boolean, open: androidx.glance.
             .background(ImageProvider(bgDrawable(renderer)))
             .cornerRadius(R.dimen.widget_corner_radius_large)
             .clickable(open)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "GAMA",
-                style = TextStyle(color = cp(C.purple), fontSize = sp(12f), fontWeight = FontWeight.Bold)
+                renderer.uppercase(),
+                style = TextStyle(
+                    color      = cp(rendererColor(renderer)),
+                    fontSize   = sp(14f),
+                    fontWeight = FontWeight.Bold
+                )
             )
-            Spacer(GlanceModifier.width(8.dp))
-            RendererBadge(renderer)
             Spacer(GlanceModifier.defaultWeight())
-            Dot(shizukuReady)
+            Dot(shizukuReady, 7)
         }
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2 × 2  ── small square
+// 2 × 2  ── small square  (renderer name, big; minimal chrome)
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun Small(renderer: String, shizukuReady: Boolean, open: androidx.glance.action.Action) {
@@ -307,51 +274,47 @@ private fun Small(renderer: String, shizukuReady: Boolean, open: androidx.glance
             .background(ImageProvider(bgDrawable(renderer)))
             .cornerRadius(R.dimen.widget_corner_radius_large)
             .clickable(open)
-            .padding(14.dp),
+            .padding(16.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
-            modifier = GlanceModifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalAlignment   = Alignment.CenterVertically
+            modifier            = GlanceModifier.fillMaxSize(),
+            horizontalAlignment = Alignment.Start,
+            verticalAlignment   = Alignment.Top
         ) {
-            // Top row
+            // Top row: wordmark + dot
             Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("GAMA", style = TextStyle(color = cp(C.grey2), fontSize = sp(10f), fontWeight = FontWeight.Bold))
+                Text(
+                    "GAMA",
+                    style = TextStyle(color = cp(C.white30), fontSize = sp(9f), fontWeight = FontWeight.Bold)
+                )
                 Spacer(GlanceModifier.defaultWeight())
                 Dot(shizukuReady)
             }
 
             Spacer(GlanceModifier.defaultWeight())
 
-            // Big renderer name
+            // Renderer — the hero
             Text(
                 renderer.uppercase(),
                 style = TextStyle(
                     color      = cp(rendererColor(renderer)),
-                    fontSize   = sp(26f),
+                    fontSize   = sp(28f),
                     fontWeight = FontWeight.Bold,
-                    textAlign  = TextAlign.Center
+                    textAlign  = TextAlign.Start
                 )
             )
-            Spacer(GlanceModifier.height(3.dp))
+            Spacer(GlanceModifier.height(2.dp))
             Text(
-                "active renderer",
-                style = TextStyle(color = cp(C.grey3), fontSize = sp(9f), textAlign = TextAlign.Center)
-            )
-
-            Spacer(GlanceModifier.defaultWeight())
-
-            Text(
-                "tap to open →",
-                style = TextStyle(color = cp(C.grey3), fontSize = sp(9f), textAlign = TextAlign.Center)
+                "active",
+                style = TextStyle(color = cp(C.white30), fontSize = sp(9f))
             )
         }
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3 × 2  ── medium landscape
+// 3 × 2  ── medium  (renderer + two pills)
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun Medium(renderer: String, shizukuReady: Boolean, open: androidx.glance.action.Action) {
@@ -363,17 +326,20 @@ private fun Medium(renderer: String, shizukuReady: Boolean, open: androidx.glanc
             .padding(14.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.Top) {
+        Column(modifier = GlanceModifier.fillMaxSize()) {
             // Header
             Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("GAMA", style = TextStyle(color = cp(C.purple), fontSize = sp(11f), fontWeight = FontWeight.Bold))
+                Text(
+                    "GAMA",
+                    style = TextStyle(color = cp(C.white60), fontSize = sp(10f), fontWeight = FontWeight.Bold)
+                )
                 Spacer(GlanceModifier.defaultWeight())
-                Dot(shizukuReady)
+                Dot(shizukuReady, 6)
                 Spacer(GlanceModifier.width(4.dp))
                 Text(
-                    if (shizukuReady) "ready" else "no shizuku",
+                    if (shizukuReady) "ready" else "offline",
                     style = TextStyle(
-                        color    = cp(if (shizukuReady) C.green else Color(0xFFFF6B6B)),
+                        color    = cp(if (shizukuReady) C.opengl else C.error),
                         fontSize = sp(9f)
                     )
                 )
@@ -381,46 +347,40 @@ private fun Medium(renderer: String, shizukuReady: Boolean, open: androidx.glanc
 
             Spacer(GlanceModifier.defaultWeight())
 
-            // Renderer label
             Text(
                 renderer.uppercase(),
-                style = TextStyle(color = cp(rendererColor(renderer)), fontSize = sp(22f), fontWeight = FontWeight.Bold)
+                style = TextStyle(
+                    color      = cp(rendererColor(renderer)),
+                    fontSize   = sp(24f),
+                    fontWeight = FontWeight.Bold
+                )
             )
             Text(
                 "active renderer",
-                style = TextStyle(color = cp(C.grey3), fontSize = sp(9f))
+                style = TextStyle(color = cp(C.white30), fontSize = sp(9f))
             )
 
             Spacer(GlanceModifier.defaultWeight())
 
-            // Buttons or warning
             if (shizukuReady) {
                 Row(modifier = GlanceModifier.fillMaxWidth()) {
-                    SwitchBtn(
-                        label          = "Vulkan",
-                        active         = renderer == "Vulkan",
-                        action         = "vulkan",
-                        activeDrawable = R.drawable.widget_btn_vulkan_active,
-                        modifier       = GlanceModifier.defaultWeight().height(38.dp)
-                    )
+                    PillBtn("Vulkan", renderer == "Vulkan", "vulkan",
+                        R.drawable.widget_btn_vulkan_active,
+                        GlanceModifier.defaultWeight().height(36.dp))
                     Spacer(GlanceModifier.width(8.dp))
-                    SwitchBtn(
-                        label          = "OpenGL",
-                        active         = renderer == "OpenGL",
-                        action         = "opengl",
-                        activeDrawable = R.drawable.widget_btn_opengl_active,
-                        modifier       = GlanceModifier.defaultWeight().height(38.dp)
-                    )
+                    PillBtn("OpenGL", renderer == "OpenGL", "opengl",
+                        R.drawable.widget_btn_opengl_active,
+                        GlanceModifier.defaultWeight().height(36.dp))
                 }
             } else {
-                ShizukuWarning(open, 38)
+                ShizukuPill(open, 36)
             }
         }
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4 × 2  ── wide
+// 4 × 2  ── wide  (split: big renderer label left, stacked pills right)
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun Wide(renderer: String, shizukuReady: Boolean, open: androidx.glance.action.Action) {
@@ -429,61 +389,75 @@ private fun Wide(renderer: String, shizukuReady: Boolean, open: androidx.glance.
             .fillMaxSize()
             .background(ImageProvider(bgDrawable(renderer)))
             .cornerRadius(R.dimen.widget_corner_radius_large)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 18.dp, vertical = 14.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = GlanceModifier.fillMaxSize()) {
             // Header
             Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("GAMA", style = TextStyle(color = cp(C.purple), fontSize = sp(11f), fontWeight = FontWeight.Bold))
+                Text(
+                    "GAMA",
+                    style = TextStyle(color = cp(C.white60), fontSize = sp(10f), fontWeight = FontWeight.Bold)
+                )
                 Spacer(GlanceModifier.width(5.dp))
-                Text("Renderer Control", style = TextStyle(color = cp(C.grey3), fontSize = sp(9f)))
+                Text("·  Renderer", style = TextStyle(color = cp(C.white30), fontSize = sp(9f)))
                 Spacer(GlanceModifier.defaultWeight())
                 Dot(shizukuReady)
                 Spacer(GlanceModifier.width(4.dp))
                 Text(
                     if (shizukuReady) "Shizuku ✓" else "Shizuku ✗",
                     style = TextStyle(
-                        color = cp(if (shizukuReady) C.green else Color(0xFFFF6B6B)),
-                        fontSize = sp(9f), fontWeight = FontWeight.Bold
+                        color      = cp(if (shizukuReady) C.opengl else C.error),
+                        fontSize   = sp(9f),
+                        fontWeight = FontWeight.Bold
                     )
                 )
             }
 
             Spacer(GlanceModifier.defaultWeight())
 
-            // Content: renderer left, buttons right
             Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                // Left: dominant renderer label
                 Column(modifier = GlanceModifier.defaultWeight()) {
-                    Text("Active", style = TextStyle(color = cp(C.grey3), fontSize = sp(9f)))
-                    Spacer(GlanceModifier.height(2.dp))
                     Text(
                         renderer.uppercase(),
-                        style = TextStyle(color = cp(rendererColor(renderer)), fontSize = sp(26f), fontWeight = FontWeight.Bold)
+                        style = TextStyle(
+                            color      = cp(rendererColor(renderer)),
+                            fontSize   = sp(30f),
+                            fontWeight = FontWeight.Bold
+                        )
                     )
+                    Text("active", style = TextStyle(color = cp(C.white30), fontSize = sp(9f)))
                 }
+
+                // Right: stacked pills or amber CTA
                 if (shizukuReady) {
                     Column(horizontalAlignment = Alignment.End) {
-                        SwitchBtn("Vulkan", renderer == "Vulkan", "vulkan",
+                        PillBtn("Vulkan", renderer == "Vulkan", "vulkan",
                             R.drawable.widget_btn_vulkan_active,
-                            GlanceModifier.width(112.dp).height(34.dp))
+                            GlanceModifier.width(108.dp).height(32.dp))
                         Spacer(GlanceModifier.height(6.dp))
-                        SwitchBtn("OpenGL", renderer == "OpenGL", "opengl",
+                        PillBtn("OpenGL", renderer == "OpenGL", "opengl",
                             R.drawable.widget_btn_opengl_active,
-                            GlanceModifier.width(112.dp).height(34.dp))
+                            GlanceModifier.width(108.dp).height(32.dp))
                     }
                 } else {
                     Box(
                         modifier = GlanceModifier
-                            .width(130.dp).height(56.dp)
-                            .background(C.amber.copy(alpha = 0.13f))
+                            .width(108.dp).height(56.dp)
+                            .background(C.amber.copy(alpha = 0.12f))
                             .cornerRadius(R.dimen.widget_corner_radius_pill)
                             .clickable(open),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             "Open\nGAMA",
-                            style = TextStyle(color = cp(C.amber), fontSize = sp(12f), fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                            style = TextStyle(
+                                color      = cp(C.amber),
+                                fontSize   = sp(11f),
+                                fontWeight = FontWeight.Bold,
+                                textAlign  = TextAlign.Center
+                            )
                         )
                     }
                 }
@@ -493,7 +467,7 @@ private fun Wide(renderer: String, shizukuReady: Boolean, open: androidx.glance.
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4 × 3  ── tall-wide
+// 4 × 3  ── tall  (glass inner hero card + wide pills)
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun Tall(renderer: String, shizukuReady: Boolean, open: androidx.glance.action.Action) {
@@ -505,100 +479,103 @@ private fun Tall(renderer: String, shizukuReady: Boolean, open: androidx.glance.
             .padding(horizontal = 16.dp, vertical = 14.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.Top) {
-            // Header row
+        Column(modifier = GlanceModifier.fillMaxSize()) {
+            // Header
             Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("GAMA", style = TextStyle(color = cp(C.purple), fontSize = sp(12f), fontWeight = FontWeight.Bold))
+                Text(
+                    "GAMA",
+                    style = TextStyle(color = cp(C.white80), fontSize = sp(12f), fontWeight = FontWeight.Bold)
+                )
                 Spacer(GlanceModifier.defaultWeight())
-                // Shizuku chip
+                // Frosted status chip
                 Box(
                     modifier = GlanceModifier
-                        .background(ImageProvider(R.drawable.widget_chip))
+                        .background(C.glass)
                         .cornerRadius(R.dimen.widget_corner_radius_small)
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Dot(shizukuReady, 6)
+                        Dot(shizukuReady, 5)
                         Spacer(GlanceModifier.width(4.dp))
                         Text(
-                            if (shizukuReady) "Shizuku" else "No Shizuku",
+                            if (shizukuReady) "Ready" else "Offline",
                             style = TextStyle(
-                                color = cp(if (shizukuReady) C.green else Color(0xFFFF6B6B)),
-                                fontSize = sp(9f), fontWeight = FontWeight.Bold
+                                color      = cp(if (shizukuReady) C.opengl else C.error),
+                                fontSize   = sp(9f),
+                                fontWeight = FontWeight.Bold
                             )
                         )
                     }
                 }
             }
 
-            Spacer(GlanceModifier.height(10.dp))
+            Spacer(GlanceModifier.height(12.dp))
 
-            // Inner renderer card
+            // Glass hero card — centrepiece of the widget
             Box(
                 modifier = GlanceModifier
                     .fillMaxWidth()
                     .background(ImageProvider(R.drawable.widget_inner_card))
                     .cornerRadius(R.dimen.widget_corner_radius_medium)
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalAlignment   = Alignment.CenterVertically
+                ) {
                     Text(
-                        "ACTIVE RENDERER",
-                        style = TextStyle(color = cp(C.grey3), fontSize = sp(8f), fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                        "ACTIVE",
+                        style = TextStyle(
+                            color      = cp(C.white30),
+                            fontSize   = sp(8f),
+                            fontWeight = FontWeight.Bold,
+                            textAlign  = TextAlign.Center
+                        )
                     )
-                    Spacer(GlanceModifier.height(5.dp))
+                    Spacer(GlanceModifier.height(4.dp))
                     Text(
                         renderer.uppercase(),
                         style = TextStyle(
-                            color = cp(rendererColor(renderer)), fontSize = sp(30f),
-                            fontWeight = FontWeight.Bold, textAlign = TextAlign.Center
+                            color      = cp(rendererColor(renderer)),
+                            fontSize   = sp(32f),
+                            fontWeight = FontWeight.Bold,
+                            textAlign  = TextAlign.Center
                         )
-                    )
-                    Spacer(GlanceModifier.height(3.dp))
-                    Text(
-                        when (renderer) {
-                            "Vulkan" -> "High-performance GPU pipeline"
-                            "OpenGL" -> "Standard GPU pipeline"
-                            else     -> "GPU pipeline"
-                        },
-                        style = TextStyle(color = cp(C.grey2), fontSize = sp(9f), textAlign = TextAlign.Center)
                     )
                 }
             }
 
             Spacer(GlanceModifier.height(10.dp))
 
-            // Buttons
+            // Pills
             if (shizukuReady) {
                 Row(modifier = GlanceModifier.fillMaxWidth()) {
-                    SwitchBtn("Vulkan", renderer == "Vulkan", "vulkan",
+                    PillBtn("Vulkan", renderer == "Vulkan", "vulkan",
                         R.drawable.widget_btn_vulkan_active,
-                        GlanceModifier.defaultWeight().height(44.dp))
-                    Spacer(GlanceModifier.width(10.dp))
-                    SwitchBtn("OpenGL", renderer == "OpenGL", "opengl",
+                        GlanceModifier.defaultWeight().height(42.dp))
+                    Spacer(GlanceModifier.width(8.dp))
+                    PillBtn("OpenGL", renderer == "OpenGL", "opengl",
                         R.drawable.widget_btn_opengl_active,
-                        GlanceModifier.defaultWeight().height(44.dp))
+                        GlanceModifier.defaultWeight().height(42.dp))
                 }
             } else {
-                ShizukuWarning(open, 44)
+                ShizukuPill(open, 42)
             }
 
             Spacer(GlanceModifier.defaultWeight())
 
-            // Footer
-            Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("GPU Renderer Control", style = TextStyle(color = cp(C.grey3), fontSize = sp(9f)))
-                Spacer(GlanceModifier.defaultWeight())
-                Text("tap to open →", style = TextStyle(color = cp(C.purple), fontSize = sp(9f), fontWeight = FontWeight.Bold))
-            }
+            Text(
+                "tap card to open  →",
+                style = TextStyle(color = cp(C.white30), fontSize = sp(9f))
+            )
         }
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4 × 4  ── full large
+// 4 × 4  ── full  (most spacious; full glass card + tall pills + footer)
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun Full(renderer: String, shizukuReady: Boolean, open: androidx.glance.action.Action) {
@@ -607,112 +584,125 @@ private fun Full(renderer: String, shizukuReady: Boolean, open: androidx.glance.
             .fillMaxSize()
             .background(ImageProvider(bgDrawable(renderer)))
             .cornerRadius(R.dimen.widget_corner_radius_large)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
+            .padding(horizontal = 18.dp, vertical = 18.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.Top) {
+        Column(modifier = GlanceModifier.fillMaxSize()) {
 
-            // ── Header ───────────────────────────────────────────────────────
+            // ── Header ──────────────────────────────────────────────────────
             Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column {
-                    Text("GAMA", style = TextStyle(color = cp(C.purple), fontSize = sp(15f), fontWeight = FontWeight.Bold))
-                    Text("Renderer Control", style = TextStyle(color = cp(C.grey3), fontSize = sp(9f)))
+                    Text(
+                        "GAMA",
+                        style = TextStyle(color = cp(C.white80), fontSize = sp(16f), fontWeight = FontWeight.Bold)
+                    )
+                    Text(
+                        "Renderer Control",
+                        style = TextStyle(color = cp(C.white30), fontSize = sp(9f))
+                    )
                 }
                 Spacer(GlanceModifier.defaultWeight())
+                // Coloured status chip
                 Box(
                     modifier = GlanceModifier
                         .background(
-                            (if (shizukuReady) C.green else Color(0xFFFF6B6B)).copy(alpha = 0.14f)
+                            if (shizukuReady) C.opengl.copy(alpha = 0.15f)
+                            else C.error.copy(alpha = 0.15f)
                         )
                         .cornerRadius(R.dimen.widget_corner_radius_small)
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Dot(shizukuReady, 7)
+                        Dot(shizukuReady, 6)
                         Spacer(GlanceModifier.width(5.dp))
                         Text(
-                            if (shizukuReady) "Shizuku Ready" else "No Shizuku",
+                            if (shizukuReady) "Shizuku" else "No Shizuku",
                             style = TextStyle(
-                                color = cp(if (shizukuReady) C.green else Color(0xFFFF6B6B)),
-                                fontSize = sp(10f), fontWeight = FontWeight.Bold
+                                color      = cp(if (shizukuReady) C.opengl else C.error),
+                                fontSize   = sp(10f),
+                                fontWeight = FontWeight.Bold
                             )
                         )
                     }
                 }
             }
 
-            Spacer(GlanceModifier.height(14.dp))
+            Spacer(GlanceModifier.height(16.dp))
 
-            // ── Renderer display card ────────────────────────────────────────
+            // ── Hero glass card ─────────────────────────────────────────────
             Box(
                 modifier = GlanceModifier
                     .fillMaxWidth()
                     .background(ImageProvider(R.drawable.widget_inner_card))
                     .cornerRadius(R.dimen.widget_corner_radius_medium)
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
+                    .padding(horizontal = 18.dp, vertical = 20.dp)
                     .clickable(open),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalAlignment   = Alignment.CenterVertically
+                ) {
                     Text(
-                        "CURRENTLY ACTIVE",
-                        style = TextStyle(color = cp(C.grey3), fontSize = sp(9f), fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                        "ACTIVE RENDERER",
+                        style = TextStyle(
+                            color      = cp(C.white30),
+                            fontSize   = sp(9f),
+                            fontWeight = FontWeight.Bold,
+                            textAlign  = TextAlign.Center
+                        )
                     )
                     Spacer(GlanceModifier.height(8.dp))
                     Text(
                         renderer.uppercase(),
                         style = TextStyle(
-                            color = cp(rendererColor(renderer)), fontSize = sp(36f),
-                            fontWeight = FontWeight.Bold, textAlign = TextAlign.Center
+                            color      = cp(rendererColor(renderer)),
+                            fontSize   = sp(38f),
+                            fontWeight = FontWeight.Bold,
+                            textAlign  = TextAlign.Center
                         )
                     )
                     Spacer(GlanceModifier.height(5.dp))
                     Text(
                         when (renderer) {
-                            "Vulkan" -> "High-performance Skia Vulkan pipeline"
-                            "OpenGL" -> "Standard Skia OpenGL pipeline"
-                            else     -> "Unknown GPU pipeline"
+                            "Vulkan" -> "Skia Vulkan pipeline"
+                            "OpenGL" -> "Skia OpenGL pipeline"
+                            else     -> "GPU pipeline"
                         },
-                        style = TextStyle(color = cp(C.grey2), fontSize = sp(10f), textAlign = TextAlign.Center)
+                        style = TextStyle(
+                            color     = cp(C.white60),
+                            fontSize  = sp(10f),
+                            textAlign = TextAlign.Center
+                        )
                     )
                 }
             }
 
             Spacer(GlanceModifier.height(12.dp))
 
-            // ── Switch buttons ───────────────────────────────────────────────
+            // ── Pill buttons ────────────────────────────────────────────────
             if (shizukuReady) {
                 Row(modifier = GlanceModifier.fillMaxWidth()) {
-                    SwitchBtn(
-                        label          = "Vulkan",
-                        active         = renderer == "Vulkan",
-                        action         = "vulkan",
-                        activeDrawable = R.drawable.widget_btn_vulkan_active,
-                        modifier       = GlanceModifier.defaultWeight().height(58.dp)
-                    )
+                    PillBtn("Vulkan", renderer == "Vulkan", "vulkan",
+                        R.drawable.widget_btn_vulkan_active,
+                        GlanceModifier.defaultWeight().height(56.dp))
                     Spacer(GlanceModifier.width(10.dp))
-                    SwitchBtn(
-                        label          = "OpenGL",
-                        active         = renderer == "OpenGL",
-                        action         = "opengl",
-                        activeDrawable = R.drawable.widget_btn_opengl_active,
-                        modifier       = GlanceModifier.defaultWeight().height(58.dp)
-                    )
+                    PillBtn("OpenGL", renderer == "OpenGL", "opengl",
+                        R.drawable.widget_btn_opengl_active,
+                        GlanceModifier.defaultWeight().height(56.dp))
                 }
             } else {
-                ShizukuWarning(open, 58)
+                ShizukuPill(open, 56)
             }
 
             Spacer(GlanceModifier.defaultWeight())
 
             // ── Footer ───────────────────────────────────────────────────────
-            Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "Tap button to switch  •  Tap card to open",
-                    style = TextStyle(color = cp(C.grey3), fontSize = sp(9f))
-                )
-            }
+            Text(
+                "tap card to open GAMA",
+                style = TextStyle(color = cp(C.white30), fontSize = sp(9f))
+            )
         }
     }
 }
@@ -720,9 +710,8 @@ private fun Full(renderer: String, shizukuReady: Boolean, open: androidx.glance.
 // ─────────────────────────────────────────────────────────────────────────────
 // ActionCallback
 //
-// KEY FIX: use prefs.edit().putString(...).commit()  (synchronous)
-// NOT .apply() (async) — so the write is guaranteed complete before
-// GamaWidget().updateAll() re-reads prefs in provideGlance().
+// Uses .commit() (synchronous) so prefs are guaranteed written before
+// GamaWidget().updateAll() re-reads them in provideGlance().
 // ─────────────────────────────────────────────────────────────────────────────
 class WidgetActionCallback : ActionCallback {
     override suspend fun onAction(
@@ -746,13 +735,15 @@ class WidgetActionCallback : ActionCallback {
             return
         }
 
-        CoroutineScope(Dispatchers.IO).launch {
+        // onAction is already a suspend function — no manual scope needed.
+        // withContext(Dispatchers.IO) runs the shell commands on the IO dispatcher
+        // without creating an unowned CoroutineScope that outlives the callback.
+        withContext(Dispatchers.IO) {
             try {
                 when (action) {
                     "vulkan" -> {
                         ShizukuHelper.runCommand("setprop debug.hwui.renderer skiavk")
                         ShizukuHelper.runCommand("am crash com.android.systemui")
-                        // .commit() is SYNCHRONOUS — write is done before updateAll runs
                         prefs.edit().putString("last_renderer", "Vulkan").commit()
                     }
                     "opengl" -> {
@@ -763,10 +754,7 @@ class WidgetActionCallback : ActionCallback {
                 }
             } catch (_: Exception) {}
 
-            // Now that prefs are committed, trigger a full widget redraw
-            try {
-                GamaWidget().updateAll(context)
-            } catch (_: Exception) {}
+            try { GamaWidget().updateAll(context) } catch (_: Exception) {}
         }
     }
 }

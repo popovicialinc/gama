@@ -56,7 +56,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = false
-        aidl = false
+        aidl = true
         resValues = false
         shaders = false
     }
@@ -86,8 +86,6 @@ android {
     }
 }
 
-val shizukuVersion = "13.1.5"
-
 dependencies {
     // Core
     implementation(libs.androidx.core.ktx)
@@ -105,10 +103,6 @@ dependencies {
     // Other
     implementation("androidx.core:core-splashscreen:1.1.0-rc01")
     implementation("com.google.android.material:material:1.11.0")
-
-    // Shizuku
-    implementation("dev.rikka.shizuku:api:${shizukuVersion}")
-    implementation("dev.rikka.shizuku:provider:${shizukuVersion}")
 
     // Glance (home screen widget)
     implementation("androidx.glance:glance-appwidget:1.1.1")
