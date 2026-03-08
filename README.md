@@ -116,7 +116,7 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
 <summary><b>🔸 Caused by GAMA* ("Aggressive" Profile Side Effects)</b></summary>
 <br>
   <p><b>"Aggressive" Profile Warning</b></p>
-  <p>Using the <b>Aggressive</b> profile for stopping background apps is nuclear. While 99% of users won't need this, be aware of the side effects:</p>
+  <p>Using the <b>Aggressive</b> profile for stopping background apps is nuclear. While 99% of users won't use this, be aware of the side effects:</p>
   <ul>
     <li><b>Resets Defaults:</b> Your default browser and keyboard will be reset.</li>
     <li><b>Connectivity Loss:</b> Possible loss of WiFi-Calling/VoLTE capability.</li>
