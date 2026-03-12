@@ -267,71 +267,73 @@ fun TitleSection(colors: ThemeColors, isSmallScreen: Boolean, isLandscape: Boole
     val ts = LocalTypeScale.current
 
     // ── Greeting pools per time period ───────────────────────────────────────
+    // Day greetings: warm, energetic, optimistic
+    // Night greetings: introspective, calm, thoughtful
     val greetingPool: List<String> = when (currentHour) {
         in 0..5 -> if (userName.isNotEmpty()) listOf(
-            "Still up, $userName? 🌙",
-            "The world is quiet, $userName. 🌙",
-            "Somewhere between today and tomorrow, $userName. 🌙",
-            "The quiet hours, $userName. 🌙",
-            "Some nights are for thinking, $userName. 🌙"
+            "The night belongs to you, $userName. 🌙",
+            "Some thoughts only come after midnight, $userName. 🌙",
+            "Even the stars are listening, $userName. 🌙",
+            "The world shrinks to just this moment, $userName. 🌙",
+            "There's a certain clarity to these hours, $userName. 🌙"
         ) else listOf(
-            "Still up? 🌙",
-            "The world is quiet. 🌙",
-            "Somewhere between today and tomorrow. 🌙",
-            "The quiet hours. 🌙",
-            "Some nights are for thinking. 🌙"
+            "The night belongs to you. 🌙",
+            "Some thoughts only come after midnight. 🌙",
+            "Even the stars are listening. 🌙",
+            "The world shrinks to just this moment. 🌙",
+            "There's a certain clarity to these hours. 🌙"
         )
         in 6..11 -> if (userName.isNotEmpty()) listOf(
-            "Good morning, $userName! ☀️",
-            "A fresh start, $userName. ☀️",
-            "The world is quiet, $userName. ☀️",
-            "The world can wait, $userName. ☀️",
-            "Up early, $userName? ☀️"
+            "Good morning, $userName! ☀️ Let's make it count.",
+            "Rise and shine, $userName! ☀️ Today has potential.",
+            "A brand new day, $userName! ☀️ Anything's possible.",
+            "Morning energy, $userName! ☀️ The best kind.",
+            "The day is yours, $userName! ☀️ Go get it."
         ) else listOf(
-            "Good morning! ☀️",
-            "A fresh start. ☀️",
-            "The world is quiet. ☀️",
-            "The world can wait. ☀️",
-            "Up early? ☀️"
+            "Good morning! ☀️ Let's make it count.",
+            "Rise and shine! ☀️ Today has potential.",
+            "A brand new day! ☀️ Anything's possible.",
+            "Morning energy! ☀️ The best kind.",
+            "The day is yours! ☀️ Go get it."
         )
         in 12..16 -> if (userName.isNotEmpty()) listOf(
-            "Hey, $userName! 👋",
-            "Welcome back, $userName. 👋",
-            "The world can wait, $userName. 👋",
-            "Good afternoon, $userName! 👋",
-            "There you are, $userName! 👋"
+            "Hey, $userName! ☀️ Afternoon momentum is real.",
+            "Good afternoon, $userName! ☀️ Keep the energy up.",
+            "Still going strong, $userName! ☀️",
+            "The day is half won, $userName! ☀️ Finish it.",
+            "There you are, $userName! ☀️ Let's do something great."
         ) else listOf(
-            "Hey! 👋",
-            "Welcome back. 👋",
-            "The world can wait. 👋",
-            "Good afternoon! 👋",
-            "There you are! 👋"
+            "Hey! ☀️ Afternoon momentum is real.",
+            "Good afternoon! ☀️ Keep the energy up.",
+            "Still going strong! ☀️",
+            "The day is half won! ☀️ Finish it.",
+            "There you are! ☀️ Let's do something great."
         )
         in 17..22 -> if (userName.isNotEmpty()) listOf(
-            "Good evening, $userName! 🌙",
-            "The world can wait, $userName. 🌙",
-            "Winding down, $userName? 🌙",
-            "The quiet hours, $userName. 🌙",
-            "Some nights are for thinking, $userName. 🌙"
+            "The evening settles in, $userName. 🌙",
+            "A quieter pace now, $userName. 🌙",
+            "The day fades — worth reflecting on, $userName. 🌙",
+            "Winding down has its own kind of beauty, $userName. 🌙",
+            "The night is gentle tonight, $userName. 🌙"
         ) else listOf(
-            "Good evening! 🌙",
-            "The world can wait. 🌙",
-            "Winding down? 🌙",
-            "The quiet hours. 🌙",
-            "Some nights are for thinking. 🌙"
+            "The evening settles in. 🌙",
+            "A quieter pace now. 🌙",
+            "The day fades — worth reflecting on. 🌙",
+            "Winding down has its own kind of beauty. 🌙",
+            "The night is gentle tonight. 🌙"
         )
         else -> if (userName.isNotEmpty()) listOf(
-            "Still up, $userName? 🌙",
-            "The quiet hours, $userName. 🌙",
-            "Somewhere between today and tomorrow, $userName. 🌙",
-            "Some nights are for thinking, $userName. 🌙",
-            "The world can wait, $userName. 🌙"
+            "The night belongs to you, $userName. 🌙",
+            "Some thoughts only come after midnight, $userName. 🌙",
+            "There's a certain clarity to these hours, $userName. 🌙",
+            "Even the stars are listening, $userName. 🌙",
+            "The world shrinks to just this moment, $userName. 🌙"
         ) else listOf(
-            "Still up? 🌙",
-            "The quiet hours. 🌙",
-            "Somewhere between today and tomorrow. 🌙",
-            "Some nights are for thinking. 🌙",
-            "The world can wait. 🌙"
+            "The night belongs to you. 🌙",
+            "Some thoughts only come after midnight. 🌙",
+            "There's a certain clarity to these hours. 🌙",
+            "Even the stars are listening. 🌙",
+            "The world shrinks to just this moment. 🌙"
         )
     }
     val displayText = remember(currentHour, userName) { greetingPool.random() }
@@ -623,8 +625,34 @@ fun SettingsNavigationCard(
         animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
         label = "settings_nav_alpha"
     )
-    // --- press-state tracking (must be declared before any animation that reads isPressed) ---
+    // --- press-state: single Animatable drives all press effects via graphicsLayer ---
+    // Previously 5 separate animateFloatAsState / animateDpAsState all responding to
+    // the same isPressed flag — that's 5 animators running simultaneously on every
+    // card press/release. Consolidating to one Animatable<Float> in [0,1] lets us
+    // derive every visual property with simple lerp in graphicsLayer (draw phase only,
+    // zero recompositions).
     var isPressed by remember { mutableStateOf(false) }
+    val pressProgress = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(isPressed) {
+        pressProgress.animateTo(
+            targetValue = if (isPressed && enabled) 1f else 0f,
+            animationSpec = spring(
+                dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+            )
+        )
+    }
+    val p = pressProgress.value  // single read; all derived values computed below
+
+    val density = LocalDensity.current
+    // Derive all press visuals from p — evaluated in draw phase via graphicsLayer
+    val pressScale       = 1f - p * (1f - MotionTokens.Scale.subtle)
+    val chevronScaleVal  = 1f + p * 0.3f
+    val chevronTXVal     = p * with(density) { 4.dp.toPx() }
+    val chevronAlphaVal  = 0.5f + p * 0.5f
+    val borderWidthVal   = (if (oledMode) 0.75f else 1f) + p * ((if (oledMode) 0.75f else 1f))  // 1dp → 2dp
+    val cardBorderWidth  = borderWidthVal.dp
 
     val animatedCardBorderColor = when {
         isPressed && enabled -> colors.primaryAccent
@@ -632,60 +660,10 @@ fun SettingsNavigationCard(
         else                 -> colors.border
     }
 
-    val cardBorderWidth by animateDpAsState(
-        targetValue = if (isPressed && enabled) 2.dp else if (oledMode) 0.75.dp else 1.dp,
-        animationSpec = tween(
-            durationMillis = if (isPressed) MotionTokens.Duration.flash else MotionTokens.Duration.quick,
-            easing = FastOutSlowInEasing
-        ),
-        label = "nav_card_border_width"
-    )
-
-    // Card scale: crisp press-down, bouncy overshoot on release
-    val pressScale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) MotionTokens.Scale.subtle else 1f,
-        animationSpec = spring(
-            dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-            stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-        ),
-        label = "settings_nav_press_scale"
-    )
-
-    // Chevron scale: pops out on press, overshoots back on release
-    val chevronScale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) 1.3f else 1f,
-        animationSpec = spring(
-            dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-            stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-        ),
-        label = "settings_nav_chevron_scale"
-    )
-
-    // Chevron translate: nudge rightward on press, overshoots back on release
-    val density = LocalDensity.current
-    val chevronTranslateX by animateFloatAsState(
-        targetValue = if (isPressed && enabled) with(density) { 4.dp.toPx() } else 0f,
-        animationSpec = spring(
-            dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-            stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-        ),
-        label = "settings_nav_chevron_translate"
-    )
-
-    // Chevron color: pulse to accent on press, fade back to muted default
-    // colors.* are already globally animated — no local animateColorAsState needed
-    val chevronAlpha by animateFloatAsState(
-        targetValue = if (isPressed && enabled) 1f else 0.5f,
-        animationSpec = tween(
-            durationMillis = if (isPressed) MotionTokens.Duration.flash else MotionTokens.Duration.quick,
-            easing = FastOutSlowInEasing
-        ),
-        label = "settings_nav_chevron_alpha"
-    )
     val chevronColor = if (isPressed && enabled)
         colors.primaryAccent
     else
-        colors.textSecondary.copy(alpha = chevronAlpha)
+        colors.textSecondary.copy(alpha = chevronAlphaVal)
 
     Box(
         modifier = modifier
@@ -769,9 +747,9 @@ fun SettingsNavigationCard(
                     modifier = Modifier
                         .size(24.dp)
                         .graphicsLayer(
-                            scaleX = chevronScale,
-                            scaleY = chevronScale,
-                            translationX = chevronTranslateX
+                            scaleX = chevronScaleVal,
+                            scaleY = chevronScaleVal,
+                            translationX = chevronTXVal
                         )
                 ) {
                     val path = Path().apply {
@@ -1357,11 +1335,13 @@ fun RendererCard(
     }
 
     // ── Infinite transition shared by glow + border pulse ───────────────────
+    // Only needed when Shizuku isn't ready — when ready, glow and warning border
+    // are never rendered, so running these animators would waste CPU for nothing.
     val infiniteTransition = rememberInfiniteTransition(label = "renderer_infinite")
 
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.18f,
-        targetValue  = 0.38f,
+        targetValue  = if (shizukuReady) 0.18f else 0.38f,  // freeze when ready — no animation needed
         animationSpec = infiniteRepeatable(
             animation = tween(1400, easing = MotionTokens.Easing.silk),
             repeatMode = RepeatMode.Reverse
@@ -1371,7 +1351,7 @@ fun RendererCard(
 
     val warningBorderAlpha by infiniteTransition.animateFloat(
         initialValue = 0.25f,
-        targetValue  = 0.9f,
+        targetValue  = if (shizukuReady) 0.25f else 0.9f,  // freeze when ready
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = MotionTokens.Easing.silk),
             repeatMode = RepeatMode.Reverse
@@ -1379,6 +1359,8 @@ fun RendererCard(
         label = "warning_border_alpha"
     )
 
+    // Text alpha pulse — only animate when shizuku is ready (subtle breathing effect).
+    // When not ready the text is always shown at 0.75 alpha (no pulse).
     val rendererTextAlpha by infiniteTransition.animateFloat(
         initialValue = 0.75f,
         targetValue  = if (shizukuReady) 1.0f else 0.75f,
@@ -1425,15 +1407,23 @@ fun RendererCard(
     val borderColor = if (isPressed) {
         colors.primaryAccent
     } else if (!shizukuReady) {
-        stateColor.copy(alpha = warningBorderAlpha)
+        // Strong, clearly visible error/warning border — pulses between 0.55 and 1.0
+        stateColor.copy(alpha = (warningBorderAlpha * 0.55f + 0.45f).coerceIn(0f, 1f))
     } else if (oledMode) {
-        colors.primaryAccent.copy(alpha = 0.3f)
+        colors.primaryAccent.copy(alpha = 0.35f)
     } else {
-        colors.border
+        // Shizuku is running — use accent color at a visible but subtle alpha
+        colors.primaryAccent.copy(alpha = 0.45f)
     }
 
     val borderWidth by animateDpAsState(
-        targetValue = if (isPressed) 2.dp else if (oledMode && shizukuReady) 0.75.dp else 1.dp,
+        targetValue = when {
+            isPressed       -> 2.dp
+            !shizukuReady   -> 1.75.dp  // thicker outline when error/warning
+            oledMode        -> 0.75.dp
+            shizukuReady    -> 1.25.dp  // slightly thicker accent outline when all good
+            else            -> 1.dp
+        },
         animationSpec = if (animLevel == 2) snap() else tween(
             durationMillis = if (isPressed) MotionTokens.Duration.flash else MotionTokens.Duration.quick,
             easing = FastOutSlowInEasing
@@ -1460,6 +1450,23 @@ fun RendererCard(
             // Light: soft warm amber — gentle warning tint without being too intense
                 Color(0xFFFFF5D6)
         }
+    } else if (shizukuReady) {
+        // Subtle accent tint when Shizuku is running — same card background style, just
+        // nudged toward the accent color so it shares the "accent outline" aesthetic.
+        if (isDarkTheme)
+            cardBackground.copy(
+                red   = (cardBackground.red   + colors.primaryAccent.red   * 0.07f).coerceAtMost(1f),
+                green = (cardBackground.green + colors.primaryAccent.green * 0.07f).coerceAtMost(1f),
+                blue  = (cardBackground.blue  + colors.primaryAccent.blue  * 0.07f).coerceAtMost(1f),
+                alpha = 1f
+            )
+        else
+            cardBackground.copy(
+                red   = (cardBackground.red   + colors.primaryAccent.red   * 0.05f).coerceAtMost(1f),
+                green = (cardBackground.green + colors.primaryAccent.green * 0.05f).coerceAtMost(1f),
+                blue  = (cardBackground.blue  + colors.primaryAccent.blue  * 0.05f).coerceAtMost(1f),
+                alpha = 1f
+            )
     } else {
         cardBackground
     }
@@ -1470,22 +1477,26 @@ fun RendererCard(
         contentAlignment = Alignment.Center,
         modifier = Modifier.fillMaxWidth()
     ) {
-        // Glow blob — blurred radial gradient, sized generously so edges spill out
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(if (isSmallScreen) 120.dp else 140.dp)
-                .blur(radius = 28.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            stateColor.copy(alpha = glowAlpha * 0.7f),
-                            stateColor.copy(alpha = glowAlpha * 0.25f),
-                            Color.Transparent
+        // Glow blob — only rendered when Shizuku is NOT ready (error/warning states).
+        // When Shizuku is ready this box and its blur(28.dp) pass are skipped entirely,
+        // saving a RenderEffect allocation + GPU blur pass on every recomposition.
+        if (!shizukuReady) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (isSmallScreen) 120.dp else 140.dp)
+                    .blur(radius = 28.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                stateColor.copy(alpha = glowAlpha * 0.7f),
+                                stateColor.copy(alpha = glowAlpha * 0.25f),
+                                Color.Transparent
+                            )
                         )
                     )
-                )
-        )
+            )
+        }
 
         // Card — scaled on press, all visuals inside the graphicsLayer so clip is respected
         Box(

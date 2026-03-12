@@ -652,21 +652,32 @@ fun GamaUI(
         else -> 0
     }
 
-    val anyPanelOpen = showWarningDialog || showGitHubDialog || showResourcesPanel || showExternalLinkConfirm ||
+    // derivedStateOf ensures downstream recompositions only trigger when the boolean
+    // *changes* (false→true or true→false), not on every recomposition that happens
+    // to read one of the ~20 constituent state variables.
+    val anyPanelOpen by remember {
+        derivedStateOf {
+            showWarningDialog || showGitHubDialog || showResourcesPanel || showExternalLinkConfirm ||
             showSettings || showVisualEffects || showColorCustomization || showOLED ||
             showFunctionality || showIntegrations || showShizukuHelp || showSuccessDialog || showDeveloperMenu ||
             showVerbosePanel || showAppSelector || showAggressiveWarning || showGPUWatchConfirm ||
             showDeveloper || showEasterEgg || showNotifications || showBackup || showCrashLog ||
             showEffects || showBlurSettings || showParticles
+        }
+    }
 
     // Blur is expensive — lightweight pop-up dialogs (ExternalLinkConfirmDialog) are excluded
     // so their entry animation never races against a simultaneous full-screen blur pass.
-    val anyFullPanelOpen = showWarningDialog || showGitHubDialog || showResourcesPanel ||
+    val anyFullPanelOpen by remember {
+        derivedStateOf {
+            showWarningDialog || showGitHubDialog || showResourcesPanel ||
             showSettings || showVisualEffects || showColorCustomization || showOLED ||
             showFunctionality || showIntegrations || showShizukuHelp || showSuccessDialog || showDeveloperMenu ||
             showVerbosePanel || showAppSelector || showAggressiveWarning || showGPUWatchConfirm ||
             showDeveloper || showEasterEgg || showNotifications || showBackup || showCrashLog ||
             showEffects || showBlurSettings || showParticles
+        }
+    }
 
     val currentVersion = "1.2.3"
 
@@ -853,10 +864,16 @@ fun GamaUI(
                         .fillMaxSize()
                         .alpha(finalGradientAlpha)
                 ) {
+                    // Use graphicsLayer for breathingAlpha so the animation only triggers
+                    // a draw-phase update, not a full recomposition on every frame.
+                    // This is the single biggest idle-CPU saving: previously the entire
+                    // content tree recomposed every ~16ms just because of this one value.
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .alpha(if (isDarkTheme) breathingAlpha else 0.6f)
+                            .graphicsLayer {
+                                alpha = if (isDarkTheme) breathingAlpha else 0.6f
+                            }
                             .background(
                                 brush = Brush.verticalGradient(
                                     colors = listOf(

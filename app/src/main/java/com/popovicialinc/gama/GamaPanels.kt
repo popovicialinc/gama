@@ -49,14 +49,28 @@ private fun PanelScaffold(
         animationSpec = tween(500, easing = MotionTokens.Easing.emphasized),
         label = "panel_back_padding"
     )
-    // Crossfade between sharp and blurred copies — same pattern as the main
-    // blur system. The blurred layer is always attached (RenderEffect stays
-    // warm); only its alpha animates, avoiding per-frame RenderEffect rebuilds.
+    // When a sub-dialog opens (isBlurred = true) the panel fades down to a dim
+    // blurred state so the dialog feels like it's on a higher layer.
+    // When the sub-dialog closes the panel fades back to full opacity/sharpness.
+    //
+    // Two animated values:
+    //   blurAlpha   — 0→1 drives the blurred copy fading IN
+    //   panelAlpha  — 1→0.35 dims the whole panel as the sub-dialog arrives
+    //
+    // The net effect: panel softly recedes, sub-dialog pops on top, then panel
+    // snaps back to life when the dialog is dismissed.
     val animLevel = LocalAnimationLevel.current
     val blurAlpha by animateFloatAsState(
         targetValue = if (isBlurred) 1f else 0f,
-        animationSpec = if (animLevel == 2) snap() else tween(300, easing = FastOutSlowInEasing),
+        animationSpec = if (animLevel == 2) snap() else tween(320, easing = FastOutSlowInEasing),
         label = "panel_blur_alpha"
+    )
+    // Overall panel dim: fades to 35% when sub-dialog is shown so it visually
+    // recedes behind the dialog, then snaps back to 100% when dialog closes.
+    val panelAlpha by animateFloatAsState(
+        targetValue = if (isBlurred) 0.35f else 1f,
+        animationSpec = if (animLevel == 2) snap() else tween(320, easing = FastOutSlowInEasing),
+        label = "panel_dim_alpha"
     )
 
     BouncyDialog(visible = visible, onDismiss = onDismiss, fullScreen = true) {
@@ -99,18 +113,25 @@ private fun PanelScaffold(
             }
         }
 
-        // Sharp layer — fades out as sub-dialog opens
-        Box(modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 1f - blurAlpha }) {
-            panelContent()
-        }
-        // Blurred layer — fades in on top; RenderEffect stays warm between transitions
-        if (isBlurred || blurAlpha > 0f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { alpha = blurAlpha }
-                    .blur(20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-            ) { panelContent() }
+        // Outer wrapper dims the whole panel as sub-dialog opens
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = panelAlpha }
+        ) {
+            // Sharp layer — fades out as sub-dialog opens (crossfade to blurred copy)
+            Box(modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 1f - blurAlpha }) {
+                panelContent()
+            }
+            // Blurred layer — fades in on top; RenderEffect stays warm between transitions
+            if (isBlurred || blurAlpha > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = blurAlpha }
+                        .blur(20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                ) { panelContent() }
+            }
         }
     }
 }

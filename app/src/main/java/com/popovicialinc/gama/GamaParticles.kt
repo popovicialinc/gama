@@ -399,6 +399,19 @@ fun ParticlesOverlay(
     val screenWidthPx = remember(configuration) {
         with(density) { configuration.screenWidthDp.dp.toPx() }
     }
+    val screenHeightPx = remember(configuration) {
+        with(density) { configuration.screenHeightDp.dp.toPx() }
+    }
+
+    // Celestial position — recomputed at most once per second via a tick counter.
+    // Previously computed inside Canvas on every draw frame (60–120× per second),
+    // which allocated a Calendar object and ran trigonometry every frame needlessly
+    // since the sun/moon only moves visibly once per minute.
+    var celestialTickSecond by remember { mutableStateOf(0L) }
+    val celestialState = remember(celestialTickSecond, timeModeEnabled) {
+        if (!timeModeEnabled) null
+        else calculateCelestialPosition(screenWidthPx, screenHeightPx, timeOffsetHours)
+    }
 
     // Calculate actual particle count based on setting
     val actualParticleCount = when (particleCount) {
@@ -636,6 +649,9 @@ fun ParticlesOverlay(
                 val frameRotY = if (parallaxEnabled) animatedRotationY else 0f
                 val frameSens = if (parallaxEnabled) parallaxSensitivity else 0f
                 frameIsDaytime = isDaytime(timeOffsetHours)
+                // Update celestial position at most once per second (not every frame)
+                val nowSec = time / 1_000_000_000L
+                if (nowSec != celestialTickSecond) celestialTickSecond = nowSec
                 frameCount++   // invalidates Canvas on every frame
 
                 // ── Physics on the main thread inside the frame callback ─────────
@@ -653,26 +669,35 @@ fun ParticlesOverlay(
         }
     }
 
-    // Animated alpha for celestial objects (sun/moon) with smooth ease-in-out fade in/out
-    // Hide celestials when panels are open, but keep particles visible
+    // Animated alpha for celestial objects (sun/moon) with smooth ease-in-out fade
+    // When panels open: stay visible but blur instead of hiding or scaling
     val celestialAlpha by animateFloatAsState(
-        targetValue = if (timeModeEnabled && !anyPanelOpen) 1f else 0f,
+        targetValue = if (timeModeEnabled) 1f else 0f,
         animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
         label = "celestial_alpha"
     )
-    val celestialScale by animateFloatAsState(
-        targetValue = if (timeModeEnabled && !anyPanelOpen) 1f else 0.72f,
-        animationSpec = spring(
-            dampingRatio = 0.55f,
-            stiffness    = 260f
-        ),
-        label = "celestial_scale"
+    // Blur radius for moon/sun when a panel is open — replaces scale/fade animation
+    val celestialBlurRadius by animateDpAsState(
+        targetValue = if (timeModeEnabled && anyPanelOpen) 18.dp else 0.dp,
+        animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+        label = "celestial_blur"
     )
 
+    // remember blocks MUST be called unconditionally (Compose rules), so they live
+    // outside the particleAlpha > 0.01f guard below.
+    // Reusable paths — allocated once, never recreated.
+    val reusableStarPath  = remember { Path() }
+    val reusableRayPath   = remember { Path() }
+    val reusableFullDisc  = remember { android.graphics.Path() }
+    val reusableBitePath  = remember { android.graphics.Path() }
+    val reusableCrescent  = remember { android.graphics.Path() }
+
     if (particleAlpha > 0.01f) {
-        // Reusable star path — allocated once, reset each draw to avoid GC pressure
-        // at 120fps (150 stars × new Path() = 18,000 allocations/sec otherwise)
-        val reusableStarPath = remember { Path() }
+        // Pre-compute base RGB int (alpha stripped) so we can reconstruct any alpha
+        // variant with Color((alpha shl 24) or colorArgb) inside the draw loop —
+        // avoiding color.copy(alpha=…) which allocates a new Color object per call.
+        // At 150 particles × 120fps this saves ~18,000 allocations/sec.
+        val colorArgb = color.toArgb() and 0x00FFFFFF
 
         Canvas(
             modifier = Modifier
@@ -705,46 +730,45 @@ fun ParticlesOverlay(
                     reusableStarPath.lineTo(cx - r * 0.25f, cy - r * 0.25f)
                     reusableStarPath.close()
 
-                    drawPath(path = reusableStarPath, color = color.copy(alpha = a))
-                    drawCircle(color = color.copy(alpha = a * 0.8f), radius = r * 0.3f,
+                    // Use int-based Color constructor to avoid color.copy() allocation
+                    val aInt  = ((a.coerceIn(0f,1f) * 255f).toInt() shl 24) or colorArgb
+                    val a8Int = ((a * 0.8f).coerceIn(0f,1f) * 255f).toInt() shl 24 or colorArgb
+                    drawPath(path = reusableStarPath, color = Color(aInt))
+                    drawCircle(color = Color(a8Int), radius = r * 0.3f,
                         center = Offset(cx, cy))
                 } else {
+                    val a = particle.alpha * particleAlpha * 0.5f
+                    val aInt = ((a.coerceIn(0f,1f) * 255f).toInt() shl 24) or colorArgb
                     drawCircle(
-                        color = color.copy(alpha = particle.alpha * particleAlpha * 0.5f),
+                        color = Color(aInt),
                         radius = particle.size,
                         center = Offset(size.width * particle.x, size.height * particle.y)
                     )
                 }
             }
 
-            // Draw celestial objects (sun or moon) when time mode is enabled
-            if (timeModeEnabled && celestialAlpha > 0.01f) {
-                val celestial = calculateCelestialPosition(size.width, size.height, timeOffsetHours)
-                celestial?.let { cel ->
-                    // In landscape mode, constrain celestial X position to left half (0 to 0.5)
-                    val adjustedX = if (isLandscape) {
-                        // Map the celestial's X from full screen (0 to width) to left half (0 to width/2)
-                        cel.x * 0.5f
-                    } else {
-                        cel.x
-                    }
+        }
 
-                    // Check if it's sun or moon time (using offset)
-                    val calendar = Calendar.getInstance()
-                    val hour = calendar.get(Calendar.HOUR_OF_DAY)
-                    val minute = calendar.get(Calendar.MINUTE)
-                    val baseTime = hour + (minute / 60f)
-                    var currentTime = (baseTime + timeOffsetHours) % 24f
-                    if (currentTime < 0f) currentTime += 24f
-                    val isSun = currentTime >= 6f && currentTime < 19f
+        // Celestial objects (sun/moon) drawn in a separate layer so we can blur
+        // them independently when a panel is open — no scale/fade, just a soft blur.
+        if (timeModeEnabled && celestialAlpha > 0.01f) {
+            val blurMod = if (celestialBlurRadius.value > 0f)
+                Modifier.blur(radius = celestialBlurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+            else Modifier
 
-                    // Apply celestial alpha to all drawing operations
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(blurMod)
+                    .graphicsLayer(alpha = celestialAlpha)
+                    .pointerInput(Unit) {}
+            ) {
+                @Suppress("UNUSED_VARIABLE") val frame = frameCount
+                celestialState?.let { cel ->
+                    val adjustedX = if (isLandscape) cel.x * 0.5f else cel.x
+                    val isSun = frameIsDaytime
                     val effectiveAlpha = cel.alpha * celestialAlpha
 
-                    // Scale transform centred on the celestial position for zoom-in/out bounce
-                    withTransform({
-                        scale(celestialScale, celestialScale, Offset(adjustedX, cel.y))
-                    }) {
                     if (isSun) {
                         // Draw beautiful sun with rays
                         val sunCenter = Offset(adjustedX, cel.y)
@@ -766,33 +790,31 @@ fun ParticlesOverlay(
                             )
 
                             // Draw ray with gradient effect (thicker at base, thinner at tip)
-                            val rayPath = Path().apply {
-                                val perpAngle = angle + (PI / 2).toFloat()
-                                val baseWidth = rayWidth
-                                val tipWidth = rayWidth * 0.3f
-
-                                // Create trapezoid shape for ray
-                                moveTo(
-                                    rayStart.x + cos(perpAngle) * baseWidth,
-                                    rayStart.y + sin(perpAngle) * baseWidth
-                                )
-                                lineTo(
-                                    rayEnd.x + cos(perpAngle) * tipWidth,
-                                    rayEnd.y + sin(perpAngle) * tipWidth
-                                )
-                                lineTo(
-                                    rayEnd.x - cos(perpAngle) * tipWidth,
-                                    rayEnd.y - sin(perpAngle) * tipWidth
-                                )
-                                lineTo(
-                                    rayStart.x - cos(perpAngle) * baseWidth,
-                                    rayStart.y - sin(perpAngle) * baseWidth
-                                )
-                                close()
-                            }
+                            // Reuse path to avoid 8 allocations per frame
+                            val perpAngle = angle + (PI / 2).toFloat()
+                            val baseWidth = rayWidth
+                            val tipWidth = rayWidth * 0.3f
+                            reusableRayPath.reset()
+                            reusableRayPath.moveTo(
+                                rayStart.x + cos(perpAngle) * baseWidth,
+                                rayStart.y + sin(perpAngle) * baseWidth
+                            )
+                            reusableRayPath.lineTo(
+                                rayEnd.x + cos(perpAngle) * tipWidth,
+                                rayEnd.y + sin(perpAngle) * tipWidth
+                            )
+                            reusableRayPath.lineTo(
+                                rayEnd.x - cos(perpAngle) * tipWidth,
+                                rayEnd.y - sin(perpAngle) * tipWidth
+                            )
+                            reusableRayPath.lineTo(
+                                rayStart.x - cos(perpAngle) * baseWidth,
+                                rayStart.y - sin(perpAngle) * baseWidth
+                            )
+                            reusableRayPath.close()
 
                             drawPath(
-                                path = rayPath,
+                                path = reusableRayPath,
                                 color = color.copy(alpha = effectiveAlpha * 0.5f)
                             )
                         }
@@ -846,20 +868,18 @@ fun ParticlesOverlay(
                             val nCanvas = canvas.nativeCanvas
                             nCanvas.save()
 
-                            // Build crescent clip path:
-                            //   full disc  MINUS  the bite circle  = crescent shape
-                            val fullDisc = android.graphics.Path().apply {
-                                addCircle(moonCenter.x, moonCenter.y, moonR, android.graphics.Path.Direction.CW)
-                            }
-                            val bitePath = android.graphics.Path().apply {
-                                addCircle(biteCenter.x, biteCenter.y, biteR, android.graphics.Path.Direction.CW)
-                            }
-                            val crescentPath = android.graphics.Path().apply {
-                                op(fullDisc, bitePath, android.graphics.Path.Op.DIFFERENCE)
-                            }
+                            // Reuse pre-allocated Path objects — avoids 3 allocations per frame
+                            reusableFullDisc.reset()
+                            reusableFullDisc.addCircle(moonCenter.x, moonCenter.y, moonR, android.graphics.Path.Direction.CW)
+
+                            reusableBitePath.reset()
+                            reusableBitePath.addCircle(biteCenter.x, biteCenter.y, biteR, android.graphics.Path.Direction.CW)
+
+                            reusableCrescent.reset()
+                            reusableCrescent.op(reusableFullDisc, reusableBitePath, android.graphics.Path.Op.DIFFERENCE)
 
                             // Clip to the crescent shape
-                            nCanvas.clipPath(crescentPath)
+                            nCanvas.clipPath(reusableCrescent)
 
                             // Fill the crescent with a warm moonlight gradient
                             val gradPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
@@ -875,7 +895,7 @@ fun ParticlesOverlay(
                                     android.graphics.Shader.TileMode.CLAMP
                                 )
                             }
-                            nCanvas.drawPath(crescentPath, gradPaint)
+                            nCanvas.drawPath(reusableCrescent, gradPaint)
 
                             // Subtle inner-edge glow along the lit side of the crescent
                             val rimPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
@@ -887,7 +907,7 @@ fun ParticlesOverlay(
                                     android.graphics.BlurMaskFilter.Blur.NORMAL
                                 )
                             }
-                            nCanvas.drawPath(crescentPath, rimPaint)
+                            nCanvas.drawPath(reusableCrescent, rimPaint)
 
                             nCanvas.restore()
                         }
@@ -915,11 +935,9 @@ fun ParticlesOverlay(
                             )
                         }
                     } // end else (moon)
-                    } // end withTransform
-                }
-            }
-
-        }
+                } // end celestialState?.let
+            } // end celestial Canvas
+        } // end if timeModeEnabled
     }
 }
 
