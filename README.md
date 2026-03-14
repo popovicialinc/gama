@@ -24,8 +24,6 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
 * 🔓 **Zero risk** - Root is not required, 100% Knox-safe.
 * 🛠️ **User-friendliness** - Simple yet beautiful UI to switch APIs without complex terminal commands
 
-Vulkan may not run smoothly across EVERY Android phone, there's simply too much variation between Android skins and hardware
-
 ![Downloads](https://img.shields.io/github/downloads/popovicialinc/gama/total?style=flat&label=DOWNLOADS&labelColor=%23111111&color=%233b2f5b)
 
 **Extra resources**
@@ -71,9 +69,9 @@ Vulkan may not run smoothly across EVERY Android phone, there's simply too much 
   * **Vulkan** - Lower temps, Better battery
   * **OpenGL** - Fallback option
 
-**Note**: If prompted, allow installation from unknown sources. (Settings > Apps > (in the top-right corner) Press the 3-dot button > Special access > Install unknown apps > Allow for your browser or file manager).
-
 **Heads up: You’ll need to run this script after every phone reboot.**
+
+**Note**: Vulkan might not run perfectly on every Android device due to the wide variety of hardware and Android skins, but it’s worth giving it a try! If your phone freezes or shows a black screen, just hold VOLUME DOWN + POWER to force a restart. GAMA forces Vulkan rendering using the setprop command (shell setprop debug.hwui.renderer). This change is temporary; Vulkan will only stay active until your next reboot. Simply restarting your device will revert any changes made by GAMA!
 
 ### Automation via Tasker
 
