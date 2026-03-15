@@ -49,6 +49,16 @@
                 android:resource="@xml/gama_widget_info" />
         </receiver>
 
+        <!-- Widget settings activity (long-press → Customise / Edit widget) -->
+        <activity
+            android:name=".GamaWidgetConfigureActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <!-- ── Tasker Integration ────────────────────────────────────────── -->
         <receiver
             android:name=".TaskerReceiver"

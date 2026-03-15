@@ -375,6 +375,28 @@ fun isDaytime(timeOffsetHours: Float = 0f): Boolean {
     return currentTime >= 7f && currentTime < 19f // 7 AM to 7 PM
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PhysicsInputs — volatile snapshot shared between the Compose main thread
+// (writes) and the physics background thread (reads).
+//
+// Why @Volatile instead of AtomicXxx:
+//   • Float/Boolean reads/writes are effectively atomic on 64-bit ARM (all
+//     modern Android).  @Volatile adds the happens-before memory barrier so
+//     the background thread always sees the latest value — no stale reads.
+//   • Zero allocation, zero lock contention, zero GC pressure.
+//   • Worst case of a racy read: one particle appears at its previous position
+//     for one 16ms frame — completely invisible to the human eye.
+// ─────────────────────────────────────────────────────────────────────────────
+private class PhysicsInputs {
+    @Volatile var rotX:     Float   = 0f
+    @Volatile var rotY:     Float   = 0f
+    @Volatile var sens:     Float   = 0f
+    @Volatile var speed:    Float   = 3f
+    @Volatile var star:     Boolean = false
+    @Volatile var timeMode: Boolean = false
+    @Volatile var daytime:  Boolean = true
+}
+
 // Standalone Particles Overlay Component
 @Composable
 fun ParticlesOverlay(
@@ -423,32 +445,28 @@ fun ParticlesOverlay(
     }
 
     val particles = remember(actualParticleCount, particleSpeed, parallaxSensitivity) {
-        // Create particles distributed across the entire screen for initial display
-        val particleList = List(actualParticleCount) {
+        // Particles are created with positions spread across the screen and
+        // modest initial velocities — no giant pre-heat spike that would cause
+        // the physics engine to thrash on the first few frames.
+        // The background physics loop warms them naturally over ~0.5 s before
+        // particleAlpha reaches 1f (the fade-in takes 2.1 s), so there is
+        // nothing visible to stutter over.
+        List(actualParticleCount) {
+            val spd = kotlin.random.Random.nextFloat() * 1.2f + 0.3f   // 0.3–1.5
             ParticleState(
-                x = kotlin.random.Random.nextFloat(), // Fully random X: 0.0 to 1.0
-                y = kotlin.random.Random.nextFloat(), // Fully random Y: 0.0 to 1.0
-                // Bigger particles: up from 4f max to 7f max
-                size = kotlin.random.Random.nextFloat() * 6f + 1f,
-                // Higher base speed for visible movement
-                speed = kotlin.random.Random.nextFloat() * 1.2f + 0.3f, // 0.3 to 1.5
-                // Higher alpha range
+                x     = kotlin.random.Random.nextFloat(),
+                y     = kotlin.random.Random.nextFloat(),
+                size  = kotlin.random.Random.nextFloat() * 6f + 1f,
+                speed = spd,
                 alpha = kotlin.random.Random.nextFloat() * 0.7f + 0.3f
-            )
+            ).also { p ->
+                // Give each particle a gentle initial upward nudge so they start
+                // moving immediately, but keep velocities well within normal
+                // operating range — no clamping, no physics thrash.
+                p.velocityX = (kotlin.random.Random.nextFloat() - 0.5f) * spd * 0.4f
+                p.velocityY = -spd * 0.8f
+            }
         }
-
-        // Pre-heat particles: give them initial velocity in both directions
-        // This prevents them from starting stationary
-        particleList.forEach { particle ->
-            // Set initial velocity to move naturally
-            val preHeatSpeed = particle.speed * 1.5f // Higher initial speed
-
-            // Initialize with both upward and horizontal movement
-            particle.velocityX = (kotlin.random.Random.nextFloat() - 0.5f) * preHeatSpeed * 2.0f // Random horizontal drift
-            particle.velocityY = -(preHeatSpeed * 5.0f) // Stronger upward movement
-        }
-
-        particleList
     }
 
     // Track device rotation for parallax
@@ -576,11 +594,13 @@ fun ParticlesOverlay(
             }
         }
 
-        // Register sensor with GAME delay for balance of responsiveness and battery
+        // Register sensor with UI delay (~15 Hz) — cuts sensor wake-ups by ~70%
+        // compared to SENSOR_DELAY_GAME (~50 Hz) with no visible difference for
+        // a subtle parallax effect that only reacts to slow, deliberate tilts.
         sensorManager?.registerListener(
             listener,
             rotationSensor,
-            android.hardware.SensorManager.SENSOR_DELAY_GAME
+            android.hardware.SensorManager.SENSOR_DELAY_UI
         )
 
         onDispose {
@@ -602,13 +622,8 @@ fun ParticlesOverlay(
         label = "particle_fade"
     )
 
-    // Independent Animation Loop
-    // Physics inputs captured per-frame (read on main thread inside withFrameNanos)
-    // Frame counter — Canvas reads this to know when to redraw each frame.
-    var frameCount by remember { mutableLongStateOf(0L) }
-    var lastFrameTime by remember { mutableStateOf(0L) }
-
-    // Convert speed setting to multiplier
+    // Speed multiplier — converted from the 0/1/2 setting once here so the
+    // physics thread and inputs-sync can both reference the same value.
     val speedMultiplier = when (particleSpeed) {
         0 -> 1.5f
         1 -> 3.0f
@@ -616,81 +631,203 @@ fun ParticlesOverlay(
         else -> 3.0f
     }
 
-    // Pre-compute daytime once per frame outside the draw loop (avoids Calendar
-    // allocation inside Canvas which runs on the render thread every frame)
+    // frameCount — incremented by the render-trigger LaunchedEffect on the main
+    // thread each time we want the Canvas to redraw.  Canvas reads this value to
+    // establish a Compose snapshot dependency; it redraws every time it changes.
+    var frameCount by remember { mutableLongStateOf(0L) }
+
+    // frameIsDaytime — updated by the render-trigger at most once per second.
+    // Kept as Compose state so Canvas reads it correctly via snapshot.
     var frameIsDaytime by remember { mutableStateOf(true) }
 
+    // ── Thread-safe input snapshot ────────────────────────────────────────────
+    // Written on the Compose main thread; read on the physics background thread.
+    val physicsInputs = remember { PhysicsInputs() }
+
+    // ── Inputs sync — main thread ─────────────────────────────────────────────
+    // Runs whenever any physics-relevant setting changes.  Cheap: just copies
+    // a handful of scalars into the volatile fields.  The physics thread reads
+    // these fields independently — no lock, no coordination needed.
+    LaunchedEffect(
+        animatedRotationX, animatedRotationY, parallaxEnabled,
+        parallaxSensitivity, speedMultiplier, starMode, timeModeEnabled, timeOffsetHours
+    ) {
+        physicsInputs.rotX     = if (parallaxEnabled) animatedRotationX else 0f
+        physicsInputs.rotY     = if (parallaxEnabled) animatedRotationY else 0f
+        physicsInputs.sens     = if (parallaxEnabled) parallaxSensitivity else 0f
+        physicsInputs.speed    = speedMultiplier
+        physicsInputs.star     = starMode
+        physicsInputs.timeMode = timeModeEnabled
+        physicsInputs.daytime  = isDaytime(timeOffsetHours)
+    }
+
+    // ── Physics loop — Dispatchers.Default (background thread) ───────────────
+    //
+    // This is the key change that eliminates the particle microstutters:
+    //
+    //   BEFORE: physics ran inside withFrameNanos on the MAIN thread.
+    //           When a panel opened and the main thread was busy compositing
+    //           the entrance animation, the frame callback was delayed — both
+    //           stalling the particles AND adding to the main thread backlog.
+    //
+    //   AFTER:  physics runs continuously on Dispatchers.Default, completely
+    //           independent of the main thread.  Panels can open, dialogs can
+    //           animate, heavy recompositions can fire — particles keep moving.
+    //           The Canvas on the main thread just reads the latest positions
+    //           whenever it gets scheduled.
+    //
+    // Paced at 60fps via delay(); no withFrameNanos needed here — we don't
+    // need to sync with the display vsync for the physics calculations.
     LaunchedEffect(particles, enabled) {
         if (!enabled) return@LaunchedEffect
 
-        lastFrameTime = 0L
+        withContext(Dispatchers.Default) {
+            val TARGET_NS     = 1_000_000_000L / 60L  // 16.67ms  = 60 fps
+            val MAX_DELTA     = 1f / 60f               // hard clamp at one 60fps step
+            // Initialise to 0 so the very first iteration always fires immediately
+            // with a clean 1-frame delta — prevents a massive catch-up step caused
+            // by the time spent spinning up the coroutine and allocating the thread.
+            var lastPhysicsNs = 0L
+
+            while (isActive) {
+                val now     = System.nanoTime()
+                val elapsed = if (lastPhysicsNs == 0L) TARGET_NS else now - lastPhysicsNs
+
+                if (elapsed >= TARGET_NS) {
+                    val delta = (elapsed / 1_000_000_000f).coerceAtMost(MAX_DELTA)
+                    lastPhysicsNs = now
+
+                    // Read the volatile snapshot once (one memory barrier for the batch)
+                    val inp = physicsInputs
+                    val rotX     = inp.rotX
+                    val rotY     = inp.rotY
+                    val sens     = inp.sens
+                    val spd      = inp.speed
+                    val star     = inp.star
+                    val timeMode = inp.timeMode
+                    val day      = inp.daytime
+
+                    particles.forEach { p ->
+                        p.update(spd, now, rotX, rotY, delta, sens, star, timeMode, day)
+                    }
+                }
+
+                // Sleep until the next 60fps tick — yields the thread to other work
+                val sleepMs = maxOf(1L, (TARGET_NS - (System.nanoTime() - lastPhysicsNs)) / 1_000_000L)
+                delay(sleepMs)
+            }
+        }
+    }
+
+    // ── Render trigger — main thread, half the display refresh rate ─────────
+    //
+    // withFrameNanos fires at the display's native refresh rate (60/90/120hz).
+    // We read the actual hardware refresh rate once at startup and skip every
+    // other vsync, so particles always render at exactly half the native rate:
+    //   60hz display  → 30fps
+    //   90hz display  → 45fps
+    //   120hz display → 60fps
+    //
+    // This scales correctly on every device with no hardcoded magic number.
+    //
+    // Celestial position and isDaytime are updated here (main thread) instead
+    // of inside the physics loop (background thread) because they write to
+    // Compose MutableState, which must happen on the main thread.
+
+    // Compute half-refresh interval once. Falls back to 60hz if unavailable.
+    val halfRefreshNs = remember(context) {
+        val hz = try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                val wm = context.getSystemService(Context.WINDOW_SERVICE)
+                            as android.view.WindowManager
+                context.display?.refreshRate ?: 60f
+            } else {
+                @Suppress("DEPRECATION")
+                (context.getSystemService(Context.WINDOW_SERVICE)
+                            as android.view.WindowManager).defaultDisplay.refreshRate
+            }
+        } catch (_: Exception) { 60f }
+        // 2 x vsync interval in nanoseconds = one frame at half rate
+        (2_000_000_000L / hz.coerceAtLeast(1f)).toLong()
+    }
+
+    LaunchedEffect(enabled) {
+        if (!enabled) return@LaunchedEffect
+
+        val TARGET_RENDER_NS = halfRefreshNs
+        var lastRenderNs     = 0L
 
         while (isActive) {
-            // ── withFrameNanos: run on main thread, kept as short as possible ───
-            // Physics runs BEFORE withFrameNanos so the updated positions are
-            // ready the instant the frame callback fires — no extra round-trip.
-            // On the very first iteration physics hasn't run yet (particles are
-            // pre-heated at creation time), which is fine.
             withFrameNanos { time ->
-                // IDEAL_FRAME = 1/120s. If the gap since the last frame is larger
-                // than this (e.g. a panel just opened and recomposition ate 25ms),
-                // we clamp to exactly one ideal step. Particles appear to pause for
-                // one frame rather than lurching forward to "catch up".
-                val IDEAL_FRAME = 0.00833f // 8.33ms = 1/120s
-                val frameDelta = if (lastFrameTime > 0L) {
-                    val raw = (time - lastFrameTime) / 1_000_000_000f
-                    if (raw > IDEAL_FRAME * 1.5f) IDEAL_FRAME else raw  // clamp on slow frames
-                } else {
-                    IDEAL_FRAME
+                // Skip this vsync if we haven't hit the 60fps window yet
+                if (lastRenderNs > 0L && time - lastRenderNs < TARGET_RENDER_NS) {
+                    return@withFrameNanos
                 }
-                lastFrameTime = time
+                lastRenderNs = time
 
-                val frameRotX = if (parallaxEnabled) animatedRotationX else 0f
-                val frameRotY = if (parallaxEnabled) animatedRotationY else 0f
-                val frameSens = if (parallaxEnabled) parallaxSensitivity else 0f
-                frameIsDaytime = isDaytime(timeOffsetHours)
-                // Update celestial position at most once per second (not every frame)
+                // Update once-per-second celestial position
                 val nowSec = time / 1_000_000_000L
                 if (nowSec != celestialTickSecond) celestialTickSecond = nowSec
-                frameCount++   // invalidates Canvas on every frame
 
-                // ── Physics on the main thread inside the frame callback ─────────
-                // Counter-intuitive but correct for 120fps: the physics work per
-                // frame is tiny (150 particles × simple arithmetic ≈ 50µs) and
-                // running it here means zero thread-switch overhead. The previous
-                // withContext(Dispatchers.Default) forced a full thread context
-                // switch AFTER every frame callback, adding ~1-2ms of scheduling
-                // latency that showed up as consistent frame drops.
-                particles.forEach { p ->
-                    p.update(speedMultiplier, time, frameRotX, frameRotY,
-                        frameDelta, frameSens, starMode, timeModeEnabled, frameIsDaytime)
-                }
+                // Sync daytime flag to physicsInputs (also used by Canvas)
+                frameIsDaytime = isDaytime(timeOffsetHours)
+                physicsInputs.daytime = frameIsDaytime
+
+                // Invalidate Canvas — particles have moved since the last render
+                frameCount++
             }
         }
     }
 
     // Animated alpha for celestial objects (sun/moon) with smooth ease-in-out fade
-    // When panels open: stay visible but blur instead of hiding or scaling
     val celestialAlpha by animateFloatAsState(
         targetValue = if (timeModeEnabled) 1f else 0f,
         animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
         label = "celestial_alpha"
     )
-    // Blur radius for moon/sun when a panel is open — replaces scale/fade animation
-    val celestialBlurRadius by animateDpAsState(
-        targetValue = if (timeModeEnabled && anyPanelOpen) 18.dp else 0.dp,
-        animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
-        label = "celestial_blur"
+
+    // Celestial blur: crossfade between sharp and blurred copies — mirrors the
+    // technique used for the main content blur in GamaUI.
+    //
+    // celestialBlurAlpha animates 0→1 when a panel opens, 1→0 when it closes.
+    // Two Canvas layers are composited: the sharp one fades OUT (1−alpha), the
+    // blurred one fades IN (alpha).  The GPU holds a fixed RenderEffect the whole
+    // time; only the layer alpha changes, which is essentially free.
+    val celestialBlurTarget = timeModeEnabled && anyPanelOpen
+    val celestialBlurAlpha by animateFloatAsState(
+        targetValue = if (celestialBlurTarget) 1f else 0f,
+        animationSpec = tween(durationMillis = 380, easing = MotionTokens.Easing.emphasized),
+        label = "celestial_blur_alpha"
     )
 
     // remember blocks MUST be called unconditionally (Compose rules), so they live
     // outside the particleAlpha > 0.01f guard below.
-    // Reusable paths — allocated once, never recreated.
+    // Reusable paths and Paint objects — allocated once, never recreated.
     val reusableStarPath  = remember { Path() }
     val reusableRayPath   = remember { Path() }
     val reusableFullDisc  = remember { android.graphics.Path() }
     val reusableBitePath  = remember { android.graphics.Path() }
     val reusableCrescent  = remember { android.graphics.Path() }
+
+    // Reusable Paint objects for the moon crescent — previously allocated fresh
+    // inside drawIntoCanvas on every draw frame (60-120x/sec), each constructing
+    // a new Paint + RadialGradient shader.  Cached here; the shader is rebuilt
+    // inside the draw block only when moonCenter/moonR/color/alpha actually change.
+    val reusableGradPaint = remember { android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG) }
+    val reusableRimPaint  = remember {
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            style = android.graphics.Paint.Style.STROKE
+        }
+    }
+
+    // Crater data: constant fractions of moonR — list allocated once, not per frame.
+    val craterData = remember {
+        listOf(
+            Triple(-0.30f, -0.20f, 0.09f),
+            Triple(-0.20f,  0.28f, 0.07f),
+            Triple(-0.42f,  0.08f, 0.06f)
+        )
+    }
 
     if (particleAlpha > 0.01f) {
         // Pre-compute base RGB int (alpha stripped) so we can reconstruct any alpha
@@ -749,25 +886,22 @@ fun ParticlesOverlay(
 
         }
 
-        // Celestial objects (sun/moon) drawn in a separate layer so we can blur
-        // them independently when a panel is open — no scale/fade, just a soft blur.
+        // Celestial objects (sun/moon) — drawn in two layers so blur can cross-
+        // fade smoothly when panels open/close without a jarring snap.
+        //
+        //  Layer 1 (sharp):  graphicsLayer alpha = celestialAlpha * (1 − blurAlpha)
+        //  Layer 2 (blurred): graphicsLayer alpha = celestialAlpha * blurAlpha
+        //
+        // Both layers share identical draw code via the celestialDrawContent lambda.
         if (timeModeEnabled && celestialAlpha > 0.01f) {
-            val blurMod = if (celestialBlurRadius.value > 0f)
-                Modifier.blur(radius = celestialBlurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-            else Modifier
 
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(blurMod)
-                    .graphicsLayer(alpha = celestialAlpha)
-                    .pointerInput(Unit) {}
-            ) {
+            // Shared draw logic — called once per active layer
+            val drawCelestial: DrawScope.() -> Unit = drawLambda@{
                 @Suppress("UNUSED_VARIABLE") val frame = frameCount
-                celestialState?.let { cel ->
-                    val adjustedX = if (isLandscape) cel.x * 0.5f else cel.x
-                    val isSun = frameIsDaytime
-                    val effectiveAlpha = cel.alpha * celestialAlpha
+                val cel = celestialState ?: return@drawLambda
+                val adjustedX = if (isLandscape) cel.x * 0.5f else cel.x
+                val isSun = frameIsDaytime
+                val effectiveAlpha = cel.alpha * celestialAlpha
 
                     if (isSun) {
                         // Draw beautiful sun with rays
@@ -881,47 +1015,38 @@ fun ParticlesOverlay(
                             // Clip to the crescent shape
                             nCanvas.clipPath(reusableCrescent)
 
-                            // Fill the crescent with a warm moonlight gradient
-                            val gradPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                                shader = android.graphics.RadialGradient(
-                                    moonCenter.x - moonR * 0.2f,
-                                    moonCenter.y - moonR * 0.2f,
-                                    moonR * 1.1f,
-                                    intArrayOf(
-                                        color.copy(alpha = effectiveAlpha).toArgb(),
-                                        color.copy(alpha = effectiveAlpha * 0.85f).toArgb()
-                                    ),
-                                    floatArrayOf(0f, 1f),
-                                    android.graphics.Shader.TileMode.CLAMP
-                                )
-                            }
-                            nCanvas.drawPath(reusableCrescent, gradPaint)
+                            // Fill the crescent — reuse cached Paint, rebuild shader with current values.
+                            // The RadialGradient must be rebuilt each frame because effectiveAlpha changes
+                            // (cel.alpha * celestialAlpha); the Paint object itself is reused.
+                            reusableGradPaint.shader = android.graphics.RadialGradient(
+                                moonCenter.x - moonR * 0.2f,
+                                moonCenter.y - moonR * 0.2f,
+                                moonR * 1.1f,
+                                intArrayOf(
+                                    color.copy(alpha = effectiveAlpha).toArgb(),
+                                    color.copy(alpha = effectiveAlpha * 0.85f).toArgb()
+                                ),
+                                floatArrayOf(0f, 1f),
+                                android.graphics.Shader.TileMode.CLAMP
+                            )
+                            nCanvas.drawPath(reusableCrescent, reusableGradPaint)
 
-                            // Subtle inner-edge glow along the lit side of the crescent
-                            val rimPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                                style = android.graphics.Paint.Style.STROKE
-                                strokeWidth = moonR * 0.06f
-                                this.color = color.copy(alpha = effectiveAlpha * 0.55f).toArgb()
-                                maskFilter = android.graphics.BlurMaskFilter(
-                                    moonR * 0.12f,
-                                    android.graphics.BlurMaskFilter.Blur.NORMAL
-                                )
-                            }
-                            nCanvas.drawPath(reusableCrescent, rimPaint)
+                            // Rim glow — reuse cached Paint, update stroke/color/blur for this frame.
+                            reusableRimPaint.strokeWidth = moonR * 0.06f
+                            reusableRimPaint.color = color.copy(alpha = effectiveAlpha * 0.55f).toArgb()
+                            reusableRimPaint.maskFilter = android.graphics.BlurMaskFilter(
+                                moonR * 0.12f, android.graphics.BlurMaskFilter.Blur.NORMAL
+                            )
+                            nCanvas.drawPath(reusableCrescent, reusableRimPaint)
 
                             nCanvas.restore()
                         }
 
-                        // 3. Small craters on the visible crescent face (left side only)
-                        val craterPositions = listOf(
-                            Pair(-0.30f, -0.20f) to 0.09f,
-                            Pair(-0.20f,  0.28f) to 0.07f,
-                            Pair(-0.42f,  0.08f) to 0.06f
-                        )
-                        craterPositions.forEach { (offset, craterSize) ->
+                        // 3. Small craters — use pre-allocated craterData list (no per-frame allocation)
+                        craterData.forEach { (offsetX, offsetY, craterSize) ->
                             val craterCenter = Offset(
-                                moonCenter.x + moonR * offset.first,
-                                moonCenter.y + moonR * offset.second
+                                moonCenter.x + moonR * offsetX,
+                                moonCenter.y + moonR * offsetY
                             )
                             drawCircle(
                                 color = Color.Black.copy(alpha = effectiveAlpha * 0.18f),
@@ -935,8 +1060,31 @@ fun ParticlesOverlay(
                             )
                         }
                     } // end else (moon)
-                } // end celestialState?.let
-            } // end celestial Canvas
+            } // end drawCelestial lambda
+
+            // Sharp layer — fades out as blur fades in
+            val sharpAlpha = celestialAlpha * (1f - celestialBlurAlpha)
+            if (sharpAlpha > 0.001f) {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(alpha = sharpAlpha)
+                        .pointerInput(Unit) {}
+                ) { drawCelestial() }
+            }
+
+            // Blurred layer — present and warm whenever transitioning or fully blurred.
+            // Keeping it alive during the entire transition (celestialBlurAlpha > 0)
+            // prevents a cold-start hitch when blur is first requested.
+            if (celestialBlurAlpha > 0.001f || celestialBlurTarget) {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .blur(18.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                        .graphicsLayer(alpha = celestialAlpha * celestialBlurAlpha)
+                        .pointerInput(Unit) {}
+                ) { drawCelestial() }
+            }
         } // end if timeModeEnabled
     }
 }

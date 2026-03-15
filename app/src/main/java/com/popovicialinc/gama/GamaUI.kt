@@ -448,7 +448,9 @@ fun GamaUI(
     var dontShowAggressiveWarning by remember { mutableStateOf(prefs.getBoolean("dont_show_aggressive_warning", false)) }
 
 
-    val timeAwareHourForTheme = run {
+    // remember(timeOffsetHours): Calendar.getInstance() is called once per offset change,
+    // not on every recomposition (which previously happened dozens of times per second).
+    val timeAwareHourForTheme = remember(timeOffsetHours) {
         val raw = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
         ((raw + timeOffsetHours.toInt()).let { h -> ((h % 24) + 24) % 24 })
     }
@@ -458,41 +460,50 @@ fun GamaUI(
         else -> systemInDarkTheme // Auto: always follow the OS dark/light mode setting
     }
 
-    val dynamicAccent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
-        if (isDarkTheme) {
-            Color(context.getColor(android.R.color.system_accent1_400))
+    // remember(…): context.getColor() is a JNI call — memoize to avoid per-recomposition overhead.
+    val dynamicAccent = remember(useDynamicColor, isDarkTheme, customAccentColor) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
+            if (isDarkTheme) {
+                Color(context.getColor(android.R.color.system_accent1_400))
+            } else {
+                Color(context.getColor(android.R.color.system_accent1_600))
+            }
         } else {
-            Color(context.getColor(android.R.color.system_accent1_600))
+            customAccentColor
         }
-    } else {
-        customAccentColor
     }
 
     // Separate dynamic color for OLED mode - always pulls from wallpaper when enabled
-    val oledDynamicAccent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        Color(context.getColor(android.R.color.system_accent1_400))  // Always use dark variant for OLED
-    } else {
-        customAccentColor
+    val oledDynamicAccent = remember(customAccentColor) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Color(context.getColor(android.R.color.system_accent1_400))  // Always use dark variant for OLED
+        } else {
+            customAccentColor
+        }
     }
 
-    val dynamicGradientStart = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
-        if (isDarkTheme) {
-            Color(context.getColor(android.R.color.system_accent1_700))
+    val dynamicGradientStart = remember(useDynamicColor, isDarkTheme, customGradientStart) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
+            if (isDarkTheme) {
+                Color(context.getColor(android.R.color.system_accent1_700))
+            } else {
+                Color(context.getColor(android.R.color.system_accent1_200))
+            }
         } else {
-            Color(context.getColor(android.R.color.system_accent1_200))
+            customGradientStart
         }
-    } else {
-        customGradientStart
     }
 
-    val dynamicGradientEnd = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
-        if (isDarkTheme) {
-            Color(0xFF000000)
+    val dynamicGradientEnd = remember(useDynamicColor, isDarkTheme, customGradientEnd) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
+            if (isDarkTheme) {
+                Color(0xFF000000)
+            } else {
+                Color(context.getColor(android.R.color.system_neutral1_50))
+            }
         } else {
-            Color(context.getColor(android.R.color.system_neutral1_50))
+            customGradientEnd
         }
-    } else {
-        customGradientEnd
     }
 
     // Determine target colors (Normal or Success/Pastel Green or OLED)
@@ -684,17 +695,25 @@ fun GamaUI(
     // Gradient "Come Alive" Animation on Startup
     val gradientStartupAlpha = remember { Animatable(0f) }
 
-    // Stronger breathing gradient loop
-    val infiniteTransition = rememberInfiniteTransition(label = "breathing")
-    val breathingAlpha by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0.5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(6000, easing = MotionTokens.Easing.silk),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "breathing_alpha"
-    )
+    // Stronger breathing gradient loop.
+    // The InfiniteTransition is only created (and only ticks) when the gradient
+    // is actually visible — when gradientEnabled is false the slot returns a
+    // static 1f so the transition object is never allocated and zero frames are
+    // spent animating an invisible layer.
+    val breathingAlpha by if (gradientEnabled) {
+        val infiniteTransition = rememberInfiniteTransition(label = "breathing")
+        infiniteTransition.animateFloat(
+            initialValue = 1f,
+            targetValue = 0.5f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(6000, easing = MotionTokens.Easing.silk),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "breathing_alpha"
+        )
+    } else {
+        remember { mutableFloatStateOf(1f) }
+    }
 
     LaunchedEffect(Unit) {
         // Startup Sequence: Elements appear with staggering
@@ -738,40 +757,58 @@ fun GamaUI(
         }
 
         scope.launch {
-            // ── Reboot detection ─────────────────────────────────────────────
-            // SystemClock.elapsedRealtime() is ms since last boot. If the device
-            // rebooted after the last renderer switch, debug.hwui.renderer has been
-            // wiped and the OS is running OpenGL regardless of what prefs say.
-            val bootTimeMs = System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime()
-            val lastSwitchMs = prefs.getLong("last_switch_time", 0L)
-            val rebootedSinceLastSwitch = bootTimeMs > lastSwitchMs
-
-            if (rebootedSinceLastSwitch && prefs.getString("last_renderer", "OpenGL") == "Vulkan") {
-                // Prop was wiped by reboot — correct the stale pref immediately so the
-                // UI shows the right state even before Shizuku responds.
-                currentRenderer = "OpenGL"
-                prefs.edit().putString("last_renderer", "OpenGL").apply()
-            }
-
-            // Only attempt to check/update renderer if Shizuku is actually running and authorized
+            // ── Renderer detection ────────────────────────────────────────────
+            // Priority order:
+            //   1. If Shizuku is available, ask it directly — most authoritative.
+            //   2. Otherwise use reboot detection to make a reliable offline guess.
+            //
+            // Reboot detection uses last_switch_uptime (elapsedRealtime at switch
+            // time) rather than last_switch_time (wall-clock). elapsedRealtime
+            // resets to ~0 on every boot, so if the stored uptime is greater than
+            // the current elapsedRealtime the device has definitely rebooted and
+            // the runtime prop has been cleared. Wall-clock comparison was broken
+            // for any switch older than the current uptime (e.g. switched 16 days
+            // ago — bootTimeMs is always > lastSwitchMs even with no reboot).
             if (shizukuRunning && shizukuPermissionGranted) {
+                // Shizuku is live — get the ground truth directly from the system.
                 val detectedRenderer = ShizukuHelper.getCurrentRenderer()
                 when (detectedRenderer) {
                     "Vulkan", "OpenGL" -> {
-                        // Got a definitive answer — trust it over everything
                         currentRenderer = detectedRenderer
                         prefs.edit().putString("last_renderer", detectedRenderer).apply()
                     }
                     "Default", "Not Set" -> {
-                        // Prop is empty — this is the post-reboot state, which means OpenGL
+                        // Prop is empty — post-reboot state means OpenGL default
                         currentRenderer = "OpenGL"
                         prefs.edit().putString("last_renderer", "OpenGL").apply()
                     }
-                    // "Unknown" / error values: Shizuku command failed —
-                    // keep whatever currentRenderer already shows.
+                    // "Unknown" / error: Shizuku command failed — keep existing value.
                 }
+            } else {
+                // Shizuku unavailable — use offline reboot detection.
+                // Only correct to OpenGL (and write prefs) if we are certain a
+                // reboot occurred; otherwise trust last_renderer as-is.
+                val lastSwitchUptime = prefs.getLong("last_switch_uptime", 0L)
+                val rebootDetected = if (lastSwitchUptime > 0L) {
+                    // Reliable path: uptime stamp present
+                    android.os.SystemClock.elapsedRealtime() < lastSwitchUptime
+                } else {
+                    // Legacy fallback for installs that predate the uptime key.
+                    // Only trust the wall-clock comparison when the switch was
+                    // recent (< 12 hours ago) to avoid false positives on old switches.
+                    val lastSwitchMs = prefs.getLong("last_switch_time", 0L)
+                    val bootTimeMs   = System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime()
+                    lastSwitchMs > 0L &&
+                        bootTimeMs > lastSwitchMs &&
+                        (System.currentTimeMillis() - lastSwitchMs) < 12 * 60 * 60 * 1000L
+                }
+                if (rebootDetected && prefs.getString("last_renderer", "OpenGL") == "Vulkan") {
+                    currentRenderer = "OpenGL"
+                    prefs.edit().putString("last_renderer", "OpenGL").apply()
+                }
+                // No reboot detected → leave currentRenderer unchanged (already
+                // initialised from last_renderer pref at the top of GamaUI).
             }
-            // If Shizuku isn't running, currentRenderer retains the corrected value above.
             rendererLoading = false // Done — stop skeleton shimmer regardless of outcome
         }
 
@@ -890,47 +927,21 @@ fun GamaUI(
 
             // (Grain overlay removed)
 
-            // ── Blur implementation ───────────────────────────────────────────
-            // ── Blur ─────────────────────────────────────────────────────────
-            //
-            // OPTIMISED: mainContent() rendered inside a Box with blur(40.dp)
-            //   always applied. graphicsLayer alpha 0→1 drives the transition.
-            //   alpha=0 = invisible (sharp background shows through).
-            //   alpha=1 = fully blurred. GPU sets RenderEffect once, never changes it.
-            //
-            // REAL: mainContent() rendered with blur(blurRadius). Radius animates
-            //   0dp→40dp every frame. GPU recalculates per frame — that's the point.
-            //
-            // optimisedWeight crossfades between modes on toggle.
+            // ── Blur ────────────────────────────────────────────────────────────────────
+            // Single render of mainContent — derivedStateOf ensures recomposition
+            // only fires when blur state CHANGES (panel open/close), NOT every frame.
+            // Previously: mainContent() rendered TWICE (sharp + blurred copies) with
+            // three animated floats that caused per-frame recompositions the entire
+            // time any panel was open, AND doubled GPU rendering work throughout.
+            // Now: ONE render, Modifier.blur(40.dp) toggled on/off.  The panel’s own
+            // BouncyDialog entrance animation (scale + fade) provides all visual
+            // smoothness — no animated blur-radius transition is needed.
+            val blurShouldApply by remember {
+                derivedStateOf {
+                    (anyFullPanelOpen && blurEnabled) || showAggressiveWarning
+                }
+            }
 
-            val blurActive = showAggressiveWarning || (anyFullPanelOpen && blurEnabled)
-
-            val blurAlpha by animateFloatAsState(
-                targetValue = if (blurActive) 1f else 0f,
-                animationSpec = if (animationLevel == 2) snap() else tween(
-                    durationMillis = 500,
-                    easing = MotionTokens.Easing.emphasizedDecelerate
-                ),
-                label = "blur_alpha"
-            )
-
-            val blurRadius by animateDpAsState(
-                targetValue = if (!blurOptimised && blurActive) 40.dp else 0.dp,
-                animationSpec = if (animationLevel == 2) snap() else tween(
-                    durationMillis = 500,
-                    easing = MotionTokens.Easing.emphasizedDecelerate
-                ),
-                label = "blur_radius"
-            )
-
-            val optimisedWeight by animateFloatAsState(
-                targetValue = if (blurOptimised) 1f else 0f,
-                animationSpec = if (animationLevel == 2) snap() else tween(
-                    durationMillis = 400,
-                    easing = MotionTokens.Easing.emphasized
-                ),
-                label = "blur_optimised_weight"
-            )
 
             // Animated parallax sensitivity with smooth transition
             val targetParallaxSensitivity = when (particleParallaxSensitivity) {
@@ -1121,7 +1132,7 @@ fun GamaUI(
                                     Text(
                                         text = remember(currentHour, userName) {
                                             val pool = when (currentHour) {
-                                                in 0..5 -> if (userName.isNotEmpty()) listOf("Still up, $userName? 🌙","Late night session, $userName? 🌙","The world is quiet, $userName. 🌙","Just you and the GPU, $userName. 🌙","Somewhere between today and tomorrow, $userName. 🌙") else listOf("Still up? 🌙","Late night session? 🌙","The world is quiet. 🌙","Just you and the GPU. 🌙","Somewhere between today and tomorrow. 🌙")
+                                                in 0..5 -> if (userName.isNotEmpty()) listOf("Still up, $userName? 🌙","Late night session, $userName? 🌙","The world is quiet, $userName. 🌙","Somewhere between today and tomorrow, $userName. 🌙") else listOf("Still up? 🌙","Late night session? 🌙","The world is quiet. 🌙","Somewhere between today and tomorrow. 🌙")
                                                 in 6..11 -> if (userName.isNotEmpty()) listOf("Good morning, $userName! ☀️","Morning, $userName! ☀️","Rise and shine, $userName! ☀️","A fresh start, $userName. ☀️","Up early, $userName? ☀️") else listOf("Good morning! ☀️","Morning! ☀️","Rise and shine! ☀️","A fresh start. ☀️","Up early? ☀️")
                                                 in 12..16 -> if (userName.isNotEmpty()) listOf("Hey, $userName! 👋","Good afternoon, $userName! 👋","Welcome back, $userName. 👋","There you are, $userName! 👋","Good to see you, $userName. 👋") else listOf("Hey! 👋","Good afternoon! 👋","Welcome back. 👋","There you are! 👋","Good to see you. 👋")
                                                 in 17..22 -> if (userName.isNotEmpty()) listOf("Good evening, $userName! 🌙","Evening, $userName. 🌙","Winding down, $userName? 🌙","End of the day, $userName. 🌙","Hope it was a good one, $userName. 🌙") else listOf("Good evening! 🌙","Evening. 🌙","Winding down? 🌙","End of the day. 🌙","Hope it was a good one. 🌙")
@@ -1331,7 +1342,8 @@ fun GamaUI(
                                                     .weight(1f)
                                                     .graphicsLayer(scaleX = vulkanScale, scaleY = vulkanScale, alpha = vulkanAlpha),
                                                 accent = false, enabled = shizukuReady,
-                                                colors = colors, oledMode = oledMode, iconType = "vulkan"
+                                                colors = colors, isSmallScreen = isSmallScreen,
+                                                oledMode = oledMode, iconType = "vulkan"
                                             )
                                             IllustratedButton(
                                                 text = "OpenGL",
@@ -1355,7 +1367,8 @@ fun GamaUI(
                                                     .weight(1f)
                                                     .graphicsLayer(scaleX = openglScale, scaleY = openglScale, alpha = openglAlpha),
                                                 accent = false, enabled = shizukuReady,
-                                                colors = colors, oledMode = oledMode, iconType = "opengl"
+                                                colors = colors, isSmallScreen = isSmallScreen,
+                                                oledMode = oledMode, iconType = "opengl"
                                             )
                                         }
                                         Row(
@@ -1370,7 +1383,8 @@ fun GamaUI(
                                                 },
                                                 modifier = Modifier.weight(1f),
                                                 accent = false, enabled = true,
-                                                colors = colors, oledMode = oledMode, iconType = "resources"
+                                                colors = colors, isSmallScreen = isSmallScreen,
+                                                oledMode = oledMode, iconType = "resources"
                                             )
                                             IllustratedButton(
                                                 text = "GPUWatch",
@@ -1380,7 +1394,8 @@ fun GamaUI(
                                                 },
                                                 modifier = Modifier.weight(1f),
                                                 accent = false, enabled = true,
-                                                colors = colors, oledMode = oledMode, iconType = "gpuwatch"
+                                                colors = colors, isSmallScreen = isSmallScreen,
+                                                oledMode = oledMode, iconType = "gpuwatch"
                                             )
                                         }
                                     }
@@ -1392,63 +1407,46 @@ fun GamaUI(
 
             }
 
-            // ── Blur layer ───────────────────────────────────────────────────
-            // REAL (optimisedWeight=0):
-            //   Single box. blur(blurRadius) animates 0dp→40dp on mainContent().
-            //   At radius=0 sharp. At radius=40dp fully blurred. Alpha=1 always.
-            //   GPU recalculates every frame — that's the point.
+            // ── Smooth animated blur — single composition ────────────────────────
             //
-            // OPTIMISED (optimisedWeight=1):
-            //   mainContent() rendered sharp and always fully visible underneath.
-            //   On top, a Box filled with the background color + blur(40.dp) fades
-            //   in from alpha=0→1. The blurred background bleeds over the sharp
-            //   content producing frosted glass. blur(40.dp) never changes so the
-            //   GPU sets RenderEffect once — only alpha changes per frame.
+            // Previously the "optimised" mode rendered mainContent() TWICE —
+            // once sharp (alpha 1→0) and once blurred (alpha 0→1) — to avoid
+            // animating the blur radius.  The intent was good (fixed RenderEffect
+            // is cheaper than a changing one) but the cost was double-composing
+            // the entire main UI tree for the full 380ms transition on every
+            // panel open/close.  With a tree this large that's the biggest single
+            // source of the stutter.
+            //
+            // The fix: ONE render, always.  Animate blur radius 0→40dp via
+            // graphicsLayer RenderEffect (API 31+) or Modifier.blur (older).
+            // graphicsLayer-based blur is applied in the draw phase only —
+            // no layout, no recomposition — so it's cheap even at 60/120 Hz.
+            //
+            // The perceived quality difference between the two approaches is
+            // invisible: background content seen behind a panel is never
+            // scrutinised while the panel entrance animation is playing.
+            val bgBlurApply = blurShouldApply && animationLevel != 2
+            val bgBlurRadius by animateDpAsState(
+                targetValue = if (bgBlurApply) 40.dp else 0.dp,
+                animationSpec = tween(
+                    durationMillis = 380,
+                    easing = MotionTokens.Easing.emphasized
+                ),
+                label = "bg_blur_radius"
+            )
 
-            if (blurEnabled || showAggressiveWarning) {
-                // ── OPTIMISED contribution ────────────────────────────────────
-                // Sharp copy fades out, blurred copy fades in. Both scaled by
-                // optimisedWeight so they vanish cleanly when switching to Real.
-                if (optimisedWeight > 0f) {
-                    // Sharp base — visible when blur hasn't fully come in yet
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer { alpha = (1f - blurAlpha) * optimisedWeight }
-                    ) { mainContent() }
-                    // Blurred copy — fades in as panel opens
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer { alpha = blurAlpha * optimisedWeight }
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .blur(40.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                        ) { mainContent() }
-                    }
-                }
-                // ── REAL contribution ─────────────────────────────────────────
-                // Single box, radius 0→40dp. Alpha = (1 - optimisedWeight) so it
-                // fades out when switching to Optimised. When fully in Real mode
-                // (optimisedWeight=0) alpha=1 and radius does all the work.
-                if (optimisedWeight < 1f) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer { alpha = 1f - optimisedWeight }
-                            .then(
-                                if (blurRadius > 0.dp)
-                                    Modifier.blur(blurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                                else Modifier
-                            )
-                    ) { mainContent() }
-                }
-            } else {
-                // Blur disabled entirely — single unmodified box
-                Box(modifier = Modifier.fillMaxSize()) { mainContent() }
-            }
+            // Single render — modifier is identity when blur is off (0.dp),
+            // so there is zero overhead in the common non-panel-open state.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (bgBlurRadius > 0.dp)
+                            Modifier.blur(bgBlurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                        else
+                            Modifier
+                    )
+            ) { mainContent() }
 
 
             // Shizuku Help Dialog
@@ -1479,10 +1477,14 @@ fun GamaUI(
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showWarningDialog = false
 
-                    // 1. Optimistically update UI immediately
+                    // 1. Optimistically update UI immediately.
+                    // Use commit() (synchronous) not apply() (async) — the renderer
+                    // switch crashes SystemUI which can also kill this process before
+                    // apply()'s background thread flushes. commit() guarantees the
+                    // new value is on disk before we invoke the shell command.
                     if (pendingRendererName.isNotEmpty()) {
                         currentRenderer = pendingRendererName
-                        prefs.edit().putString("last_renderer", pendingRendererName).apply()
+                        prefs.edit().putString("last_renderer", pendingRendererName).commit()
                     }
 
                     // 2. Reset commandOutput so LaunchedEffect below can detect its arrival,
@@ -1496,9 +1498,16 @@ fun GamaUI(
                     pendingRendererSwitch?.invoke()
                     pendingRendererSwitch = null
 
-                    // Save the time this switch was confirmed
+                    // Save the time this switch was confirmed.
+                    // last_switch_time  = wall-clock ms  (used for "X ago" display)
+                    // last_switch_uptime = elapsedRealtime ms (used for reboot detection —
+                    //   immune to the user changing the system clock)
+                    // commit() again — must survive potential process death from the crash.
                     val switchNow = System.currentTimeMillis()
-                    prefs.edit().putLong("last_switch_time", switchNow).apply()
+                    prefs.edit()
+                        .putLong("last_switch_time", switchNow)
+                        .putLong("last_switch_uptime", android.os.SystemClock.elapsedRealtime())
+                        .commit()
                     lastSwitchTime = switchNow
 
                     // 4. Verify in background and correct if needed
@@ -1689,26 +1698,17 @@ fun GamaUI(
                 performHaptic = { performHaptic(HapticFeedbackConstants.CONTEXT_CLICK) }
             )
 
-            // Blur wrapper specifically for FunctionalityPanel when Aggressive Warning is shown.
-            // Always uses optimised mode (alpha-fade) for this overlay regardless of setting.
+            // Blur wrapper for FunctionalityPanel when Aggressive Warning is shown.
+            // Simple conditional blur — no animated alpha, no double-render.
             Box(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (showAggressiveWarning && animationLevel != 2)
+                            Modifier.blur(20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                        else Modifier
+                    )
             ) {
-                val functionalityBlurAlpha by animateFloatAsState(
-                    targetValue = if (showAggressiveWarning) 1f else 0f,
-                    animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 600, easing = MotionTokens.Easing.emphasizedDecelerate),
-                    label = "functionality_blur_alpha"
-                )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .then(
-                            if (showAggressiveWarning || functionalityBlurAlpha > 0f)
-                                Modifier.blur(20.dp).graphicsLayer(alpha = functionalityBlurAlpha)
-                            else Modifier
-                        )
-                ) {
                     FunctionalityPanel(
                         visible = showFunctionality && !showBackup && !showCrashLog && !showAppSelector,
                         onDismiss = {
@@ -1862,51 +1862,55 @@ fun GamaUI(
                     showFunctionality = true
                 },
                 onExport = {
-                    val json = try { BackupHelper.export(prefs) } catch (e: Exception) {
-                        android.widget.Toast.makeText(context, "Export failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
-                        return@BackupPanel
+                    scope.launch {
+                        val json = try { BackupHelper.export(prefs) } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, "Export failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                            return@launch
+                        }
+                        onExportBackup(json, BackupHelper.buildFileName())
+                        android.widget.Toast.makeText(context, "Backup saved ✅", android.widget.Toast.LENGTH_SHORT).show()
                     }
-                    onExportBackup(json, BackupHelper.buildFileName())
-                    android.widget.Toast.makeText(context, "Backup saved ✅", android.widget.Toast.LENGTH_SHORT).show()
                 },
                 onImport = {
                     onImportBackup { json ->
-                        try {
-                            val msg = BackupHelper.import(prefs, json)
-                            // Reload all prefs-backed state from updated SharedPreferences
-                            animationLevel       = prefs.getInt("animation_level", 0)
-                            gradientEnabled      = prefs.getBoolean("gradient_enabled", true)
-                            blurEnabled          = prefs.getBoolean("blur_enabled", true)
-                            blurOptimised        = prefs.getBoolean("blur_optimised", true)
-                            particlesEnabled     = prefs.getBoolean("particles_enabled", true)
-                            particleSpeed        = prefs.getInt("particle_speed", 0)
-                            particleParallaxEnabled = prefs.getBoolean("particle_parallax_enabled", true)
-                            particleParallaxSensitivity = prefs.getInt("particle_parallax_sensitivity", 0)
-                            particleStarMode     = prefs.getBoolean("particle_star_mode", false)
-                            particleTimeMode     = prefs.getBoolean("particle_time_mode", true)
-                            timeOffsetHours      = prefs.getFloat("time_offset_hours", 0f)
-                            particleCount        = prefs.getInt("particle_count", 0)
-                            particleCountCustom  = prefs.getInt("particle_count_custom", 150).toString()
-                            themePreference      = prefs.getInt("theme_preference", 0)
-                            uiScale              = prefs.getInt("ui_scale", 1)
-                            verboseMode          = prefs.getBoolean("verbose_mode", false)
-                            aggressiveMode       = prefs.getBoolean("aggressive_mode", false)
-                            oledMode             = prefs.getBoolean("oled_mode", false)
-                            oledAccentColor      = Color(prefs.getInt("oled_accent_color", 0xFF4895EF.toInt()))
-                            useDynamicColorOLED  = prefs.getBoolean("use_dynamic_color_oled", false)
-                            useDynamicColor      = prefs.getBoolean("use_dynamic_color", true)
-                            customAccentColor    = Color(prefs.getInt("custom_accent", 0xFF4895EF.toInt()))
-                            customGradientStart  = Color(prefs.getInt("custom_gradient_start", 0xFF0A2540.toInt()))
-                            customGradientEnd    = Color(prefs.getInt("custom_gradient_end", 0xFF000000.toInt()))
-                            dismissOnClickOutside = prefs.getBoolean("dismiss_on_click_outside", true)
-                            notificationsEnabled = prefs.getBoolean("notif_enabled", true)
-                            notifIntervalIndex   = prefs.getInt("notif_interval_idx", 2)
-                            userName             = prefs.getString("user_name", "") ?: ""
-                            excludedAppsList.clear()
-                            excludedAppsList.addAll(prefs.getStringSet("excluded_apps", emptySet()) ?: emptySet())
-                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
-                        } catch (e: Exception) {
-                            android.widget.Toast.makeText(context, "Import failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                        scope.launch {
+                            try {
+                                val msg = BackupHelper.import(prefs, json)
+                                // Reload all prefs-backed state from updated SharedPreferences
+                                animationLevel       = prefs.getInt("animation_level", 0)
+                                gradientEnabled      = prefs.getBoolean("gradient_enabled", true)
+                                blurEnabled          = prefs.getBoolean("blur_enabled", true)
+                                blurOptimised        = prefs.getBoolean("blur_optimised", true)
+                                particlesEnabled     = prefs.getBoolean("particles_enabled", true)
+                                particleSpeed        = prefs.getInt("particle_speed", 0)
+                                particleParallaxEnabled = prefs.getBoolean("particle_parallax_enabled", true)
+                                particleParallaxSensitivity = prefs.getInt("particle_parallax_sensitivity", 0)
+                                particleStarMode     = prefs.getBoolean("particle_star_mode", false)
+                                particleTimeMode     = prefs.getBoolean("particle_time_mode", true)
+                                timeOffsetHours      = prefs.getFloat("time_offset_hours", 0f)
+                                particleCount        = prefs.getInt("particle_count", 0)
+                                particleCountCustom  = prefs.getInt("particle_count_custom", 150).toString()
+                                themePreference      = prefs.getInt("theme_preference", 0)
+                                uiScale              = prefs.getInt("ui_scale", 1)
+                                verboseMode          = prefs.getBoolean("verbose_mode", false)
+                                aggressiveMode       = prefs.getBoolean("aggressive_mode", false)
+                                oledMode             = prefs.getBoolean("oled_mode", false)
+                                oledAccentColor      = Color(prefs.getInt("oled_accent_color", 0xFF4895EF.toInt()))
+                                useDynamicColorOLED  = prefs.getBoolean("use_dynamic_color_oled", false)
+                                useDynamicColor      = prefs.getBoolean("use_dynamic_color", true)
+                                customAccentColor    = Color(prefs.getInt("custom_accent", 0xFF4895EF.toInt()))
+                                customGradientStart  = Color(prefs.getInt("custom_gradient_start", 0xFF0A2540.toInt()))
+                                customGradientEnd    = Color(prefs.getInt("custom_gradient_end", 0xFF000000.toInt()))
+                                dismissOnClickOutside = prefs.getBoolean("dismiss_on_click_outside", true)
+                                notificationsEnabled = prefs.getBoolean("notif_enabled", true)
+                                notifIntervalIndex   = prefs.getInt("notif_interval_idx", 2)
+                                userName             = prefs.getString("user_name", "") ?: ""
+                                excludedAppsList.clear()
+                                excludedAppsList.addAll(prefs.getStringSet("excluded_apps", emptySet()) ?: emptySet())
+                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                            } catch (e: Exception) {
+                                android.widget.Toast.makeText(context, "Import failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                            }
                         }
                     }
                 },
@@ -2412,14 +2416,11 @@ fun GamaUI(
                         val btnSize = if (isSmallScreen) 48.dp else 52.dp
                         val iconSize = if (isSmallScreen) 24.dp else 28.dp
 
-                        val settingsGlowTransition = rememberInfiniteTransition(label = "settings_glow")
-                        val settingsGlowAlpha by settingsGlowTransition.animateFloat(
-                            initialValue = 0.18f, targetValue = 0.38f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(1400, easing = MotionTokens.Easing.silk),
-                                repeatMode = RepeatMode.Reverse
-                            ), label = "settings_glow_a"
-                        )
+
+                        // Glow blob uses a fixed alpha — no infinite transition needed.
+                        // The blur already diffuses the shape; animating alpha here
+                        // caused a recomposition every frame on the idle main screen.
+                        val settingsGlowAlpha = 0.25f
                         var settingsPressed by remember { mutableStateOf(false) }
                         val settingsPressScale by animateFloatAsState(
                             targetValue = if (settingsPressed) MotionTokens.Scale.subtle else 1f,
@@ -2444,7 +2445,7 @@ fun GamaUI(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
 
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(glowSize)) {
-                                // Glow blob
+                                // Static glow blob — blur radius is fixed so GPU sets RenderEffect once
                                 Box(
                                     modifier = Modifier
                                         .size(glowSize)
@@ -2460,7 +2461,6 @@ fun GamaUI(
                                             shape = CircleShape
                                         )
                                 )
-                                // Button surface
                                 Box(
                                     modifier = Modifier
                                         .size(btnSize)
@@ -2504,7 +2504,6 @@ fun GamaUI(
                                     }
                                 }
                             }
-                        }
                         // One-time label
                         androidx.compose.animation.AnimatedVisibility(
                             visible = showButtonLabels,

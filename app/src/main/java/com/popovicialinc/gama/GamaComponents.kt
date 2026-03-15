@@ -668,7 +668,7 @@ fun SettingsNavigationCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = if (LocalConfiguration.current.screenWidthDp.dp < 360.dp) 72.dp else 80.dp)
+            .heightIn(min = if (isSmallScreen) 72.dp else 80.dp)
             // combine disabled scale and press scale
             .graphicsLayer(
                 scaleX = disabledScale * pressScale,
@@ -679,7 +679,7 @@ fun SettingsNavigationCard(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = if (LocalConfiguration.current.screenWidthDp.dp < 360.dp) 72.dp else 80.dp)
+                .heightIn(min = if (isSmallScreen) 72.dp else 80.dp)
                 .graphicsLayer(alpha = alpha)
                 .then(if (!enabled) Modifier.pointerInput(enabled) {
                     awaitPointerEventScope {
@@ -707,7 +707,7 @@ fun SettingsNavigationCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = if (LocalConfiguration.current.screenWidthDp.dp < 360.dp) 72.dp else 80.dp)
+                    .heightIn(min = if (isSmallScreen) 72.dp else 80.dp)
                     .padding(if (isSmallScreen) 20.dp else 24.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -782,11 +782,11 @@ fun FlatButton(
     enabled: Boolean = true,
     colors: ThemeColors,
     maxLines: Int,
+    isSmallScreen: Boolean = false,
     oledMode: Boolean = false
 ) {
     val animLevel = LocalAnimationLevel.current
     var isPressed by remember { mutableStateOf(false) }
-    val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val density = LocalDensity.current
 
     val baseHeight = if (isSmallScreen) 54.dp else 58.dp
@@ -794,53 +794,29 @@ fun FlatButton(
     val baseFontSize = ts.buttonLarge
     val shape = RoundedCornerShape(18.dp)
 
-    // Card scale: crisp press-down, bouncy overshoot on release
-    val pressScale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) MotionTokens.Scale.subtle else 1f,
-        animationSpec = if (animLevel == 2) snap() else spring(
-            dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-            stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-        ),
-        label = "flatbtn_scale"
-    )
-
-    // Text scale: pops inward on press, overshoots back out on release
-    val textScale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) 0.93f else 1f,
-        animationSpec = if (animLevel == 2) snap() else spring(
-            dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-            stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-        ),
-        label = "flatbtn_text_scale"
-    )
-
-    // Text translate: nudges down on press, springs back with overshoot
-    val textTranslateY by animateFloatAsState(
-        targetValue = if (isPressed && enabled) with(density) { 1.5.dp.toPx() } else 0f,
-        animationSpec = if (animLevel == 2) snap() else spring(
-            dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-            stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-        ),
-        label = "flatbtn_text_ty"
-    )
-
-    // Border: normal weight at rest, thicker accent on press
-    val borderWidth by animateDpAsState(
-        targetValue = if (isPressed && enabled) 2.dp else if (oledMode) 0.75.dp else 1.dp,
-        animationSpec = tween(
-            durationMillis = if (isPressed) MotionTokens.Duration.flash else MotionTokens.Duration.quick,
-            easing = FastOutSlowInEasing
-        ),
-        label = "flatbtn_border_width"
-    )
-    val borderAlpha by animateFloatAsState(
-        targetValue = if (isPressed && enabled) 1f else 0.5f,
-        animationSpec = tween(
-            durationMillis = if (isPressed) MotionTokens.Duration.flash else MotionTokens.Duration.quick,
-            easing = FastOutSlowInEasing
-        ),
-        label = "flatbtn_border_alpha"
-    )
+    // Single Animatable<Float> [0=rest, 1=pressed] drives ALL press visuals via
+    // graphicsLayer — replaces 5 separate animateFloatAsState/animateDpAsState calls
+    // that previously ran simultaneously on every press/release.
+    val pressProgress = remember { Animatable(0f) }
+    val flatBtnScope  = rememberCoroutineScope()
+    LaunchedEffect(isPressed) {
+        pressProgress.animateTo(
+            targetValue   = if (isPressed && enabled) 1f else 0f,
+            animationSpec = if (animLevel == 2) snap() else spring(
+                dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+            )
+        )
+    }
+    val pp = pressProgress.value  // single read; all visuals derived below
+    val nudgePx = with(density) { 1.5.dp.toPx() }
+    val restBorderW = if (oledMode) 0.75f else 1f
+    // Derived press visuals — evaluated in draw phase via graphicsLayer, zero recompose
+    val pressScale    = 1f - pp * (1f - MotionTokens.Scale.subtle)
+    val textScale     = 1f - pp * 0.07f
+    val textTranslateY = pp * nudgePx
+    val borderWidthDp  = (restBorderW + pp * restBorderW).dp   // 1dp → 2dp
+    val borderAlpha    = 0.5f + pp * 0.5f
 
     val animatedButtonColor = if (!enabled) colors.textSecondary.copy(alpha = 0.05f)
     else if (oledMode) Color.Black
@@ -878,7 +854,7 @@ fun FlatButton(
                 .background(animatedButtonColor)
                 .then(
                     if (shouldShowBorder) Modifier.border(
-                        width = borderWidth,
+                        width = borderWidthDp,
                         color = borderColor,
                         shape = shape
                     ) else Modifier
@@ -922,54 +898,40 @@ fun IllustratedButton(
     accent: Boolean = false,
     enabled: Boolean = true,
     colors: ThemeColors,
+    isSmallScreen: Boolean = false,
     oledMode: Boolean = false,
     iconType: String   // "vulkan" | "opengl" | "resources" | "gpuwatch"
 ) {
     val animLevel = LocalAnimationLevel.current
     var isPressed by remember { mutableStateOf(false) }
-    val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val density = LocalDensity.current
     val ts = LocalTypeScale.current
 
     val baseHeight = if (isSmallScreen) 54.dp else 58.dp
     val shape = RoundedCornerShape(18.dp)
 
-    val pressScale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) MotionTokens.Scale.subtle else 1f,
-        animationSpec = if (animLevel == 2) snap() else spring(
-            dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-            stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-        ), label = "illbtn_scale"
-    )
-    val textScale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) 0.93f else 1f,
-        animationSpec = if (animLevel == 2) snap() else spring(
-            dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-            stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-        ), label = "illbtn_text_scale"
-    )
-    val textTranslateY by animateFloatAsState(
-        targetValue = if (isPressed && enabled) with(density) { 1.5.dp.toPx() } else 0f,
-        animationSpec = if (animLevel == 2) snap() else spring(
-            dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-            stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-        ), label = "illbtn_text_ty"
-    )
-    val borderWidth by animateDpAsState(
-        targetValue = if (isPressed && enabled) 2.dp else if (oledMode) 0.75.dp else 1.dp,
-        animationSpec = tween(
-            durationMillis = if (isPressed) MotionTokens.Duration.flash else MotionTokens.Duration.quick,
-            easing = FastOutSlowInEasing
-        ), label = "illbtn_border_width"
-    )
-    val borderAlpha by animateFloatAsState(
-        targetValue = if (isPressed && enabled) 1f else 0.5f,
-        animationSpec = tween(
-            durationMillis = if (isPressed) MotionTokens.Duration.flash else MotionTokens.Duration.quick,
-            easing = FastOutSlowInEasing
-        ), label = "illbtn_border_alpha"
-    )
 
+    // Single Animatable<Float> drives ALL press visuals — same pattern as FlatButton.
+    // Replaces 5 separate animators (pressScale, textScale, textTranslateY,
+    // borderWidth, borderAlpha) that all fired simultaneously on every press.
+    val pressProgress = remember { Animatable(0f) }
+    LaunchedEffect(isPressed) {
+        pressProgress.animateTo(
+            targetValue   = if (isPressed && enabled) 1f else 0f,
+            animationSpec = if (animLevel == 2) snap() else spring(
+                dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+            )
+        )
+    }
+    val pp = pressProgress.value
+    val nudgePx = with(density) { 1.5.dp.toPx() }
+    val restBorderW = if (oledMode) 0.75f else 1f
+    val pressScale      = 1f - pp * (1f - MotionTokens.Scale.subtle)
+    val textScale       = 1f - pp * 0.07f
+    val textTranslateY  = pp * nudgePx
+    val borderWidthDp   = (restBorderW + pp * restBorderW).dp
+    val borderAlpha     = 0.5f + pp * 0.5f
     val animatedButtonColor = if (!enabled) colors.textSecondary.copy(alpha = 0.05f)
     else if (oledMode) Color.Black
     else if (accent) colors.primaryAccent
@@ -1022,7 +984,7 @@ fun IllustratedButton(
                 .graphicsLayer(scaleX = pressScale, scaleY = pressScale)
                 .clip(shape)
                 .background(animatedButtonColor)
-                .then(if (shouldShowBorder) Modifier.border(borderWidth, borderColor, shape) else Modifier)
+                .then(if (shouldShowBorder) Modifier.border(borderWidthDp, borderColor, shape) else Modifier)
                 .then(if (enabled) Modifier.pointerInput(enabled) {
                     detectTapGestures(
                         onPress = {
@@ -1249,6 +1211,7 @@ fun MainContentCards(
                             accent = true,
                             enabled = shizukuReady,
                             colors = colors,
+                            isSmallScreen = isSmallScreen,
                             oledMode = oledMode,
                             iconType = "vulkan"
                         )
@@ -1272,6 +1235,7 @@ fun MainContentCards(
                             accent = true,
                             enabled = shizukuReady,
                             colors = colors,
+                            isSmallScreen = isSmallScreen,
                             oledMode = oledMode,
                             iconType = "opengl"
                         )
@@ -1288,6 +1252,7 @@ fun MainContentCards(
                             accent = false,
                             enabled = true,
                             colors = colors,
+                            isSmallScreen = isSmallScreen,
                             oledMode = oledMode,
                             iconType = "resources"
                         )
@@ -1298,6 +1263,7 @@ fun MainContentCards(
                             accent = false,
                             enabled = true,
                             colors = colors,
+                            isSmallScreen = isSmallScreen,
                             oledMode = oledMode,
                             iconType = "gpuwatch"
                         )
@@ -1334,42 +1300,56 @@ fun RendererCard(
         else            -> Color(0xFFE8A020)
     }
 
-    // ── Infinite transition shared by glow + border pulse ───────────────────
-    // Only needed when Shizuku isn't ready — when ready, glow and warning border
-    // are never rendered, so running these animators would waste CPU for nothing.
-    val infiniteTransition = rememberInfiniteTransition(label = "renderer_infinite")
 
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.18f,
-        targetValue  = if (shizukuReady) 0.18f else 0.38f,  // freeze when ready — no animation needed
-        animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = MotionTokens.Easing.silk),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "renderer_glow_alpha"
-    )
+    // ── Pulse animations: only run when Shizuku NOT ready ─────────────────────
+    // The InfiniteTransition object is only created when it's actually needed.
+    // On the happy path (shizukuReady = true) no transition object is allocated
+    // at all — zero ticks, zero slot overhead, zero per-frame work from this card.
+    //
+    // warningBorderAlpha / glowAlpha  — pulse only when Shizuku is NOT ready
+    // rendererTextAlpha               — pulse only when Shizuku IS ready
+    //
+    // Each branch is a separate `if` so Compose never creates an InfiniteTransition
+    // in both states simultaneously; the key insight is that shizukuReady flipping
+    // causes a recomposition anyway, so switching between static and animated values
+    // at that moment is free.
 
-    val warningBorderAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.25f,
-        targetValue  = if (shizukuReady) 0.25f else 0.9f,  // freeze when ready
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = MotionTokens.Easing.silk),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "warning_border_alpha"
-    )
+    val warningBorderAlpha by if (!shizukuReady) {
+        val t = rememberInfiniteTransition(label = "renderer_warning")
+        t.animateFloat(
+            initialValue = 0.30f, targetValue = 1.0f,
+            animationSpec = infiniteRepeatable(
+                tween(1100, easing = MotionTokens.Easing.silk), RepeatMode.Reverse
+            ),
+            label = "warning_border_alpha"
+        )
+    } else {
+        remember { mutableFloatStateOf(0.30f) }
+    }
 
-    // Text alpha pulse — only animate when shizuku is ready (subtle breathing effect).
-    // When not ready the text is always shown at 0.75 alpha (no pulse).
-    val rendererTextAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.75f,
-        targetValue  = if (shizukuReady) 1.0f else 0.75f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = MotionTokens.Easing.silk),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "renderer_text_alpha"
-    )
+    val glowAlpha by if (!shizukuReady) {
+        val t = rememberInfiniteTransition(label = "renderer_glow")
+        t.animateFloat(
+            initialValue = 0.22f, targetValue = 0.55f,
+            animationSpec = infiniteRepeatable(
+                tween(1100, easing = MotionTokens.Easing.silk), RepeatMode.Reverse
+            ),
+            label = "renderer_glow_alpha"
+        )
+    } else {
+        remember { mutableFloatStateOf(0f) }
+    }
+
+    val rendererTextAlpha by if (shizukuReady) {
+        val t = rememberInfiniteTransition(label = "renderer_text")
+        t.animateFloat(
+            initialValue = 0.75f, targetValue = 1.0f,
+            animationSpec = infiniteRepeatable(tween(1800, easing = MotionTokens.Easing.silk), RepeatMode.Reverse),
+            label = "renderer_text_alpha"
+        )
+    } else {
+        remember { mutableFloatStateOf(0.75f) }
+    }
 
     // ── Press state ──────────────────────────────────────────────────────────
     var isPressed by remember { mutableStateOf(false) }
@@ -1407,8 +1387,8 @@ fun RendererCard(
     val borderColor = if (isPressed) {
         colors.primaryAccent
     } else if (!shizukuReady) {
-        // Strong, clearly visible error/warning border — pulses between 0.55 and 1.0
-        stateColor.copy(alpha = (warningBorderAlpha * 0.55f + 0.45f).coerceIn(0f, 1f))
+        // Breathing outline: full range 30% → 100% opacity — very noticeable
+        stateColor.copy(alpha = warningBorderAlpha)
     } else if (oledMode) {
         colors.primaryAccent.copy(alpha = 0.35f)
     } else {
@@ -1419,9 +1399,9 @@ fun RendererCard(
     val borderWidth by animateDpAsState(
         targetValue = when {
             isPressed       -> 2.dp
-            !shizukuReady   -> 1.75.dp  // thicker outline when error/warning
+            !shizukuReady   -> 2.dp    // thick pulsing outline for error/warning
             oledMode        -> 0.75.dp
-            shizukuReady    -> 1.25.dp  // slightly thicker accent outline when all good
+            shizukuReady    -> 1.25.dp
             else            -> 1.dp
         },
         animationSpec = if (animLevel == 2) snap() else tween(
@@ -1473,24 +1453,24 @@ fun RendererCard(
 
     // ── Layout: glow blob behind + card on top ───────────────────────────────
     // The glow is larger than the card so it bleeds softly around all edges.
+    // When Shizuku is not ready: colored shadow (red = not running, orange = no permission)
+    // When Shizuku is ready: no shadow rendered at all (saves a blur pass)
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier.fillMaxWidth()
     ) {
-        // Glow blob — only rendered when Shizuku is NOT ready (error/warning states).
-        // When Shizuku is ready this box and its blur(28.dp) pass are skipped entirely,
-        // saving a RenderEffect allocation + GPU blur pass on every recomposition.
+        // Colored shadow blob — only rendered when Shizuku is NOT ready.
         if (!shizukuReady) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (isSmallScreen) 120.dp else 140.dp)
-                    .blur(radius = 28.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    .height(if (isSmallScreen) 130.dp else 150.dp)
+                    .blur(radius = 32.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
                     .background(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                stateColor.copy(alpha = glowAlpha * 0.7f),
-                                stateColor.copy(alpha = glowAlpha * 0.25f),
+                                stateColor.copy(alpha = glowAlpha),
+                                stateColor.copy(alpha = glowAlpha * 0.4f),
                                 Color.Transparent
                             )
                         )
@@ -2031,7 +2011,9 @@ fun CleanTitle(
         }
     }
 
-    // REFACTORED TO INCLUDE GRADIENT BARS WITH OPTIONAL REVERSE
+    // FIXED GRADIENT BARS — always use horizontal gradient regardless of orientation.
+    // The reverseGradient flag was previously switching to verticalGradient which made
+    // the bars invisible (0-height boxes don't show vertical gradients).
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2042,17 +2024,14 @@ fun CleanTitle(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
-        // Left Gradient Bar — shimmer travels right-to-left (toward the text)
+        // Left Gradient Bar — fades transparent→accent, shimmer sweeps left→right
         Box(
             modifier = Modifier
                 .weight(1f)
                 .height(4.dp)
                 .drawWithContent {
                     drawContent()
-                    // Shimmer highlight: a narrow bright band sweeping inward
-                    // Progress 0→1 maps the band from the far-left edge to the text edge
                     val bandWidth = size.width * 0.35f
-                    // Left bar: band moves from left (0) toward right (size.width)
                     val bandCenter = shimmerProgress * (size.width + bandWidth) - bandWidth * 0.5f
                     val shimmerBrush = Brush.horizontalGradient(
                         colors = listOf(
@@ -2068,21 +2047,12 @@ fun CleanTitle(
                     drawRect(brush = shimmerBrush)
                 }
                 .background(
-                    brush = if (reverseGradient) {
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                colors.primaryAccent.copy(alpha = 0f),
-                                colors.primaryAccent.copy(alpha = 1f)
-                            )
-                        )
-                    } else {
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                colors.primaryAccent.copy(alpha = 0f),
-                                colors.primaryAccent.copy(alpha = 1f)
-                            )
-                        )
-                    }
+                    brush = Brush.horizontalGradient(
+                        colors = if (reverseGradient)
+                            listOf(colors.primaryAccent.copy(alpha = 1f), colors.primaryAccent.copy(alpha = 0f))
+                        else
+                            listOf(colors.primaryAccent.copy(alpha = 0f), colors.primaryAccent.copy(alpha = 1f))
+                    )
                 )
         )
 
@@ -2116,14 +2086,14 @@ fun CleanTitle(
                 }
         )
 
-        // Right Gradient Bar — shimmer sweeps right-to-left (toward the text)
+        // Right Gradient Bar — fades accent→transparent, shimmer sweeps right→left
         Box(
             modifier = Modifier
                 .weight(1f)
                 .height(4.dp)
                 .drawWithContent {
                     drawContent()
-                    // Right bar: band moves from right edge toward left (text edge)
+                    // Right bar shimmer travels from right edge toward text (right→left)
                     val bandWidth = size.width * 0.35f
                     val bandCenter = (1f - shimmerProgress) * (size.width + bandWidth) - bandWidth * 0.5f
                     val shimmerBrush = Brush.horizontalGradient(
@@ -2140,21 +2110,12 @@ fun CleanTitle(
                     drawRect(brush = shimmerBrush)
                 }
                 .background(
-                    brush = if (reverseGradient) {
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                colors.primaryAccent.copy(alpha = 1f),
-                                colors.primaryAccent.copy(alpha = 0f)
-                            )
-                        )
-                    } else {
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                colors.primaryAccent.copy(alpha = 1f),
-                                colors.primaryAccent.copy(alpha = 0f)
-                            )
-                        )
-                    }
+                    brush = Brush.horizontalGradient(
+                        colors = if (reverseGradient)
+                            listOf(colors.primaryAccent.copy(alpha = 0f), colors.primaryAccent.copy(alpha = 1f))
+                        else
+                            listOf(colors.primaryAccent.copy(alpha = 1f), colors.primaryAccent.copy(alpha = 0f))
+                    )
                 )
         )
     }
@@ -2361,23 +2322,15 @@ fun ToggleCard(
 fun BackArrowButton(
     onClick: () -> Unit,
     colors: ThemeColors,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isSmallScreen: Boolean = false
 ) {
-    val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val buttonSize = if (isSmallScreen) 48.dp else 56.dp
     val iconSize = if (isSmallScreen) 22.dp else 26.dp
 
-    // Glow pulse
-    val glowTransition = rememberInfiniteTransition(label = "back_glow")
-    val glowAlpha by glowTransition.animateFloat(
-        initialValue = 0.12f,
-        targetValue = 0.28f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1600, easing = MotionTokens.Easing.silk),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "back_glow_alpha"
-    )
+    // Static glow alpha — no infinite transition needed; the blur radius
+    // already softens the shape and the button is only visible in dialogs.
+    val glowAlpha = 0.22f
 
     var isPressed by remember { mutableStateOf(false) }
     val pressScale by animateFloatAsState(
@@ -2494,17 +2447,10 @@ fun PanelBackButton(
     val btnSize  = if (isSmallScreen) 48.dp else 52.dp
     val iconSize = if (isSmallScreen) 22.dp else 26.dp
 
-    // Breathing glow — same parameters as Settings buttons
-    val glowTransition = rememberInfiniteTransition(label = "back_btn_glow")
-    val glowAlpha by glowTransition.animateFloat(
-        initialValue = 0.18f,
-        targetValue  = 0.38f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1300, easing = MotionTokens.Easing.silk),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "back_btn_glow_a"
-    )
+    // Static glow alpha — back button is shown inside already-open panels;
+    // running an infinite transition here would tick every frame for the
+    // entire duration the panel is visible.  Static value is indistinguishable.
+    val glowAlpha = 0.26f
 
     var isPressed by remember { mutableStateOf(false) }
     val pressScale by animateFloatAsState(
@@ -2629,13 +2575,13 @@ fun DialogButton(
     colors: ThemeColors,
     cardBackground: Color,
     accent: Boolean = false,
+    isSmallScreen: Boolean = false,
     oledMode: Boolean = false,
     borderAlphaOverride: Float? = null // when set, rest-state border alpha matches the surrounding card outline
 ) {
     val ts = LocalTypeScale.current
     val animLevel = LocalAnimationLevel.current
     var isPressed by remember { mutableStateOf(false) }
-    val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val density = LocalDensity.current
     val shape = RoundedCornerShape(14.dp)
 

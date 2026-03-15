@@ -232,8 +232,19 @@ fun VisualEffectsPanel(
             colors = colors, scrollOffset = scrollState.value
         )
 
-        // Theme
+        // Effects nav — FIRST at the top of Visuals
         AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 6) {
+            SettingsNavigationCard(
+                title = "EFFECTS",
+                description = "Frosted glass blur, animated gradient, and floating particles",
+                onClick = { performHaptic(); onEffectsClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
+
+        // Theme
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 6) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -266,7 +277,7 @@ fun VisualEffectsPanel(
         }
 
         // Animations
-        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 6) {
+        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 6) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -299,7 +310,7 @@ fun VisualEffectsPanel(
         }
 
         // UI Scale
-        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 6) {
+        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 6) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -332,7 +343,7 @@ fun VisualEffectsPanel(
         }
 
         // OLED toggle
-        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 6) {
+        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 6) {
             ToggleCard(
                 title = "OLED MODE",
                 description = "Turns backgrounds pure black — great for battery life on OLED screens",
@@ -344,22 +355,11 @@ fun VisualEffectsPanel(
         }
 
         // Colors nav
-        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 6) {
+        AnimatedElement(visible = visible, staggerIndex = 6, totalItems = 6) {
             SettingsNavigationCard(
                 title = "COLORS",
                 description = "Pick your accent color and customize the background gradient",
                 onClick = { performHaptic(); onColorCustomizationClick() },
-                isSmallScreen = isSmallScreen, colors = colors,
-                cardBackground = cardBackground, oledMode = oledMode
-            )
-        }
-
-        // Effects nav
-        AnimatedElement(visible = visible, staggerIndex = 6, totalItems = 6) {
-            SettingsNavigationCard(
-                title = "EFFECTS",
-                description = "Frosted glass blur, animated gradient, and floating particles",
-                onClick = { performHaptic(); onEffectsClick() },
                 isSmallScreen = isSmallScreen, colors = colors,
                 cardBackground = cardBackground, oledMode = oledMode
             )
@@ -952,7 +952,8 @@ fun NotificationsPanel(
                         )
                         FlatButton(
                             text = "Grant Permission", onClick = onRequestPermission,
-                            modifier = Modifier.fillMaxWidth(), accent = true, colors = colors, maxLines = 1
+                            modifier = Modifier.fillMaxWidth(), accent = true, colors = colors,
+                            maxLines = 1, isSmallScreen = isSmallScreen
                         )
                     }
                 }
@@ -1036,7 +1037,7 @@ fun NotificationsPanel(
                 FlatButton(
                     text = "Send Test Notification", onClick = onTestNotification,
                     modifier = Modifier.fillMaxWidth(), accent = false, enabled = testBtnEnabled,
-                    colors = colors, maxLines = 1, oledMode = oledMode
+                    colors = colors, maxLines = 1, isSmallScreen = isSmallScreen, oledMode = oledMode
                 )
             }
         }
@@ -1182,13 +1183,15 @@ fun DeveloperPanel(
         AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 3) {
             FlatButton(
                 text = "Send Test Notification", onClick = { performHaptic(); onTestNotification() },
-                modifier = Modifier.fillMaxWidth(), accent = false, colors = colors, maxLines = 1
+                modifier = Modifier.fillMaxWidth(), accent = false, colors = colors,
+                maxLines = 1, isSmallScreen = isSmallScreen
             )
         }
         AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 3) {
             FlatButton(
                 text = "Send Boot Notification", onClick = { performHaptic(); onTestBootNotification() },
-                modifier = Modifier.fillMaxWidth(), accent = false, colors = colors, maxLines = 1
+                modifier = Modifier.fillMaxWidth(), accent = false, colors = colors,
+                maxLines = 1, isSmallScreen = isSmallScreen
             )
         }
         AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 3) {

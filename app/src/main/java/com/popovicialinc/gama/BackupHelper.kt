@@ -2,6 +2,8 @@ package com.popovicialinc.gama
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -46,9 +48,10 @@ object BackupHelper {
 
     /**
      * Export — read every key from [prefs] and return a compact JSON string.
+     * Runs on [Dispatchers.IO] so SharedPreferences reads never block the main thread.
      * @throws Exception if serialisation fails.
      */
-    fun export(prefs: SharedPreferences): String {
+    suspend fun export(prefs: SharedPreferences): String = withContext(Dispatchers.IO) {
         val root = JSONObject()
 
         // Version stamp — lets future GAMA versions handle schema migrations
@@ -68,16 +71,18 @@ object BackupHelper {
             root.put(key, arr)
         }
 
-        return root.toString(2) // pretty-print with 2-space indent
+        root.toString(2) // pretty-print with 2-space indent
     }
 
     /**
      * Import — parse [json] and write every recognised key back into [prefs].
      * Unknown keys are silently ignored so forward-compatible backups work.
+     * Runs on [Dispatchers.IO] so JSON parsing and SharedPreferences writes
+     * never block the main thread.
      * @return a human-readable summary like "Restored 24 settings."
      * @throws Exception if the JSON is malformed or has wrong backup version.
      */
-    fun import(prefs: SharedPreferences, json: String): String {
+    suspend fun import(prefs: SharedPreferences, json: String): String = withContext(Dispatchers.IO) {
         val root = JSONObject(json)
 
         // Reject completely foreign files
@@ -114,6 +119,6 @@ object BackupHelper {
         }
 
         editor.apply()
-        return "Restored $count settings successfully."
+        "Restored $count settings successfully."
     }
 }

@@ -58,9 +58,12 @@ class TaskerReceiver : BroadcastReceiver() {
         // goAsync() keeps the BroadcastReceiver process alive until finish() is called.
         // Without it, Android can kill the process as soon as onReceive() returns,
         // cutting off the shell commands mid-execution.
+        //
+        // The CoroutineScope is tied directly to the pendingResult: the job is
+        // cancelled in the finally block (via pendingResult.finish()), so rapid
+        // repeated Tasker invocations never accumulate leaked coroutines.
         val pendingResult = goAsync()
-
-        CoroutineScope(SupervisorJob() + Dispatchers.Main).launch {
+        val job = CoroutineScope(SupervisorJob() + Dispatchers.Main).launch {
             try {
                 when (renderer) {
                     "vulkan" -> ShizukuHelper.runVulkanSuspend(

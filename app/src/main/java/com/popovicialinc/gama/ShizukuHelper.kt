@@ -35,8 +35,23 @@ object ShizukuHelper {
     // dependency minimal — only Shizuku.java needs to be vendored, not the
     // full process wrapper hierarchy.
 
-    fun runCommand(cmd: String): String {
-        return try {
+    // ── Shell command execution via Shizuku.newProcess() ─────────────────────
+    // Still uses reflection for newProcess since it keeps the Shizuku source
+    // dependency minimal — only Shizuku.java needs to be vendored, not the
+    // full process wrapper hierarchy.
+    //
+    // runCommand is a suspend function so it can be cancelled by the caller's
+    // coroutine scope (e.g. the user dismisses the switch dialog mid-switch).
+    // The blocking waitFor runs on Dispatchers.IO — never on the main thread.
+    //
+    // Timeout is 3 seconds, not 10. `getprop`, `setprop`, `am crash`, and
+    // `am force-stop` all complete in well under 1s on any supported device.
+    // 10s was just the outer safety net; 3s still covers any legitimate slow
+    // case while cutting the worst-case UI freeze from 10s to 3s if Shizuku
+    // hangs on an unusual command.
+
+    suspend fun runCommand(cmd: String): String = withContext(Dispatchers.IO) {
+        try {
             val cls = Shizuku::class.java
             val method = cls.getDeclaredMethod(
                 "newProcess",
@@ -46,25 +61,27 @@ object ShizukuHelper {
             )
             method.isAccessible = true
             val remoteProcess = method.invoke(null, arrayOf("sh", "-c", cmd), null, null)
-            val process = remoteProcess as? Process ?: return "Error: Could not cast to Process"
+            val process = remoteProcess as? Process ?: return@withContext "Error: Could not cast to Process"
 
             // Read stdout and stderr sequentially on the calling thread.
             // Previously this spawned two raw Thread objects per command — with
             // aggressive mode force-stopping 200+ packages that meant hundreds of
             // short-lived threads.  Sequential reads are safe here because:
-            //   (a) runCommand is always called from Dispatchers.IO so blocking is fine
+            //   (a) runCommand always runs on Dispatchers.IO so blocking is fine
             //   (b) the shell command has already finished (or timed out) before we
             //       read — there is no deadlock risk since we don't write to stdin.
-            val finished = process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
+            val finished = process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)
             val output = process.inputStream.bufferedReader().readText()
             val error  = process.errorStream.bufferedReader().readText()
             process.destroy()
 
             val exitCode = if (finished) process.exitValue() else -1
-            if (!finished)                                "Error: command timed out"
-            else if (exitCode != 0 && error.isNotEmpty()) "Error: $error"
-            else if (output.isEmpty())                    "Success"
-            else output.trim()
+            when {
+                !finished               -> "Error: command timed out"
+                output.isNotEmpty()     -> output.trim()  // stdout wins even if stderr has warnings
+                exitCode != 0 && error.isNotEmpty() -> "Error: $error"
+                else                    -> "Success"      // empty stdout, clean exit = prop not set
+            }
         } catch (e: Exception) {
             "Error: ${e.message}"
         }
@@ -83,15 +100,82 @@ object ShizukuHelper {
     }
 
     // ── Renderer detection ────────────────────────────────────────────────────
+    //
+    // Multi-source, foolproof renderer detection strategy:
+    //  1. Check debug.hwui.renderer  — the prop GAMA sets; most reliable signal
+    //  2. If empty/unset → system is running OpenGL (Android default when prop absent)
+    //  3. If that fails → scan all properties for any hwui renderer mention
+    //  4. Only return "Unknown" on a genuine I/O / permission error
 
     suspend fun getCurrentRenderer(): String = withContext(Dispatchers.IO) {
         if (!checkBinder() || !checkPermission()) return@withContext "Unknown"
-        val result = runCommand("getprop debug.hwui.renderer")
+
+        // ── Source 1: the prop GAMA directly sets ─────────────────────────────
+        val primary = runCommand("getprop debug.hwui.renderer").trim()
         when {
-            result.contains("skiavk", ignoreCase = true) -> "Vulkan"
-            result.contains("opengl", ignoreCase = true) -> "OpenGL"
-            result.startsWith("Error")                   -> "Unknown"
-            else                                         -> "Default"
+            primary.contains("skiavk", ignoreCase = true) -> return@withContext "Vulkan"
+            primary.contains("opengl", ignoreCase = true) -> return@withContext "OpenGL"
+            primary.isEmpty() || primary == "Success"     -> return@withContext "OpenGL"
+            primary.startsWith("Error")                   -> { /* fall through to secondary */ }
+            else                                          -> return@withContext "OpenGL"
+        }
+
+        // ── Source 2: scan all properties for any renderer mention ────────────
+        // Use grep -E for extended regex so | is proper alternation (not \|
+        // which is a literal backslash-pipe in basic grep and matches nothing).
+        val allProps = runCommand("getprop | grep -Ei 'hwui|renderer'").trim()
+        when {
+            allProps.contains("skiavk", ignoreCase = true) -> return@withContext "Vulkan"
+            allProps.contains("opengl", ignoreCase = true)  -> return@withContext "OpenGL"
+            allProps.startsWith("Error")                    -> { /* fall through */ }
+        }
+
+        // ── Source 3: last resort — ask hwui what it's actually using ─────────
+        // "dumpsys hwui" is slow so we pipe just the first 20 lines.
+        val dumpsys = runCommand("dumpsys hwui 2>/dev/null | head -20").trim()
+        when {
+            dumpsys.contains("skiavk",  ignoreCase = true) -> return@withContext "Vulkan"
+            dumpsys.contains("vulkan",  ignoreCase = true) -> return@withContext "Vulkan"
+            dumpsys.contains("opengl",  ignoreCase = true) -> return@withContext "OpenGL"
+            dumpsys.contains("skiagl",  ignoreCase = true) -> return@withContext "OpenGL"
+            dumpsys.contains("software",ignoreCase = true) -> return@withContext "OpenGL"
+        }
+
+        // All three sources failed — return Unknown so the caller can decide what to show
+        "Unknown"
+    }
+
+    // ── Educated guess when Shizuku is unavailable ────────────────────────────
+    // Returns the best guess at the current renderer without running any shell
+    // commands, using only stable signals (SharedPreferences + boot time).
+    //
+    //  • If the device rebooted after the last recorded renderer switch, Android
+    //    will have cleared all runtime system props → must be OpenGL (default).
+    //  • Otherwise, last_renderer pref is our best evidence.
+    //
+    // Uses last_switch_uptime (SystemClock.elapsedRealtime() at switch time)
+    // rather than last_switch_time (wall-clock) for reboot detection.
+    // elapsedRealtime resets to ~0 on every boot, so comparing the stored
+    // uptime against current elapsedRealtime() reliably detects reboots even
+    // if the user manually changed the system clock between sessions.
+    fun guessRendererWithoutShizuku(prefs: android.content.SharedPreferences): String {
+        val lastRenderer     = prefs.getString("last_renderer", "OpenGL") ?: "OpenGL"
+        val lastSwitchUptime = prefs.getLong("last_switch_uptime", 0L)
+
+        // If we've never recorded an uptime-stamped switch, fall back to the
+        // wall-clock key for backward compatibility with existing installs.
+        if (lastSwitchUptime == 0L) {
+            val lastSwitchMs = prefs.getLong("last_switch_time", 0L)
+            val bootTimeMs   = System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime()
+            return if (lastSwitchMs > 0L && bootTimeMs > lastSwitchMs) "OpenGL" else lastRenderer
+        }
+
+        // Reliable path: if current elapsedRealtime < stored uptime, the device
+        // has rebooted since the last switch and runtime props were cleared.
+        return if (android.os.SystemClock.elapsedRealtime() < lastSwitchUptime) {
+            "OpenGL"
+        } else {
+            lastRenderer
         }
     }
 
@@ -219,7 +303,7 @@ object ShizukuHelper {
         scope.launch { applyCustomRenderersSuspend(context, customRendererApps, onStatusUpdate, onVerboseOutput) }
     }
 
-    fun getAllInstalledPackages(): List<String> {
+    suspend fun getAllInstalledPackages(): List<String> {
         if (!checkBinder() || !checkPermission()) return emptyList()
         return runCommand("pm list packages").split("\n")
             .filter { it.startsWith("package:") }.map { it.substring(8).trim() }

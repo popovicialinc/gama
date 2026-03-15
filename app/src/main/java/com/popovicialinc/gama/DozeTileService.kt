@@ -97,7 +97,7 @@ class DozeTileService : TileService() {
      * Ask the system for the *actual* deep idle state rather than trusting prefs.
      * Returns true only if the device is genuinely in deep doze (IDLE).
      */
-    private fun isActuallyIdle(): Boolean {
+    private suspend fun isActuallyIdle(): Boolean {
         val result = ShizukuHelper.runCommand("dumpsys deviceidle get deep")
         return result.trim().equals("IDLE", ignoreCase = true)
     }
@@ -120,7 +120,7 @@ class DozeTileService : TileService() {
      * Refresh tile by checking real device state, not just prefs.
      * Also syncs prefs so they stay accurate for other parts of the app.
      */
-    private fun refreshTile() {
+    private suspend fun refreshTile() {
         val idle = if (ShizukuHelper.checkBinder() && ShizukuHelper.checkPermission()) {
             isActuallyIdle().also { actualIdle ->
                 // Keep prefs in sync passively

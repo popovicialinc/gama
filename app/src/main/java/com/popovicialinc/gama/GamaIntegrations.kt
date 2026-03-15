@@ -374,7 +374,8 @@ fun IntegrationInfoDialog(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth(),
                     colors = colors,
-                    cardBackground = cardBackground
+                    cardBackground = cardBackground,
+                    isSmallScreen = isSmallScreen
                 )
             }
         }

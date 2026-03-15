@@ -181,6 +181,7 @@ fun ShizukuHelpDialog(
                 modifier = Modifier.fillMaxWidth(),
                 colors = colors,
                 cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen,
                 accent = true,
                 borderAlphaOverride = dialogBorderAlpha
             )
@@ -285,7 +286,8 @@ fun WarningDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         colors = colors,
-                        cardBackground = cardBackground
+                        cardBackground = cardBackground,
+                        isSmallScreen = isSmallScreen,
                     )
                     DialogButton(
                         text = "Continue",
@@ -293,6 +295,7 @@ fun WarningDialog(
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground,
+                        isSmallScreen = isSmallScreen,
                         accent = true
                     )
                 }
@@ -318,17 +321,25 @@ fun SuccessDialog(
     val ts        = LocalTypeScale.current
     val animLevel = LocalAnimationLevel.current
 
-    // ── Spinner — only runs while isSwitching ─────────────────────────────────
-    val spinnerTransition = rememberInfiniteTransition(label = "success_spinner")
-    val spinnerAngle by spinnerTransition.animateFloat(
-        initialValue  = 0f,
-        targetValue   = if (isSwitching) 360f else 0f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(durationMillis = 900, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "spinner_rot"
-    )
+    // ── Spinner — Animatable loop that only ticks while isSwitching is true ────
+    // The previous infiniteRepeatable kept ticking even after isSwitching became
+    // false (it just froze at targetValue=0), wasting animator budget on idle.
+    // This Animatable loops in a coroutine that exits the moment isSwitching ends.
+    val spinnerAngle = remember { Animatable(0f) }
+    LaunchedEffect(isSwitching) {
+        if (isSwitching) {
+            // Loop until isSwitching goes false (LaunchedEffect cancels this coroutine)
+            while (true) {
+                spinnerAngle.snapTo(0f)
+                spinnerAngle.animateTo(
+                    targetValue   = 360f,
+                    animationSpec = tween(durationMillis = 900, easing = LinearEasing)
+                )
+            }
+        } else {
+            spinnerAngle.snapTo(0f)  // reset so checkmark starts clean
+        }
+    }
 
     // ── Checkmark draw progress (0 → 1 once switching finishes) ──────────────
     // Driven by animateFloatAsState so it eases in smoothly after the spinner stops.
@@ -384,7 +395,7 @@ fun SuccessDialog(
                         // 270° spinning arc
                         drawArc(
                             color      = iconColor.copy(alpha = 0.85f),
-                            startAngle = spinnerAngle - 90f,
+                            startAngle = spinnerAngle.value - 90f,
                             sweepAngle = 270f,
                             useCenter  = false,
                             style      = Stroke(width = strokePx, cap = StrokeCap.Round)
@@ -463,6 +474,7 @@ fun SuccessDialog(
                         modifier       = Modifier.fillMaxWidth(),
                         colors         = colors,
                         cardBackground = cardBackground,
+                        isSmallScreen = isSmallScreen,
                         accent         = true
                     )
                 }
@@ -537,6 +549,7 @@ fun DeveloperMenuDialog(
                     accent = false,
                     enabled = true,
                     colors = colors,
+                    isSmallScreen = isSmallScreen,
                     maxLines = 1
                 )
 
@@ -546,6 +559,7 @@ fun DeveloperMenuDialog(
                     modifier = Modifier.fillMaxWidth(),
                     colors = colors,
                     cardBackground = cardBackground,
+                    isSmallScreen = isSmallScreen,
                     accent = true
                 )
             }
@@ -658,7 +672,8 @@ fun GitHubDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         colors = colors,
-                        cardBackground = cardBackground
+                        cardBackground = cardBackground,
+                        isSmallScreen = isSmallScreen,
                     )
                     DialogButton(
                         text = "Sure!",
@@ -666,6 +681,7 @@ fun GitHubDialog(
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground,
+                        isSmallScreen = isSmallScreen,
                         accent = true
                     )
                 }
@@ -768,7 +784,8 @@ fun ExternalLinkConfirmDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         colors = colors,
-                        cardBackground = cardBackground
+                        cardBackground = cardBackground,
+                        isSmallScreen = isSmallScreen,
                     )
                     DialogButton(
                         text = "Open",
@@ -776,6 +793,7 @@ fun ExternalLinkConfirmDialog(
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground,
+                        isSmallScreen = isSmallScreen,
                         accent = true
                     )
                 }
@@ -972,6 +990,7 @@ fun EasterEggDialog(
                             modifier = Modifier.fillMaxWidth(),
                             colors = colors,
                             cardBackground = cardBackground,
+                            isSmallScreen = isSmallScreen,
                             accent = true
                         )
                     }
@@ -1153,6 +1172,7 @@ fun AggressiveWarningDialog(
                             modifier = Modifier.weight(1f),
                             colors = colors,
                             cardBackground = cardBackground,
+                            isSmallScreen = isSmallScreen,
                             accent = false,
                             oledMode = oledMode
                         )
@@ -1162,6 +1182,7 @@ fun AggressiveWarningDialog(
                             modifier = Modifier.weight(1f),
                             colors = colors,
                             cardBackground = cardBackground,
+                            isSmallScreen = isSmallScreen,
                             accent = true,
                             oledMode = oledMode
                         )
@@ -1274,6 +1295,7 @@ fun GPUWatchConfirmDialog(
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground,
+                        isSmallScreen = isSmallScreen,
                         accent = false,
                         oledMode = oledMode
                     )
@@ -1283,6 +1305,7 @@ fun GPUWatchConfirmDialog(
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground,
+                        isSmallScreen = isSmallScreen,
                         accent = true,
                         oledMode = oledMode
                     )
