@@ -63,7 +63,7 @@ class TaskerReceiver : BroadcastReceiver() {
         // cancelled in the finally block (via pendingResult.finish()), so rapid
         // repeated Tasker invocations never accumulate leaked coroutines.
         val pendingResult = goAsync()
-        val job = CoroutineScope(SupervisorJob() + Dispatchers.Main).launch {
+        CoroutineScope(SupervisorJob() + Dispatchers.Main).launch {
             try {
                 when (renderer) {
                     "vulkan" -> ShizukuHelper.runVulkanSuspend(

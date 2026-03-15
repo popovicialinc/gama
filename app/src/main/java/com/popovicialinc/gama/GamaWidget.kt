@@ -61,8 +61,8 @@ import androidx.glance.text.Text as GT
 import androidx.glance.text.TextAlign as GTA
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -721,7 +721,9 @@ private fun WidgetSettingsSheet(widgetId: Int, onDone: () -> Unit) {
                                 Activity.RESULT_OK,
                                 Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
                             )
-                            GlobalScope.launch { try { GamaWidget().updateAll(ctx) } catch (_: Exception) {} }
+                            (ctx as? ComponentActivity)?.lifecycleScope?.launch {
+                                try { GamaWidget().updateAll(ctx) } catch (_: Exception) {}
+                            }
                             onDone()
                         },
                     contentAlignment = Alignment.Center

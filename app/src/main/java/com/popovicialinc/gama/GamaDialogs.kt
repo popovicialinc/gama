@@ -181,7 +181,6 @@ fun ShizukuHelpDialog(
                 modifier = Modifier.fillMaxWidth(),
                 colors = colors,
                 cardBackground = cardBackground,
-                isSmallScreen = isSmallScreen,
                 accent = true,
                 borderAlphaOverride = dialogBorderAlpha
             )
@@ -286,8 +285,7 @@ fun WarningDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         colors = colors,
-                        cardBackground = cardBackground,
-                        isSmallScreen = isSmallScreen,
+                        cardBackground = cardBackground
                     )
                     DialogButton(
                         text = "Continue",
@@ -295,7 +293,6 @@ fun WarningDialog(
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground,
-                        isSmallScreen = isSmallScreen,
                         accent = true
                     )
                 }
@@ -474,7 +471,6 @@ fun SuccessDialog(
                         modifier       = Modifier.fillMaxWidth(),
                         colors         = colors,
                         cardBackground = cardBackground,
-                        isSmallScreen = isSmallScreen,
                         accent         = true
                     )
                 }
@@ -549,7 +545,6 @@ fun DeveloperMenuDialog(
                     accent = false,
                     enabled = true,
                     colors = colors,
-                    isSmallScreen = isSmallScreen,
                     maxLines = 1
                 )
 
@@ -559,7 +554,6 @@ fun DeveloperMenuDialog(
                     modifier = Modifier.fillMaxWidth(),
                     colors = colors,
                     cardBackground = cardBackground,
-                    isSmallScreen = isSmallScreen,
                     accent = true
                 )
             }
@@ -672,8 +666,7 @@ fun GitHubDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         colors = colors,
-                        cardBackground = cardBackground,
-                        isSmallScreen = isSmallScreen,
+                        cardBackground = cardBackground
                     )
                     DialogButton(
                         text = "Sure!",
@@ -681,7 +674,6 @@ fun GitHubDialog(
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground,
-                        isSmallScreen = isSmallScreen,
                         accent = true
                     )
                 }
@@ -784,8 +776,7 @@ fun ExternalLinkConfirmDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         colors = colors,
-                        cardBackground = cardBackground,
-                        isSmallScreen = isSmallScreen,
+                        cardBackground = cardBackground
                     )
                     DialogButton(
                         text = "Open",
@@ -793,7 +784,6 @@ fun ExternalLinkConfirmDialog(
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground,
-                        isSmallScreen = isSmallScreen,
                         accent = true
                     )
                 }
@@ -853,22 +843,39 @@ fun EasterEggDialog(
                             RepeatMode.Reverse
                         ), label = "egg_glow_a"
                     )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(220.dp)
-                            .blur(60.dp, BlurredEdgeTreatment.Unbounded)
-                            .background(
-                                Brush.radialGradient(
-                                    colors = listOf(
-                                        colors.primaryAccent.copy(alpha = glowAlpha),
-                                        colors.primaryAccent.copy(alpha = glowAlpha * 0.3f),
-                                        Color.Transparent
-                                    ),
-                                    radius = 400f
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                                .blur(60.dp, BlurredEdgeTreatment.Unbounded)
+                                .background(
+                                    Brush.radialGradient(
+                                        colors = listOf(
+                                            colors.primaryAccent.copy(alpha = glowAlpha),
+                                            colors.primaryAccent.copy(alpha = glowAlpha * 0.3f),
+                                            Color.Transparent
+                                        ),
+                                        radius = 400f
+                                    )
                                 )
-                            )
-                    )
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                                .background(
+                                    Brush.radialGradient(
+                                        colors = listOf(
+                                            colors.primaryAccent.copy(alpha = glowAlpha * 0.45f),
+                                            Color.Transparent
+                                        ),
+                                        radius = 400f
+                                    )
+                                )
+                        )
+                    }
 
                     Column(
                         modifier = Modifier
@@ -886,6 +893,21 @@ fun EasterEggDialog(
                         val gamaSize = if (isSmallScreen) (ts.displayLarge.value * 1.4f).sp
                         else (ts.displayLarge.value * 1.7f).sp
                         val context = LocalContext.current
+                        // Cache Paint+BlurMaskFilter — both are constant; no need to
+                        // reconstruct them on every draw frame inside drawWithContent.
+                        val easterGlowPaint = remember(colors.primaryAccent, gamaSize) {
+                            android.graphics.Paint().apply {
+                                isAntiAlias = true
+                                color = android.graphics.Color.TRANSPARENT
+                                maskFilter = android.graphics.BlurMaskFilter(
+                                    100f, android.graphics.BlurMaskFilter.Blur.NORMAL
+                                )
+                                setShadowLayer(
+                                    100f, 0f, 0f,
+                                    colors.primaryAccent.copy(alpha = 0.7f).toArgb()
+                                )
+                            }
+                        }
                         Text(
                             text = "GAMA",
                             fontSize = gamaSize,
@@ -895,19 +917,12 @@ fun EasterEggDialog(
                             textAlign = TextAlign.Center,
                             modifier = Modifier.drawWithContent {
                                 drawIntoCanvas { canvas ->
-                                    val gp = android.graphics.Paint().apply {
-                                        isAntiAlias = true
-                                        color = android.graphics.Color.TRANSPARENT
-                                        maskFilter = android.graphics.BlurMaskFilter(
-                                            100f, android.graphics.BlurMaskFilter.Blur.NORMAL
-                                        )
-                                        setShadowLayer(100f, 0f, 0f, colors.primaryAccent.copy(alpha = 0.7f).toArgb())
-                                    }
+                                    easterGlowPaint.textSize = gamaSize.toPx()
                                     canvas.nativeCanvas.drawText(
                                         "GAMA",
                                         size.width / 2f,
                                         size.height / 2f + gamaSize.toPx() * 0.28f,
-                                        gp
+                                        easterGlowPaint
                                     )
                                 }
                                 drawContent()
@@ -990,7 +1005,6 @@ fun EasterEggDialog(
                             modifier = Modifier.fillMaxWidth(),
                             colors = colors,
                             cardBackground = cardBackground,
-                            isSmallScreen = isSmallScreen,
                             accent = true
                         )
                     }
@@ -1172,7 +1186,6 @@ fun AggressiveWarningDialog(
                             modifier = Modifier.weight(1f),
                             colors = colors,
                             cardBackground = cardBackground,
-                            isSmallScreen = isSmallScreen,
                             accent = false,
                             oledMode = oledMode
                         )
@@ -1182,7 +1195,6 @@ fun AggressiveWarningDialog(
                             modifier = Modifier.weight(1f),
                             colors = colors,
                             cardBackground = cardBackground,
-                            isSmallScreen = isSmallScreen,
                             accent = true,
                             oledMode = oledMode
                         )
@@ -1295,7 +1307,6 @@ fun GPUWatchConfirmDialog(
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground,
-                        isSmallScreen = isSmallScreen,
                         accent = false,
                         oledMode = oledMode
                     )
@@ -1305,7 +1316,6 @@ fun GPUWatchConfirmDialog(
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground,
-                        isSmallScreen = isSmallScreen,
                         accent = true,
                         oledMode = oledMode
                     )

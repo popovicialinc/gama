@@ -74,8 +74,34 @@ private fun PanelScaffold(
     )
 
     BouncyDialog(visible = visible, onDismiss = onDismiss, fullScreen = true) {
-        // Shared panel content lambda — called twice for the crossfade
-        val panelContent: @Composable () -> Unit = {
+        // Single render of panel content — no double composition.
+        //
+        // Previously: panelContent() was called twice (sharp copy + blurred copy),
+        // composing the entire panel tree twice during the ~320ms transition.
+        //
+        // Now: one render, always.  When a sub-dialog opens:
+        //   • API 31+: Modifier.blur() is applied in the draw phase only (zero
+        //     recomposition overhead) and the panel dims to 35% alpha.
+        //   • API < 31: blur is unavailable, the panel just dims to 35% — still
+        //     communicates depth without any GPU blur cost.
+        //
+        // The visual difference on API 31+ is imperceptible: the user is looking
+        // at a dialog, not scrutinising the blurred panel behind it.
+        val useBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = panelAlpha }
+                .then(
+                    if (useBlur && (isBlurred || blurAlpha > 0f))
+                        Modifier.blur(
+                            radius = (blurAlpha * 20f).dp,
+                            edgeTreatment = BlurredEdgeTreatment.Unbounded
+                        )
+                    else Modifier
+                )
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -110,27 +136,6 @@ private fun PanelScaffold(
                         .align(Alignment.BottomEnd)
                         .padding(end = 20.dp, bottom = 28.dp)
                 )
-            }
-        }
-
-        // Outer wrapper dims the whole panel as sub-dialog opens
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { alpha = panelAlpha }
-        ) {
-            // Sharp layer — fades out as sub-dialog opens (crossfade to blurred copy)
-            Box(modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 1f - blurAlpha }) {
-                panelContent()
-            }
-            // Blurred layer — fades in on top; RenderEffect stays warm between transitions
-            if (isBlurred || blurAlpha > 0f) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { alpha = blurAlpha }
-                        .blur(20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                ) { panelContent() }
             }
         }
     }
@@ -952,8 +957,7 @@ fun NotificationsPanel(
                         )
                         FlatButton(
                             text = "Grant Permission", onClick = onRequestPermission,
-                            modifier = Modifier.fillMaxWidth(), accent = true, colors = colors,
-                            maxLines = 1, isSmallScreen = isSmallScreen
+                            modifier = Modifier.fillMaxWidth(), accent = true, colors = colors, maxLines = 1
                         )
                     }
                 }
@@ -1037,7 +1041,7 @@ fun NotificationsPanel(
                 FlatButton(
                     text = "Send Test Notification", onClick = onTestNotification,
                     modifier = Modifier.fillMaxWidth(), accent = false, enabled = testBtnEnabled,
-                    colors = colors, maxLines = 1, isSmallScreen = isSmallScreen, oledMode = oledMode
+                    colors = colors, maxLines = 1, oledMode = oledMode
                 )
             }
         }
@@ -1183,15 +1187,13 @@ fun DeveloperPanel(
         AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 3) {
             FlatButton(
                 text = "Send Test Notification", onClick = { performHaptic(); onTestNotification() },
-                modifier = Modifier.fillMaxWidth(), accent = false, colors = colors,
-                maxLines = 1, isSmallScreen = isSmallScreen
+                modifier = Modifier.fillMaxWidth(), accent = false, colors = colors, maxLines = 1
             )
         }
         AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 3) {
             FlatButton(
                 text = "Send Boot Notification", onClick = { performHaptic(); onTestBootNotification() },
-                modifier = Modifier.fillMaxWidth(), accent = false, colors = colors,
-                maxLines = 1, isSmallScreen = isSmallScreen
+                modifier = Modifier.fillMaxWidth(), accent = false, colors = colors, maxLines = 1
             )
         }
         AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 3) {

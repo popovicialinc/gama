@@ -690,7 +690,11 @@ fun GamaUI(
         }
     }
 
-    val currentVersion = "1.2.3"
+    val currentVersion = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "—"
+        } catch (_: Exception) { "—" }
+    }
 
     // Gradient "Come Alive" Animation on Startup
     val gradientStartupAlpha = remember { Animatable(0f) }
@@ -1179,6 +1183,18 @@ fun GamaUI(
                                                 android.graphics.Typeface.DEFAULT_BOLD
                                             }
                                         }
+                                        // Cache Paint outside drawWithContent — same fix as TitleSection.
+                                        // Allocating Paint+setShadowLayer inside the draw lambda runs every
+                                        // frame and generates GC pressure on JIT-based older devices.
+                                        val gamaGlowPaint = remember(colors.textPrimary, gamaTextSize) {
+                                            android.graphics.Paint().apply {
+                                                isAntiAlias = true
+                                                color = android.graphics.Color.TRANSPARENT
+                                                setShadowLayer(200f, 0f, 0f, colors.textPrimary.toArgb())
+                                                textAlign = android.graphics.Paint.Align.CENTER
+                                                isDither = true
+                                            }
+                                        }
 
                                         Text(
                                             text = "GAMA",
@@ -1199,17 +1215,12 @@ fun GamaUI(
                                                 }
                                                 .drawWithContent {
                                                     drawIntoCanvas { canvas ->
-                                                        val paint = Paint().asFrameworkPaint()
-                                                        paint.color = android.graphics.Color.TRANSPARENT
-                                                        paint.textSize = gamaTextSize.toPx()
-                                                        paint.setShadowLayer(200f, 0f, 0f, colors.textPrimary.toArgb())
-                                                        paint.textAlign = android.graphics.Paint.Align.CENTER
-                                                        paint.isDither = true
+                                                        gamaGlowPaint.textSize = gamaTextSize.toPx()
                                                         canvas.nativeCanvas.drawText(
                                                             "GAMA",
                                                             size.width / 2,
                                                             size.height / 2 + (gamaTextSize.toPx() * 0.25f),
-                                                            paint
+                                                            gamaGlowPaint
                                                         )
                                                     }
                                                     drawContent()
@@ -1342,8 +1353,7 @@ fun GamaUI(
                                                     .weight(1f)
                                                     .graphicsLayer(scaleX = vulkanScale, scaleY = vulkanScale, alpha = vulkanAlpha),
                                                 accent = false, enabled = shizukuReady,
-                                                colors = colors, isSmallScreen = isSmallScreen,
-                                                oledMode = oledMode, iconType = "vulkan"
+                                                colors = colors, oledMode = oledMode, iconType = "vulkan"
                                             )
                                             IllustratedButton(
                                                 text = "OpenGL",
@@ -1367,8 +1377,7 @@ fun GamaUI(
                                                     .weight(1f)
                                                     .graphicsLayer(scaleX = openglScale, scaleY = openglScale, alpha = openglAlpha),
                                                 accent = false, enabled = shizukuReady,
-                                                colors = colors, isSmallScreen = isSmallScreen,
-                                                oledMode = oledMode, iconType = "opengl"
+                                                colors = colors, oledMode = oledMode, iconType = "opengl"
                                             )
                                         }
                                         Row(
@@ -1383,8 +1392,7 @@ fun GamaUI(
                                                 },
                                                 modifier = Modifier.weight(1f),
                                                 accent = false, enabled = true,
-                                                colors = colors, isSmallScreen = isSmallScreen,
-                                                oledMode = oledMode, iconType = "resources"
+                                                colors = colors, oledMode = oledMode, iconType = "resources"
                                             )
                                             IllustratedButton(
                                                 text = "GPUWatch",
@@ -1394,8 +1402,7 @@ fun GamaUI(
                                                 },
                                                 modifier = Modifier.weight(1f),
                                                 accent = false, enabled = true,
-                                                colors = colors, isSmallScreen = isSmallScreen,
-                                                oledMode = oledMode, iconType = "gpuwatch"
+                                                colors = colors, oledMode = oledMode, iconType = "gpuwatch"
                                             )
                                         }
                                     }
@@ -1407,25 +1414,19 @@ fun GamaUI(
 
             }
 
-            // ── Smooth animated blur — single composition ────────────────────────
+            // ── Background blur when panels are open ─────────────────────────────
             //
-            // Previously the "optimised" mode rendered mainContent() TWICE —
-            // once sharp (alpha 1→0) and once blurred (alpha 0→1) — to avoid
-            // animating the blur radius.  The intent was good (fixed RenderEffect
-            // is cheaper than a changing one) but the cost was double-composing
-            // the entire main UI tree for the full 380ms transition on every
-            // panel open/close.  With a tree this large that's the biggest single
-            // source of the stutter.
+            // Single render, always. Modifier.blur() is applied in the draw phase
+            // via graphicsLayer — zero recomposition overhead on any frame.
             //
-            // The fix: ONE render, always.  Animate blur radius 0→40dp via
-            // graphicsLayer RenderEffect (API 31+) or Modifier.blur (older).
-            // graphicsLayer-based blur is applied in the draw phase only —
-            // no layout, no recomposition — so it's cheap even at 60/120 Hz.
+            // API gate: Modifier.blur() requires API 31 (Android 12 / RenderEffect).
+            // On older devices the panel open is indicated by the panel sliding in
+            // alone — no blur needed and none applied. Zero GPU cost on old chipsets.
             //
-            // The perceived quality difference between the two approaches is
-            // invisible: background content seen behind a panel is never
-            // scrutinised while the panel entrance animation is playing.
-            val bgBlurApply = blurShouldApply && animationLevel != 2
+            // The blurEnabled user setting is still respected: if the user has
+            // turned blur off, bgBlurApply is false and no blur runs at all.
+            val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+            val bgBlurApply = blurShouldApply && animationLevel != 2 && canBlur
             val bgBlurRadius by animateDpAsState(
                 targetValue = if (bgBlurApply) 40.dp else 0.dp,
                 animationSpec = tween(
@@ -1435,16 +1436,13 @@ fun GamaUI(
                 label = "bg_blur_radius"
             )
 
-            // Single render — modifier is identity when blur is off (0.dp),
-            // so there is zero overhead in the common non-panel-open state.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(
                         if (bgBlurRadius > 0.dp)
                             Modifier.blur(bgBlurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                        else
-                            Modifier
+                        else Modifier
                     )
             ) { mainContent() }
 
@@ -1699,12 +1697,14 @@ fun GamaUI(
             )
 
             // Blur wrapper for FunctionalityPanel when Aggressive Warning is shown.
-            // Simple conditional blur — no animated alpha, no double-render.
+            // API-gated: blur requires API 31; on older devices the panel is simply
+            // visible unblurred behind the warning dialog — functionally identical.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(
-                        if (showAggressiveWarning && animationLevel != 2)
+                        if (showAggressiveWarning && animationLevel != 2 &&
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
                             Modifier.blur(20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
                         else Modifier
                     )
@@ -2445,22 +2445,39 @@ fun GamaUI(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
 
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(glowSize)) {
-                                // Static glow blob — blur radius is fixed so GPU sets RenderEffect once
-                                Box(
-                                    modifier = Modifier
-                                        .size(glowSize)
-                                        .blur(radius = 20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                                        .background(
-                                            brush = Brush.radialGradient(
-                                                colors = listOf(
-                                                    colors.primaryAccent.copy(alpha = settingsGlowAlpha),
-                                                    colors.primaryAccent.copy(alpha = settingsGlowAlpha * 0.4f),
-                                                    Color.Transparent
-                                                )
-                                            ),
-                                            shape = CircleShape
-                                        )
-                                )
+                                // Static glow blob — blur radius is fixed so GPU sets RenderEffect once.
+                                // On API < 31 (no RenderEffect support) just draw a soft circle with alpha.
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(glowSize)
+                                            .blur(radius = 20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                                            .background(
+                                                brush = Brush.radialGradient(
+                                                    colors = listOf(
+                                                        colors.primaryAccent.copy(alpha = settingsGlowAlpha),
+                                                        colors.primaryAccent.copy(alpha = settingsGlowAlpha * 0.4f),
+                                                        Color.Transparent
+                                                    )
+                                                ),
+                                                shape = CircleShape
+                                            )
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(glowSize)
+                                            .background(
+                                                brush = Brush.radialGradient(
+                                                    colors = listOf(
+                                                        colors.primaryAccent.copy(alpha = settingsGlowAlpha * 0.4f),
+                                                        Color.Transparent
+                                                    )
+                                                ),
+                                                shape = CircleShape
+                                            )
+                                    )
+                                }
                                 Box(
                                     modifier = Modifier
                                         .size(btnSize)

@@ -377,6 +377,22 @@ fun TitleSection(colors: ThemeColors, isSmallScreen: Boolean, isLandscape: Boole
             shimmerTarget = 1f
         }
 
+        // Cache the Paint and BlurMaskFilter outside drawWithContent.
+        // Previously both were allocated fresh on every draw frame (~60x/sec on old
+        // devices), generating significant GC pressure on JIT-based Dalvik runtimes.
+        // maskFilter = 80f is constant — it never changes, so one allocation is enough.
+        val titleGlowPaint = remember(colors.textPrimary, gamaTextSize) {
+            Paint().asFrameworkPaint().apply {
+                isAntiAlias = true
+                color = android.graphics.Color.TRANSPARENT
+                textSize = 1f  // overridden per-draw via the canvas transform
+                textAlign = android.graphics.Paint.Align.CENTER
+                maskFilter = android.graphics.BlurMaskFilter(80f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+                setShadowLayer(80f, 0f, 0f, colors.textPrimary.toArgb())
+                typeface = typeface  // inherit whatever was already set
+            }
+        }
+
         Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center) {
@@ -386,20 +402,23 @@ fun TitleSection(colors: ThemeColors, isSmallScreen: Boolean, isLandscape: Boole
                     .height(4.dp)
                     .drawWithContent {
                         drawContent()
-                        val bandWidth = size.width * 0.35f
-                        val bandCenter = shimmerProgress * (size.width + bandWidth) - bandWidth * 0.5f
-                        val shimmerBrush = Brush.horizontalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                colors.primaryAccent.copy(alpha = 0.55f),
-                                Color.White.copy(alpha = 0.75f),
-                                colors.primaryAccent.copy(alpha = 0.55f),
-                                Color.Transparent
-                            ),
-                            startX = bandCenter - bandWidth * 0.5f,
-                            endX   = bandCenter + bandWidth * 0.5f
-                        )
-                        drawRect(brush = shimmerBrush)
+                        // Only draw shimmer band while the animation is in flight
+                        if (shimmerProgress > 0f && shimmerProgress < 1f) {
+                            val bandWidth = size.width * 0.35f
+                            val bandCenter = shimmerProgress * (size.width + bandWidth) - bandWidth * 0.5f
+                            val shimmerBrush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    colors.primaryAccent.copy(alpha = 0.55f),
+                                    Color.White.copy(alpha = 0.75f),
+                                    colors.primaryAccent.copy(alpha = 0.55f),
+                                    Color.Transparent
+                                ),
+                                startX = bandCenter - bandWidth * 0.5f,
+                                endX   = bandCenter + bandWidth * 0.5f
+                            )
+                            drawRect(brush = shimmerBrush)
+                        }
                     }
                     .background(Brush.horizontalGradient(listOf(colors.primaryAccent.copy(alpha=0f), colors.primaryAccent.copy(alpha=1f)))))
                 Text(text = "GAMA", fontSize = gamaTextSize, fontWeight = FontWeight.Bold,
@@ -408,14 +427,12 @@ fun TitleSection(colors: ThemeColors, isSmallScreen: Boolean, isLandscape: Boole
                         if (onEasterEgg != null) detectTapGestures(onLongPress = { onEasterEgg() })
                     }.drawWithContent {
                         drawIntoCanvas { canvas ->
-                            val gp = Paint().asFrameworkPaint().apply {
-                                isAntiAlias = true; color = android.graphics.Color.TRANSPARENT
-                                textSize = gamaTextSize.toPx(); textAlign = android.graphics.Paint.Align.CENTER
-                                maskFilter = android.graphics.BlurMaskFilter(80f, android.graphics.BlurMaskFilter.Blur.NORMAL)
-                                setShadowLayer(80f, 0f, 0f, colors.textPrimary.toArgb())
-                            }
-                            val cx = size.width/2; val cy = size.height/2 + gamaTextSize.toPx()*0.25f
-                            canvas.nativeCanvas.drawText("GAMA", cx, cy, gp)
+                            // Reuse cached Paint — only update textSize which depends on
+                            // the actual measured size available in the draw scope.
+                            titleGlowPaint.textSize = gamaTextSize.toPx()
+                            val cx = size.width / 2
+                            val cy = size.height / 2 + gamaTextSize.toPx() * 0.25f
+                            canvas.nativeCanvas.drawText("GAMA", cx, cy, titleGlowPaint)
                         }
                         drawContent()
                     })
@@ -425,22 +442,25 @@ fun TitleSection(colors: ThemeColors, isSmallScreen: Boolean, isLandscape: Boole
                     .height(4.dp)
                     .drawWithContent {
                         drawContent()
-                        val bandWidth = size.width * 0.35f
-                        val bandCenter = (1f - shimmerProgress) * (size.width + bandWidth) - bandWidth * 0.5f
-                        val shimmerBrush = Brush.horizontalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                colors.primaryAccent.copy(alpha = 0.55f),
-                                Color.White.copy(alpha = 0.75f),
-                                colors.primaryAccent.copy(alpha = 0.55f),
-                                Color.Transparent
-                            ),
-                            startX = bandCenter - bandWidth * 0.5f,
-                            endX   = bandCenter + bandWidth * 0.5f
-                        )
-                        drawRect(brush = shimmerBrush)
+                        if (shimmerProgress > 0f && shimmerProgress < 1f) {
+                            val bandWidth = size.width * 0.35f
+                            val bandCenter = (1f - shimmerProgress) * (size.width + bandWidth) - bandWidth * 0.5f
+                            val shimmerBrush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    colors.primaryAccent.copy(alpha = 0.55f),
+                                    Color.White.copy(alpha = 0.75f),
+                                    colors.primaryAccent.copy(alpha = 0.55f),
+                                    Color.Transparent
+                                ),
+                                startX = bandCenter - bandWidth * 0.5f,
+                                endX   = bandCenter + bandWidth * 0.5f
+                            )
+                            drawRect(brush = shimmerBrush)
+                        }
                     }
                     .background(Brush.horizontalGradient(listOf(colors.primaryAccent.copy(alpha=1f), colors.primaryAccent.copy(alpha=0f)))))
+                // end right bar
             }
         }
 
@@ -668,7 +688,7 @@ fun SettingsNavigationCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = if (isSmallScreen) 72.dp else 80.dp)
+            .heightIn(min = if (LocalConfiguration.current.screenWidthDp.dp < 360.dp) 72.dp else 80.dp)
             // combine disabled scale and press scale
             .graphicsLayer(
                 scaleX = disabledScale * pressScale,
@@ -679,7 +699,7 @@ fun SettingsNavigationCard(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = if (isSmallScreen) 72.dp else 80.dp)
+                .heightIn(min = if (LocalConfiguration.current.screenWidthDp.dp < 360.dp) 72.dp else 80.dp)
                 .graphicsLayer(alpha = alpha)
                 .then(if (!enabled) Modifier.pointerInput(enabled) {
                     awaitPointerEventScope {
@@ -707,7 +727,7 @@ fun SettingsNavigationCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = if (isSmallScreen) 72.dp else 80.dp)
+                    .heightIn(min = if (LocalConfiguration.current.screenWidthDp.dp < 360.dp) 72.dp else 80.dp)
                     .padding(if (isSmallScreen) 20.dp else 24.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -782,11 +802,11 @@ fun FlatButton(
     enabled: Boolean = true,
     colors: ThemeColors,
     maxLines: Int,
-    isSmallScreen: Boolean = false,
     oledMode: Boolean = false
 ) {
     val animLevel = LocalAnimationLevel.current
     var isPressed by remember { mutableStateOf(false) }
+    val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val density = LocalDensity.current
 
     val baseHeight = if (isSmallScreen) 54.dp else 58.dp
@@ -898,12 +918,12 @@ fun IllustratedButton(
     accent: Boolean = false,
     enabled: Boolean = true,
     colors: ThemeColors,
-    isSmallScreen: Boolean = false,
     oledMode: Boolean = false,
     iconType: String   // "vulkan" | "opengl" | "resources" | "gpuwatch"
 ) {
     val animLevel = LocalAnimationLevel.current
     var isPressed by remember { mutableStateOf(false) }
+    val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val density = LocalDensity.current
     val ts = LocalTypeScale.current
 
@@ -1211,7 +1231,6 @@ fun MainContentCards(
                             accent = true,
                             enabled = shizukuReady,
                             colors = colors,
-                            isSmallScreen = isSmallScreen,
                             oledMode = oledMode,
                             iconType = "vulkan"
                         )
@@ -1235,7 +1254,6 @@ fun MainContentCards(
                             accent = true,
                             enabled = shizukuReady,
                             colors = colors,
-                            isSmallScreen = isSmallScreen,
                             oledMode = oledMode,
                             iconType = "opengl"
                         )
@@ -1252,7 +1270,6 @@ fun MainContentCards(
                             accent = false,
                             enabled = true,
                             colors = colors,
-                            isSmallScreen = isSmallScreen,
                             oledMode = oledMode,
                             iconType = "resources"
                         )
@@ -1263,7 +1280,6 @@ fun MainContentCards(
                             accent = false,
                             enabled = true,
                             colors = colors,
-                            isSmallScreen = isSmallScreen,
                             oledMode = oledMode,
                             iconType = "gpuwatch"
                         )
@@ -1301,18 +1317,10 @@ fun RendererCard(
     }
 
 
-    // ── Pulse animations: only run when Shizuku NOT ready ─────────────────────
-    // The InfiniteTransition object is only created when it's actually needed.
-    // On the happy path (shizukuReady = true) no transition object is allocated
-    // at all — zero ticks, zero slot overhead, zero per-frame work from this card.
-    //
-    // warningBorderAlpha / glowAlpha  — pulse only when Shizuku is NOT ready
-    // rendererTextAlpha               — pulse only when Shizuku IS ready
-    //
-    // Each branch is a separate `if` so Compose never creates an InfiniteTransition
-    // in both states simultaneously; the key insight is that shizukuReady flipping
-    // causes a recomposition anyway, so switching between static and animated values
-    // at that moment is free.
+    // ── Pulse animations: only run when actually needed ───────────────────────
+    // Each InfiniteTransition is created only in the branch where it's used.
+    // On the happy path (shizukuReady = true) the error transitions don't exist —
+    // zero ticks, zero slots, zero per-frame CPU on old chipsets.
 
     val warningBorderAlpha by if (!shizukuReady) {
         val t = rememberInfiniteTransition(label = "renderer_warning")
@@ -1460,22 +1468,41 @@ fun RendererCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         // Colored shadow blob — only rendered when Shizuku is NOT ready.
+        // API 31+: blurred glow. API < 31: unblurred radial gradient at reduced
+        // alpha — same colour signal, zero GPU blur cost on old chipsets.
         if (!shizukuReady) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(if (isSmallScreen) 130.dp else 150.dp)
-                    .blur(radius = 32.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                    .background(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                stateColor.copy(alpha = glowAlpha),
-                                stateColor.copy(alpha = glowAlpha * 0.4f),
-                                Color.Transparent
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(if (isSmallScreen) 130.dp else 150.dp)
+                        .blur(radius = 32.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    stateColor.copy(alpha = glowAlpha),
+                                    stateColor.copy(alpha = glowAlpha * 0.4f),
+                                    Color.Transparent
+                                )
                             )
                         )
-                    )
-            )
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(if (isSmallScreen) 130.dp else 150.dp)
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    stateColor.copy(alpha = glowAlpha * 0.5f),
+                                    stateColor.copy(alpha = glowAlpha * 0.15f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+            }
         }
 
         // Card — scaled on press, all visuals inside the graphicsLayer so clip is respected
@@ -2011,14 +2038,22 @@ fun CleanTitle(
         }
     }
 
+    // Cache the Paint outside drawWithContent — previously allocated fresh on every
+    // draw frame. setShadowLayer radius (80f) and text alignment are constant.
+    val titleGlowPaint = remember(colors.primaryAccent, fontSize) {
+        Paint().asFrameworkPaint().apply {
+            color = android.graphics.Color.TRANSPARENT
+            setShadowLayer(80f, 0f, 0f, colors.primaryAccent.toArgb())
+            textAlign = android.graphics.Paint.Align.CENTER
+            isDither = true
+        }
+    }
+
     // FIXED GRADIENT BARS — always use horizontal gradient regardless of orientation.
-    // The reverseGradient flag was previously switching to verticalGradient which made
-    // the bars invisible (0-height boxes don't show vertical gradients).
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
-                // Parallax: title drifts upward at 40% of scroll speed, creating depth
                 translationY = -scrollOffset * 0.4f
             },
         verticalAlignment = Alignment.CenterVertically,
@@ -2031,20 +2066,23 @@ fun CleanTitle(
                 .height(4.dp)
                 .drawWithContent {
                     drawContent()
-                    val bandWidth = size.width * 0.35f
-                    val bandCenter = shimmerProgress * (size.width + bandWidth) - bandWidth * 0.5f
-                    val shimmerBrush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            colors.primaryAccent.copy(alpha = 0.55f),
-                            Color.White.copy(alpha = 0.75f),
-                            colors.primaryAccent.copy(alpha = 0.55f),
-                            Color.Transparent
-                        ),
-                        startX = bandCenter - bandWidth * 0.5f,
-                        endX   = bandCenter + bandWidth * 0.5f
-                    )
-                    drawRect(brush = shimmerBrush)
+                    // Only allocate shimmer Brush while animation is in flight
+                    if (shimmerProgress > 0f && shimmerProgress < 1f) {
+                        val bandWidth = size.width * 0.35f
+                        val bandCenter = shimmerProgress * (size.width + bandWidth) - bandWidth * 0.5f
+                        val shimmerBrush = Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                colors.primaryAccent.copy(alpha = 0.55f),
+                                Color.White.copy(alpha = 0.75f),
+                                colors.primaryAccent.copy(alpha = 0.55f),
+                                Color.Transparent
+                            ),
+                            startX = bandCenter - bandWidth * 0.5f,
+                            endX   = bandCenter + bandWidth * 0.5f
+                        )
+                        drawRect(brush = shimmerBrush)
+                    }
                 }
                 .background(
                     brush = Brush.horizontalGradient(
@@ -2066,22 +2104,16 @@ fun CleanTitle(
             modifier = Modifier
                 .padding(horizontal = 24.dp)
                 .drawWithContent {
-                    // Draw glow shadow underneath via canvas
                     drawIntoCanvas { canvas ->
-                        val paint = Paint().asFrameworkPaint()
-                        paint.color = android.graphics.Color.TRANSPARENT
-                        paint.textSize = fontSize.toPx()
-                        paint.setShadowLayer(80f, 0f, 0f, colors.primaryAccent.toArgb())
-                        paint.textAlign = android.graphics.Paint.Align.CENTER
-                        paint.isDither = true
+                        // Reuse cached Paint; only textSize depends on draw-scope density
+                        titleGlowPaint.textSize = fontSize.toPx()
                         canvas.nativeCanvas.drawText(
                             text,
                             size.width / 2,
                             size.height / 2 + (fontSize.toPx() * 0.25f),
-                            paint
+                            titleGlowPaint
                         )
                     }
-                    // Draw actual Compose text on top (uses quicksandFontFamily)
                     drawContent()
                 }
         )
@@ -2093,21 +2125,23 @@ fun CleanTitle(
                 .height(4.dp)
                 .drawWithContent {
                     drawContent()
-                    // Right bar shimmer travels from right edge toward text (right→left)
-                    val bandWidth = size.width * 0.35f
-                    val bandCenter = (1f - shimmerProgress) * (size.width + bandWidth) - bandWidth * 0.5f
-                    val shimmerBrush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            colors.primaryAccent.copy(alpha = 0.55f),
-                            Color.White.copy(alpha = 0.75f),
-                            colors.primaryAccent.copy(alpha = 0.55f),
-                            Color.Transparent
-                        ),
-                        startX = bandCenter - bandWidth * 0.5f,
-                        endX   = bandCenter + bandWidth * 0.5f
-                    )
-                    drawRect(brush = shimmerBrush)
+                    // Only allocate shimmer Brush while animation is in flight
+                    if (shimmerProgress > 0f && shimmerProgress < 1f) {
+                        val bandWidth = size.width * 0.35f
+                        val bandCenter = (1f - shimmerProgress) * (size.width + bandWidth) - bandWidth * 0.5f
+                        val shimmerBrush = Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                colors.primaryAccent.copy(alpha = 0.55f),
+                                Color.White.copy(alpha = 0.75f),
+                                colors.primaryAccent.copy(alpha = 0.55f),
+                                Color.Transparent
+                            ),
+                            startX = bandCenter - bandWidth * 0.5f,
+                            endX   = bandCenter + bandWidth * 0.5f
+                        )
+                        drawRect(brush = shimmerBrush)
+                    }
                 }
                 .background(
                     brush = Brush.horizontalGradient(
@@ -2322,9 +2356,9 @@ fun ToggleCard(
 fun BackArrowButton(
     onClick: () -> Unit,
     colors: ThemeColors,
-    modifier: Modifier = Modifier,
-    isSmallScreen: Boolean = false
+    modifier: Modifier = Modifier
 ) {
+    val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val buttonSize = if (isSmallScreen) 48.dp else 56.dp
     val iconSize = if (isSmallScreen) 22.dp else 26.dp
 
@@ -2355,22 +2389,40 @@ fun BackArrowButton(
         contentAlignment = Alignment.Center,
         modifier = modifier.size(glowSize)
     ) {
-        // Blurred glow behind button
-        Box(
-            modifier = Modifier
-                .size(glowSize)
-                .blur(radius = 18.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            colors.primaryAccent.copy(alpha = glowAlpha),
-                            colors.primaryAccent.copy(alpha = glowAlpha * 0.4f),
-                            Color.Transparent
-                        )
-                    ),
-                    shape = CircleShape
-                )
-        )
+        // Blurred glow behind button — API 31+ only.
+        // On older devices a plain radial gradient gives the same accent-colour
+        // hint without touching the GPU blur pipeline.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Box(
+                modifier = Modifier
+                    .size(glowSize)
+                    .blur(radius = 18.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                colors.primaryAccent.copy(alpha = glowAlpha),
+                                colors.primaryAccent.copy(alpha = glowAlpha * 0.4f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(glowSize)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                colors.primaryAccent.copy(alpha = glowAlpha * 0.45f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+            )
+        }
 
         // Circular button surface
         Box(
@@ -2497,22 +2549,38 @@ fun PanelBackButton(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        // Glow blob
-        Box(
-            modifier = Modifier
-                .size(glowSize)
-                .blur(radius = 20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            colors.primaryAccent.copy(alpha = glowAlpha),
-                            colors.primaryAccent.copy(alpha = glowAlpha * 0.4f),
-                            Color.Transparent
-                        )
-                    ),
-                    shape = CircleShape
-                )
-        )
+        // Glow blob — API 31+ only; plain radial gradient fallback on older devices.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Box(
+                modifier = Modifier
+                    .size(glowSize)
+                    .blur(radius = 20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                colors.primaryAccent.copy(alpha = glowAlpha),
+                                colors.primaryAccent.copy(alpha = glowAlpha * 0.4f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(glowSize)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                colors.primaryAccent.copy(alpha = glowAlpha * 0.45f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+            )
+        }
         // Button surface — square with rounded corners, same as Settings button
         Box(
             modifier = Modifier
@@ -2575,13 +2643,13 @@ fun DialogButton(
     colors: ThemeColors,
     cardBackground: Color,
     accent: Boolean = false,
-    isSmallScreen: Boolean = false,
     oledMode: Boolean = false,
     borderAlphaOverride: Float? = null // when set, rest-state border alpha matches the surrounding card outline
 ) {
     val ts = LocalTypeScale.current
     val animLevel = LocalAnimationLevel.current
     var isPressed by remember { mutableStateOf(false) }
+    val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val density = LocalDensity.current
     val shape = RoundedCornerShape(14.dp)
 
