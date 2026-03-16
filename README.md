@@ -21,7 +21,6 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
 * 🛠️ **User-friendliness** - Simple yet beautiful UI to switch APIs without complex terminal commands
 
 **Extra resources**
-* 🛜 [**The GAMA Discord Server**](https://discord.gg/Kh8ajAVUGx)
 * 📱 [**Does Vulkan work on my device?**](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
     * Vulkan support can vary between Android devices and One UI versions, so performance may differ, especially on versions below One UI 7 (Android 15). You’re always welcome to give it a try though! If something doesn’t work as expected, a quick reboot will bring everything back to normal.
     * If your device is not listed, please kindly follow [this link](https://forms.gle/qYUHHhaQNLiY9i1MA) where you will be able to fill out a form - The relevant, collected data will be added to the [spreadsheet](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
