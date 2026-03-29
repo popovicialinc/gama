@@ -1,17 +1,18 @@
+-dontobfuscate
+
 # Maximum optimization
 -optimizationpasses 5
 -allowaccessmodification
--repackageclasses ''
 
 # ── Shizuku ──────────────────────────────────────────────────
 -keep class rikka.shizuku.** { *; }
+-keep class rikka.shizuku.shared.** { *; }
+-keep interface rikka.shizuku.** { *; }
+-keepclassmembers class rikka.shizuku.** { *; }
+-keepnames class rikka.shizuku.ShizukuProvider
 
-# ── GAMA app classes ─────────────────────────────────────────
--keep class com.popovicialinc.gama.MainActivity { *; }
--keep class com.popovicialinc.gama.ShizukuHelper { *; }
--keep class com.popovicialinc.gama.GamaUIKt { *; }
--keep class com.popovicialinc.gama.BootReceiver { *; }
--keep class com.popovicialinc.gama.TaskerReceiver { *; }
+# ── GAMA ─────────────────────────────────────────────────────
+-keep class com.popovicialinc.gama.** { *; }
 
 # ── WorkManager (reflection-based instantiation) ─────────────
 -keep class * extends androidx.work.Worker
@@ -41,6 +42,21 @@
     void sourceInformation(...);
     void sourceInformationMarkerStart(...);
     void sourceInformationMarkerEnd(...);
+}
+
+# ── Shizuku newProcess reflection ────────────────────────────
+-keepclassmembers class rikka.shizuku.Shizuku {
+    public static *** newProcess(...);
+    public static *** pingBinder(...);
+    public static *** checkSelfPermission(...);
+    public static *** requestPermission(...);
+    public static *** isPreV11(...);
+    public static *** addBinderReceivedListenerSticky(...);
+    public static *** addBinderDeadListener(...);
+    public static *** addRequestPermissionResultListener(...);
+    public static *** removeBinderReceivedListener(...);
+    public static *** removeBinderDeadListener(...);
+    public static *** removeRequestPermissionResultListener(...);
 }
 
 -keepattributes *Annotation*
