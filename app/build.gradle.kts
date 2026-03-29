@@ -12,6 +12,15 @@ android {
         includeInBundle = false
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("C:\\Users\\popov\\Documents\\gama_key") 
+            storePassword = "alinalin11"
+            keyAlias = "gama-key"
+            keyPassword = "alinalin11"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.popovicialinc.gama"
         minSdk = 29
@@ -30,6 +39,8 @@ android {
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release") 
+            
             isMinifyEnabled = true
             isShrinkResources = true
 
