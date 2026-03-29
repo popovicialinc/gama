@@ -2,51 +2,48 @@
 -optimizationpasses 5
 -allowaccessmodification
 -repackageclasses ''
--overloadaggressively
--mergeinterfacesaggressively
 
-# Keep only essential classes
+# ── Shizuku ──────────────────────────────────────────────────
 -keep class rikka.shizuku.** { *; }
+
+# ── GAMA app classes ─────────────────────────────────────────
 -keep class com.popovicialinc.gama.MainActivity { *; }
 -keep class com.popovicialinc.gama.ShizukuHelper { *; }
 -keep class com.popovicialinc.gama.GamaUIKt { *; }
+-keep class com.popovicialinc.gama.BootReceiver { *; }
+-keep class com.popovicialinc.gama.TaskerReceiver { *; }
 
-# Aggressively strip everything else
--dontwarn **
--ignorewarnings
+# ── WorkManager (reflection-based instantiation) ─────────────
+-keep class * extends androidx.work.Worker
+-keep class * extends androidx.work.ListenableWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
+-keep class androidx.work.impl.** { *; }
+-keep class androidx.work.WorkerParameters { *; }
 
-# Remove all logging and debug code
+# ── Room (used internally by WorkManager) ────────────────────
+-keep class * extends androidx.room.RoomDatabase
+-keepclassmembers class * extends androidx.room.RoomDatabase {
+    public static <fields>;
+    static <fields>;
+}
+-keep @androidx.room.Database class * { *; }
+
+# ── Logging strip ────────────────────────────────────────────
 -assumenosideeffects class android.util.Log {
     public static *** *(...);
 }
-
--assumenosideeffects class java.io.PrintStream {
-    public void println(%);
-    public void println(**);
-}
-
--assumenosideeffects class java.lang.Throwable {
-    public void printStackTrace();
-}
-
-# Remove Kotlin assertions and checks
 -assumenosideeffects class kotlin.jvm.internal.Intrinsics {
     static void check*(...);
     static void throw*(...);
 }
-
-# Remove annotations
--dontwarn org.jetbrains.annotations.**
--dontwarn javax.annotation.**
--dontwarn kotlin.Metadata
-
-# Optimize attributes
--keepattributes *Annotation*
--keepattributes Signature
-
-# Remove unused Compose code
 -assumenosideeffects class androidx.compose.runtime.ComposerKt {
     void sourceInformation(...);
     void sourceInformationMarkerStart(...);
     void sourceInformationMarkerEnd(...);
 }
+
+-keepattributes *Annotation*
+-keepattributes Signature
+-dontwarn **
+-ignorewarnings
