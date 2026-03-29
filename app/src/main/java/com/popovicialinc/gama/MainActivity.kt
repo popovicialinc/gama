@@ -57,6 +57,33 @@ class MainActivity : ComponentActivity() {
         try { installSplashScreen() } catch (_: Exception) {}
         super.onCreate(savedInstanceState)
 
+        // ── Crash logger ──────────────────────────────────────────────────────
+        // Capture the default handler BEFORE we replace it so we can chain to
+        // it after writing the log — this keeps the normal crash dialog / restart
+        // behaviour intact while also persisting the stack trace for our panel.
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        val crashLogFile = java.io.File(filesDir, "crash_log.txt")
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                val timestamp = java.text.SimpleDateFormat(
+                    "yyyy-MM-dd HH:mm:ss", java.util.Locale.US
+                ).format(java.util.Date())
+                val entry = buildString {
+                    append("── $timestamp ─────────────────────────────\n")
+                    append("Thread: ${thread.name}\n")
+                    append(throwable.stackTraceToString())
+                    append("\n\n")
+                }
+                // Prepend so newest crash is always at the top; keep file under ~64 KB
+                val existing = if (crashLogFile.exists()) crashLogFile.readText() else ""
+                val trimmed = if (existing.length > 60_000) existing.take(60_000) else existing
+                crashLogFile.writeText(entry + trimmed)
+            } catch (_: Exception) {
+                // Never let the logger itself prevent the normal crash flow
+            }
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
+
         // Register Shizuku listeners as early as possible
         Shizuku.addBinderReceivedListenerSticky(binderReceivedListener)
         Shizuku.addBinderDeadListener(binderDeadListener)
@@ -115,6 +142,22 @@ class MainActivity : ComponentActivity() {
                 pendingRestoreCallback = null
             }
 
+            // ── Crash log export: SAF file create (plain text) ────────────────
+            var pendingCrashLogContent by remember { mutableStateOf<String?>(null) }
+            val createCrashLogLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.CreateDocument("text/plain")
+            ) { uri ->
+                val content = pendingCrashLogContent ?: return@rememberLauncherForActivityResult
+                uri?.let {
+                    try {
+                        contentResolver.openOutputStream(it)?.use { out ->
+                            out.write(content.toByteArray(Charsets.UTF_8))
+                        }
+                    } catch (_: Exception) {}
+                }
+                pendingCrashLogContent = null
+            }
+
             Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
                 GamaUI(
                     onRequestNotificationPermission = {
@@ -129,6 +172,10 @@ class MainActivity : ComponentActivity() {
                     onImportBackup = { callback ->
                         pendingRestoreCallback = callback
                         openDocLauncher.launch(arrayOf("application/json"))
+                    },
+                    onExportCrashLog = { content, fileName ->
+                        pendingCrashLogContent = content
+                        createCrashLogLauncher.launch(fileName)
                     }
                 )
             }

@@ -109,7 +109,8 @@ import kotlin.math.roundToInt
 fun GamaUI(
     onRequestNotificationPermission: () -> Unit = {},
     onExportBackup: (jsonContent: String, fileName: String) -> Unit = { _, _ -> },
-    onImportBackup: (callback: (String) -> Unit) -> Unit = {}
+    onImportBackup: (callback: (String) -> Unit) -> Unit = {},
+    onExportCrashLog: (content: String, fileName: String) -> Unit = { _, _ -> }
 ) {
     val ts = LocalTypeScale.current
     val scope = rememberCoroutineScope()
@@ -202,6 +203,7 @@ fun GamaUI(
 
     // Dialog States
     var showSuccessDialog by remember { mutableStateOf(false) }
+    var showClearRecentsDialog by remember { mutableStateOf(false) }
     var successDialogMessage by remember { mutableStateOf("") }
     // True from the moment the user taps Continue until commandOutput arrives,
     // which is the real completion signal from ShizukuHelper. During this window
@@ -209,11 +211,6 @@ fun GamaUI(
     var rendererSwitching by remember { mutableStateOf(false) }
     var showDeveloperMenu by remember { mutableStateOf(false) }
     var showVerbosePanel by remember { mutableStateOf(false) }
-    var showAppSelector by remember { mutableStateOf(false) }
-    // Pre-cached app list — loaded on IO thread the moment showAppSelector becomes true,
-    // before BouncyDialog's enter animation even starts, so the list is ready instantly.
-    var cachedAppList by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
-    var appListLoading by remember { mutableStateOf(false) }
     var verboseOutput by remember { mutableStateOf("") }
     var showAggressiveWarning by remember { mutableStateOf(false) }
     var showGPUWatchConfirm by remember { mutableStateOf(false) }
@@ -234,17 +231,12 @@ fun GamaUI(
     var pendingExternalLinkLabel by remember { mutableStateOf("") }
     var pendingExternalLinkDescription by remember { mutableStateOf("") }
     var showSettings by remember { mutableStateOf(false) }
-    var showVisualEffects by remember { mutableStateOf(false) }
+    var showAppearance by remember { mutableStateOf(false) }
     var showEffects by remember { mutableStateOf(false) }
     var showBlurSettings by remember { mutableStateOf(false) }
     var showColorCustomization by remember { mutableStateOf(false) }
-    var showOLED by remember { mutableStateOf(false) }
-    var showFunctionality by remember { mutableStateOf(false) }
-    var showIntegrations by remember { mutableStateOf(false) }
-    var showIntegrationLinkConfirm  by remember { mutableStateOf(false) }
-    var pendingIntegrationLink      by remember { mutableStateOf("") }
-    var pendingIntegrationLinkLabel by remember { mutableStateOf("") }
-    var pendingIntegrationLinkDesc  by remember { mutableStateOf("") }
+    var showSystem by remember { mutableStateOf(false) }
+    var showRendererPanel by remember { mutableStateOf(false) }
     var showIntegrationInfoDialog   by remember { mutableStateOf(false) }
     var integrationInfoTitle        by remember { mutableStateOf("") }
     var integrationInfoBody         by remember { mutableStateOf("") }
@@ -273,6 +265,11 @@ fun GamaUI(
         }
     }
 
+    BackHandler(enabled = showClearRecentsDialog) {
+        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+        showClearRecentsDialog = false
+    }
+
     BackHandler(enabled = showDeveloperMenu) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showDeveloperMenu = false
@@ -288,70 +285,65 @@ fun GamaUI(
         showShizukuHelp = false
     }
 
+    // ── Appearance sub-panels ─────────────────────────────────────────────────
+
     BackHandler(enabled = showColorCustomization) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showColorCustomization = false
-        // Re-open parent
-        showVisualEffects = true
-    }
-
-    BackHandler(enabled = showParticles) {
-        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-        showParticles = false
-        // Re-open parent (Effects panel, not Visual Effects)
-        showEffects = true
-    }
-
-    BackHandler(enabled = showVisualEffects && !showColorCustomization && !showOLED && !showParticles) {
-        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-        showVisualEffects = false
-    }
-
-    BackHandler(enabled = showOLED) {
-        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-        showOLED = false
-    }
-
-    BackHandler(enabled = showEffects && !showBlurSettings) {
-        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-        showEffects = false
-        // Re-open parent
-        showVisualEffects = true
     }
 
     BackHandler(enabled = showBlurSettings) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showBlurSettings = false
-        showEffects = true
     }
+
+    BackHandler(enabled = showParticles) {
+        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+        showParticles = false
+    }
+
+    BackHandler(enabled = showEffects && !showBlurSettings && !showParticles) {
+        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+        showEffects = false
+    }
+
+    BackHandler(enabled = showAppearance) {
+        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+        showAppearance = false
+    }
+
+    // ── System sub-panels ─────────────────────────────────────────────────────
 
     BackHandler(enabled = showNotifications) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showNotifications = false
-        showFunctionality = true
     }
 
     BackHandler(enabled = showBackup) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showBackup = false
-        showFunctionality = true
     }
 
     BackHandler(enabled = showCrashLog) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showCrashLog = false
-        showFunctionality = true
     }
 
-    BackHandler(enabled = showFunctionality && !showNotifications && !showBackup && !showCrashLog) {
+    BackHandler(enabled = showSystem && !showNotifications && !showBackup && !showCrashLog) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-        showFunctionality = false
-    }
-    BackHandler(enabled = showIntegrations) {
-        showIntegrations = false
+        showSystem = false
     }
 
-    BackHandler(enabled = showSettings && !showVisualEffects && !showColorCustomization && !showOLED && !showFunctionality && !showEffects && !showBlurSettings && !showParticles && !showNotifications) {
+    // ── Renderer ──────────────────────────────────────────────────────────────
+
+    BackHandler(enabled = showRendererPanel) {
+        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+        showRendererPanel = false
+    }
+
+    // ── Top-level Settings ────────────────────────────────────────────────────
+
+    BackHandler(enabled = showSettings && !showAppearance && !showColorCustomization && !showEffects && !showBlurSettings && !showParticles && !showSystem && !showNotifications && !showRendererPanel) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showSettings = false
     }
@@ -385,11 +377,6 @@ fun GamaUI(
     BackHandler(enabled = showVerbosePanel) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showVerbosePanel = false
-    }
-
-    BackHandler(enabled = showAppSelector) {
-        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-        showAppSelector = false
     }
 
     BackHandler(enabled = showAggressiveWarning) {
@@ -426,7 +413,11 @@ fun GamaUI(
     var uiScale by remember { mutableStateOf(prefs.getInt("ui_scale", 1)) } // 0=75%, 1=100%, 2=125%
     var verboseMode by remember { mutableStateOf(prefs.getBoolean("verbose_mode", false)) }
     var aggressiveMode by remember { mutableStateOf(prefs.getBoolean("aggressive_mode", false)) }
+    var killLauncher by remember { mutableStateOf(prefs.getBoolean("kill_launcher", false)) }
     var dozeMode by remember { mutableStateOf(prefs.getBoolean("doze_mode", false)) }
+    var showGpuWatchButton by remember { mutableStateOf(prefs.getBoolean("show_gpuwatch_button", false)) }
+    var staggerEnabled by remember { mutableStateOf(prefs.getBoolean("stagger_enabled", true)) }
+    var nativeRefreshRate by remember { mutableStateOf(prefs.getBoolean("native_refresh_rate", false)) }
     // Using SnapshotStateList for instant updates
     val excludedAppsList = remember { mutableStateListOf<String>().apply { addAll(prefs.getStringSet("excluded_apps", setOf()) ?: emptySet()) } }
     var oledMode by remember { mutableStateOf(prefs.getBoolean("oled_mode", false)) }
@@ -523,42 +514,42 @@ fun GamaUI(
     // naturally), without needing artificial delays that desync fast toggles.
     val animatedAccent by animateColorAsState(
         targetValue = targetColors.primaryAccent,
-        animationSpec = tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
         label = "accent_anim"
     )
     val animatedBorder by animateColorAsState(
         targetValue = targetColors.border,
-        animationSpec = tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
         label = "border_anim"
     )
     val animatedTextPrimary by animateColorAsState(
         targetValue = targetColors.textPrimary,
-        animationSpec = tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
         label = "text_primary_anim"
     )
     val animatedTextSecondary by animateColorAsState(
         targetValue = targetColors.textSecondary,
-        animationSpec = tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
         label = "text_secondary_anim"
     )
     val animatedCardBackground by animateColorAsState(
         targetValue = targetColors.cardBackground,
-        animationSpec = tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
         label = "card_bg_anim"
     )
     val animatedBackgroundColor by animateColorAsState(
         targetValue = targetColors.background,
-        animationSpec = tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
         label = "bg_anim"
     )
     val animatedGradientStart by animateColorAsState(
         targetValue = targetColors.gradientStart,
-        animationSpec = tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
         label = "grad_start_anim"
     )
     val animatedGradientEnd by animateColorAsState(
         targetValue = targetColors.gradientEnd,
-        animationSpec = tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
         label = "grad_end_anim"
     )
 
@@ -608,7 +599,11 @@ fun GamaUI(
         val snapUiScale          = uiScale
         val snapVerbose          = verboseMode
         val snapAggressive       = aggressiveMode
+        val snapKillLauncher     = killLauncher
         val snapDoze             = dozeMode
+        val snapShowGpuWatch     = showGpuWatchButton
+        val snapStagger          = staggerEnabled
+        val snapNativeRefresh    = nativeRefreshRate
         val snapOled             = oledMode
         val snapOledAccent       = oledAccentColor.toArgb()
         val snapDynColorOled     = useDynamicColorOLED
@@ -642,7 +637,11 @@ fun GamaUI(
                 putInt("ui_scale",                      snapUiScale)
                 putBoolean("verbose_mode",              snapVerbose)
                 putBoolean("aggressive_mode",           snapAggressive)
+                putBoolean("kill_launcher",             snapKillLauncher)
                 putBoolean("doze_mode",                 snapDoze)
+                putBoolean("show_gpuwatch_button",      snapShowGpuWatch)
+                putBoolean("stagger_enabled",           snapStagger)
+                putBoolean("native_refresh_rate",       snapNativeRefresh)
                 putStringSet("excluded_apps",           excludedAppsSnapshot)
                 putBoolean("oled_mode",                 snapOled)
                 putInt("oled_accent_color",             snapOledAccent)
@@ -654,6 +653,19 @@ fun GamaUI(
                 putBoolean("notif_perm_requested",      snapNotifPermReq)
                 apply()
             }
+        }
+    }
+
+    // ── Debounced save — for sliders that fire on every frame ────────────────
+    // Toggles call savePreferences() directly (one-shot, cheap).
+    // Sliders cancel any pending job and reschedule — only the final value
+    // after the finger lifts is actually written to SharedPreferences.
+    var pendingSaveJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    fun savePreferencesDebounced(delayMs: Long = 300L) {
+        pendingSaveJob?.cancel()
+        pendingSaveJob = scope.launch {
+            delay(delayMs)
+            savePreferences()
         }
     }
 
@@ -669,22 +681,22 @@ fun GamaUI(
     val anyPanelOpen by remember {
         derivedStateOf {
             showWarningDialog || showGitHubDialog || showResourcesPanel || showExternalLinkConfirm ||
-            showSettings || showVisualEffects || showColorCustomization || showOLED ||
-            showFunctionality || showIntegrations || showShizukuHelp || showSuccessDialog || showDeveloperMenu ||
-            showVerbosePanel || showAppSelector || showAggressiveWarning || showGPUWatchConfirm ||
+            showSettings || showAppearance || showColorCustomization ||
+            showSystem || showRendererPanel ||
+            showShizukuHelp || showSuccessDialog || showClearRecentsDialog || showDeveloperMenu ||
+            showVerbosePanel || showAggressiveWarning || showGPUWatchConfirm ||
             showDeveloper || showEasterEgg || showNotifications || showBackup || showCrashLog ||
-            showEffects || showBlurSettings || showParticles
+            showEffects || showBlurSettings || showParticles || showIntegrationInfoDialog
         }
     }
 
-    // Blur is expensive — lightweight pop-up dialogs (ExternalLinkConfirmDialog) are excluded
-    // so their entry animation never races against a simultaneous full-screen blur pass.
     val anyFullPanelOpen by remember {
         derivedStateOf {
             showWarningDialog || showGitHubDialog || showResourcesPanel ||
-            showSettings || showVisualEffects || showColorCustomization || showOLED ||
-            showFunctionality || showIntegrations || showShizukuHelp || showSuccessDialog || showDeveloperMenu ||
-            showVerbosePanel || showAppSelector || showAggressiveWarning || showGPUWatchConfirm ||
+            showSettings || showAppearance || showColorCustomization ||
+            showSystem || showRendererPanel ||
+            showShizukuHelp || showSuccessDialog || showClearRecentsDialog || showDeveloperMenu ||
+            showVerbosePanel || showAggressiveWarning || showGPUWatchConfirm ||
             showDeveloper || showEasterEgg || showNotifications || showBackup || showCrashLog ||
             showEffects || showBlurSettings || showParticles
         }
@@ -831,6 +843,11 @@ fun GamaUI(
         }
         // Poll every 15 minutes, fire when the interval has elapsed
         while (isActive) {
+            // No point waking up at all if the renderer is already Vulkan
+            if (currentRenderer != "OpenGL") {
+                delay(15 * 60_000L)
+                continue
+            }
             delay(15 * 60_000L) // check every 15 min
             if (!notificationsEnabled) continue
             if (!ShizukuHelper.hasNotificationPermission(context)) continue
@@ -877,6 +894,7 @@ fun GamaUI(
         LocalThemeColors provides colors,
         LocalUIScale provides uiScale,
         LocalDismissOnClickOutside provides dismissOnClickOutside,
+        LocalStaggerEnabled provides staggerEnabled,
         LocalTypeScale provides typeScale,
         LocalDensity provides Density(
             density = currentDensity.density * animatedUiScale,
@@ -984,7 +1002,8 @@ fun GamaUI(
                 timeModeEnabled = particleTimeMode,
                 timeOffsetHours = timeOffsetHours,
                 anyPanelOpen = anyPanelOpen,
-                isLandscape = isLandscape
+                isLandscape = isLandscape,
+                nativeRefreshRate = nativeRefreshRate
             )
 
             // ── Main content ──────────────────────────────────────────────────
@@ -1063,6 +1082,11 @@ fun GamaUI(
                                     },
                                     onVulkanClick = {
                                         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                        if (!shizukuRunning || !shizukuPermissionGranted) {
+                                            shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
+                                            showShizukuHelp = true
+                                            return@MainContentCards
+                                        }
                                         pendingRendererName = "Vulkan"
                                         pendingRendererSwitch = {
                                             verboseOutput = ""
@@ -1071,19 +1095,23 @@ fun GamaUI(
                                                 context,
                                                 scope,
                                                 aggressiveMode,
+                                                killLauncher,
                                                 excludedAppsList.toSet(),
                                                 emptySet(),
                                                 { commandOutput = it },
                                                 if (verboseMode) { output -> verboseOutput += output } else null
                                             )
                                         }
-                                        // Prepare success message
-                                        successDialogMessage =
-                                            "Okay! Vulkan has been applied!\nClear your recents menu."
+                                        successDialogMessage = "Vulkan has been applied!"
                                         showWarningDialog = true
                                     },
                                     onOpenGLClick = {
                                         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                        if (!shizukuRunning || !shizukuPermissionGranted) {
+                                            shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
+                                            showShizukuHelp = true
+                                            return@MainContentCards
+                                        }
                                         pendingRendererName = "OpenGL"
                                         pendingRendererSwitch = {
                                             verboseOutput = ""
@@ -1092,15 +1120,14 @@ fun GamaUI(
                                                 context,
                                                 scope,
                                                 aggressiveMode,
+                                                killLauncher,
                                                 excludedAppsList.toSet(),
                                                 emptySet(),
                                                 { commandOutput = it },
                                                 if (verboseMode) { output -> verboseOutput += output } else null
                                             )
                                         }
-                                        // Prepare success message
-                                        successDialogMessage =
-                                            "Okay! OpenGL has been applied!\nClear your recents menu."
+                                        successDialogMessage = "OpenGL has been applied!"
                                         showWarningDialog = true
                                     },
                                     onResourcesClick = {
@@ -1111,6 +1138,7 @@ fun GamaUI(
                                         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                                         showGPUWatchConfirm = true // Correctly show dialog first
                                     },
+                                    showGpuWatchButton = showGpuWatchButton,
                                     oledMode = oledMode,
                                     rendererLoading = rendererLoading,
                                     lastSwitchTime = lastSwitchTime
@@ -1135,12 +1163,13 @@ fun GamaUI(
                                     totalItems = 7) {
                                     Text(
                                         text = remember(currentHour, userName) {
-                                            val pool = when (currentHour) {
-                                                in 0..5 -> if (userName.isNotEmpty()) listOf("Still up, $userName? 🌙","Late night session, $userName? 🌙","The world is quiet, $userName. 🌙","Somewhere between today and tomorrow, $userName. 🌙") else listOf("Still up? 🌙","Late night session? 🌙","The world is quiet. 🌙","Somewhere between today and tomorrow. 🌙")
-                                                in 6..11 -> if (userName.isNotEmpty()) listOf("Good morning, $userName! ☀️","Morning, $userName! ☀️","Rise and shine, $userName! ☀️","A fresh start, $userName. ☀️","Up early, $userName? ☀️") else listOf("Good morning! ☀️","Morning! ☀️","Rise and shine! ☀️","A fresh start. ☀️","Up early? ☀️")
-                                                in 12..16 -> if (userName.isNotEmpty()) listOf("Hey, $userName! 👋","Good afternoon, $userName! 👋","Welcome back, $userName. 👋","There you are, $userName! 👋","Good to see you, $userName. 👋") else listOf("Hey! 👋","Good afternoon! 👋","Welcome back. 👋","There you are! 👋","Good to see you. 👋")
-                                                in 17..22 -> if (userName.isNotEmpty()) listOf("Good evening, $userName! 🌙","Evening, $userName. 🌙","Winding down, $userName? 🌙","End of the day, $userName. 🌙","Hope it was a good one, $userName. 🌙") else listOf("Good evening! 🌙","Evening. 🌙","Winding down? 🌙","End of the day. 🌙","Hope it was a good one. 🌙")
-                                                else -> if (userName.isNotEmpty()) listOf("Still at it, $userName? 🌙","The quiet hours, $userName. 🌙","Almost tomorrow, $userName. 🌙","Some nights are for thinking, $userName. 🌙","The world can wait, $userName. 🌙") else listOf("Still at it? 🌙","The quiet hours. 🌙","Almost tomorrow. 🌙","Some nights are for thinking. 🌙","The world can wait. 🌙")
+                                            // Lists built once per hour/name change, not on every recomposition
+                                            val pool: Array<String> = when (currentHour) {
+                                                in 0..5   -> if (userName.isNotEmpty()) arrayOf("Still up, $userName? 🌙","Late night session, $userName? 🌙","The world is quiet, $userName. 🌙","Somewhere between today and tomorrow, $userName. 🌙") else arrayOf("Still up? 🌙","Late night session? 🌙","The world is quiet. 🌙","Somewhere between today and tomorrow. 🌙")
+                                                in 6..11  -> if (userName.isNotEmpty()) arrayOf("Good morning, $userName! ☀️","Morning, $userName! ☀️","Rise and shine, $userName! ☀️","A fresh start, $userName. ☀️","Up early, $userName? ☀️") else arrayOf("Good morning! ☀️","Morning! ☀️","Rise and shine! ☀️","A fresh start. ☀️","Up early? ☀️")
+                                                in 12..16 -> if (userName.isNotEmpty()) arrayOf("Hey, $userName! 👋","Good afternoon, $userName! 👋","Welcome back, $userName. 👋","There you are, $userName! 👋","Good to see you, $userName. 👋") else arrayOf("Hey! 👋","Good afternoon! 👋","Welcome back. 👋","There you are! 👋","Good to see you. 👋")
+                                                in 17..22 -> if (userName.isNotEmpty()) arrayOf("Good evening, $userName! 🌙","Evening, $userName. 🌙","Winding down, $userName? 🌙","End of the day, $userName. 🌙","Hope it was a good one, $userName. 🌙") else arrayOf("Good evening! 🌙","Evening. 🌙","Winding down? 🌙","End of the day. 🌙","Hope it was a good one. 🌙")
+                                                else      -> if (userName.isNotEmpty()) arrayOf("Still at it, $userName? 🌙","The quiet hours, $userName. 🌙","Almost tomorrow, $userName. 🌙","Some nights are for thinking, $userName. 🌙","The world can wait, $userName. 🌙") else arrayOf("Still at it? 🌙","The quiet hours. 🌙","Almost tomorrow. 🌙","Some nights are for thinking. 🌙","The world can wait. 🌙")
                                             }
                                             pool.random()
                                         },
@@ -1302,25 +1331,16 @@ fun GamaUI(
                                 // 2×2 Button Grid
                                 AnimatedElement(visible = isVisible, staggerIndex = 5,
                                     totalItems = 7) {
-                                    val vulkanScale by animateFloatAsState(
+                                    // Both buttons share identical scale/alpha — one animator each instead of four
+                                    val buttonScale by animateFloatAsState(
                                         targetValue = if (shizukuRunning && shizukuPermissionGranted) 1f else 0.85f,
                                         animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
-                                        label = "vulkan_scale"
+                                        label = "button_scale"
                                     )
-                                    val vulkanAlpha by animateFloatAsState(
+                                    val buttonAlpha by animateFloatAsState(
                                         targetValue = if (shizukuRunning && shizukuPermissionGranted) 1f else 0.25f,
                                         animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
-                                        label = "vulkan_alpha"
-                                    )
-                                    val openglScale by animateFloatAsState(
-                                        targetValue = if (shizukuRunning && shizukuPermissionGranted) 1f else 0.85f,
-                                        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
-                                        label = "opengl_scale"
-                                    )
-                                    val openglAlpha by animateFloatAsState(
-                                        targetValue = if (shizukuRunning && shizukuPermissionGranted) 1f else 0.25f,
-                                        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
-                                        label = "opengl_alpha"
+                                        label = "button_alpha"
                                     )
                                     val shizukuReady = shizukuRunning && shizukuPermissionGranted
                                     Column(
@@ -1335,48 +1355,60 @@ fun GamaUI(
                                                 text = "Vulkan",
                                                 onClick = {
                                                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                    if (!shizukuRunning || !shizukuPermissionGranted) {
+                                                        shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
+                                                        showShizukuHelp = true
+                                                        return@IllustratedButton
+                                                    }
                                                     pendingRendererName = "Vulkan"
                                                     pendingRendererSwitch = {
                                                         verboseOutput = ""
                                                         if (verboseMode) showVerbosePanel = true
                                                         ShizukuHelper.runVulkan(
                                                             context, scope, aggressiveMode,
+                                                            killLauncher,
                                                             excludedAppsList.toSet(), emptySet(),
                                                             { commandOutput = it },
                                                             if (verboseMode) { output -> verboseOutput += output } else null
                                                         )
                                                     }
-                                                    successDialogMessage = "Okay! Vulkan has been applied!\nClear your recents menu."
+                                                    successDialogMessage = "Vulkan has been applied!"
                                                     showWarningDialog = true
                                                 },
                                                 modifier = Modifier
                                                     .weight(1f)
-                                                    .graphicsLayer(scaleX = vulkanScale, scaleY = vulkanScale, alpha = vulkanAlpha),
-                                                accent = false, enabled = shizukuReady,
+                                                    .graphicsLayer(scaleX = buttonScale, scaleY = buttonScale, alpha = buttonAlpha),
+                                                accent = false, enabled = true,
                                                 colors = colors, oledMode = oledMode, iconType = "vulkan"
                                             )
                                             IllustratedButton(
                                                 text = "OpenGL",
                                                 onClick = {
                                                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                    if (!shizukuRunning || !shizukuPermissionGranted) {
+                                                        shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
+                                                        showShizukuHelp = true
+                                                        return@IllustratedButton
+                                                    }
                                                     pendingRendererName = "OpenGL"
                                                     pendingRendererSwitch = {
                                                         verboseOutput = ""
                                                         if (verboseMode) showVerbosePanel = true
                                                         ShizukuHelper.runOpenGL(
                                                             context, scope, aggressiveMode,
+                                                            killLauncher,
                                                             excludedAppsList.toSet(), emptySet(),
                                                             { commandOutput = it },
                                                             if (verboseMode) { output -> verboseOutput += output } else null
                                                         )
                                                     }
-                                                    successDialogMessage = "Okay! OpenGL has been applied!\nClear your recents menu."
+                                                    successDialogMessage = "OpenGL has been applied!"
                                                     showWarningDialog = true
                                                 },
                                                 modifier = Modifier
                                                     .weight(1f)
-                                                    .graphicsLayer(scaleX = openglScale, scaleY = openglScale, alpha = openglAlpha),
-                                                accent = false, enabled = shizukuReady,
+                                                    .graphicsLayer(scaleX = buttonScale, scaleY = buttonScale, alpha = buttonAlpha),
+                                                accent = false, enabled = true,
                                                 colors = colors, oledMode = oledMode, iconType = "opengl"
                                             )
                                         }
@@ -1390,20 +1422,22 @@ fun GamaUI(
                                                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                                                     showResourcesPanel = true
                                                 },
-                                                modifier = Modifier.weight(1f),
+                                                modifier = if (showGpuWatchButton) Modifier.weight(1f) else Modifier.fillMaxWidth(),
                                                 accent = false, enabled = true,
                                                 colors = colors, oledMode = oledMode, iconType = "resources"
                                             )
-                                            IllustratedButton(
-                                                text = "GPUWatch",
-                                                onClick = {
-                                                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                                    showGPUWatchConfirm = true
-                                                },
-                                                modifier = Modifier.weight(1f),
-                                                accent = false, enabled = true,
-                                                colors = colors, oledMode = oledMode, iconType = "gpuwatch"
-                                            )
+                                            if (showGpuWatchButton) {
+                                                IllustratedButton(
+                                                    text = "GPUWatch",
+                                                    onClick = {
+                                                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                        showGPUWatchConfirm = true
+                                                    },
+                                                    modifier = Modifier.weight(1f),
+                                                    accent = false, enabled = true,
+                                                    colors = colors, oledMode = oledMode, iconType = "gpuwatch"
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1416,35 +1450,131 @@ fun GamaUI(
 
             // ── Background blur when panels are open ─────────────────────────────
             //
-            // Single render, always. Modifier.blur() is applied in the draw phase
-            // via graphicsLayer — zero recomposition overhead on any frame.
-            //
             // API gate: Modifier.blur() requires API 31 (Android 12 / RenderEffect).
-            // On older devices the panel open is indicated by the panel sliding in
-            // alone — no blur needed and none applied. Zero GPU cost on old chipsets.
+            // On older devices no blur is applied — zero GPU cost.
             //
-            // The blurEnabled user setting is still respected: if the user has
-            // turned blur off, bgBlurApply is false and no blur runs at all.
+            // Two modes controlled by blurOptimised:
+            //
+            // OPTIMISED (default, recommended):
+            //   A fully-blurred copy of mainContent sits behind the panel at all times.
+            //   Its alpha animates 0→1 on open and 1→0 on close with an ease-in-out
+            //   curve. The GPU calculates the blur exactly once, then only updates alpha
+            //   — a single scalar per frame. No per-frame blur recalculation.
+            //
+            // REAL:
+            //   The blur radius itself animates 0→40dp frame by frame. The GPU
+            //   recalculates the full RenderEffect every frame during the transition.
+            //   Looks physically accurate. Heavier on the GPU during the animation.
             val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-            val bgBlurApply = blurShouldApply && animationLevel != 2 && canBlur
-            val bgBlurRadius by animateDpAsState(
-                targetValue = if (bgBlurApply) 40.dp else 0.dp,
-                animationSpec = tween(
-                    durationMillis = 380,
-                    easing = MotionTokens.Easing.emphasized
-                ),
-                label = "bg_blur_radius"
-            )
+            val blurActive = blurShouldApply && animationLevel != 2 && canBlur
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(
-                        if (bgBlurRadius > 0.dp)
-                            Modifier.blur(bgBlurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                        else Modifier
+            if (blurOptimised) {
+                // ── Optimised mode ────────────────────────────────────────────
+                //
+                // DESIGN PRINCIPLE: the blur must be completely inert during
+                // panel-to-panel navigation (Settings → Visuals, etc.).
+                // blurActive only changes at the true boundary:
+                //   main screen → first panel open  (false → true)
+                //   last panel close → main screen  (true → false)
+                // It stays TRUE the entire time the user navigates between panels,
+                // so every blur-related computation below must produce zero work
+                // in that steady state.
+                //
+                // TWO previous approaches that caused lag:
+                //
+                //  v1 — double mainContent():
+                //       Composed mainContent() twice (sharp + blurred layers).
+                //       Every panel-state recomposition ran the entire background
+                //       twice. Fixed by going to a single call.
+                //
+                //  v2 — graphicsLayer { renderEffect = cachedBlurEffect }:
+                //       animateFloatAsState returns a Float captured in composition
+                //       scope — NOT a deferred draw-phase read.  Even with blurAlpha
+                //       stable at 1f, each recomposition created a new lambda object,
+                //       which Compose treated as a "changed" modifier and forced a
+                //       layer update with identical values.
+                //
+                // CURRENT APPROACH — two separate responsibilities:
+                //
+                //  ① mainContent layer  →  Modifier.blur(40.dp)
+                //     A structural modifier with a fixed constant radius.
+                //     Compose compares by structural equality: same type + same dp
+                //     value → IDENTICAL modifier → layer update is skipped entirely.
+                //     During panel-to-panel: blurActive stays true, modifier never
+                //     changes, zero overhead. At the true open/close boundary one
+                //     recomposition happens and the modifier is toggled — that's fine
+                //     and unavoidable.
+                //
+                //  ② scrim layer  →  Animatable + graphicsLayer draw-phase read
+                //     Animatable.value IS a State<Float>.  Reading it inside a
+                //     graphicsLayer {} lambda is a genuine deferred draw-phase read:
+                //     animation frames only invalidate the draw layer, never the
+                //     composition.  LaunchedEffect(blurActive) fires the 380 ms
+                //     tween only when blurActive actually changes — i.e. only at the
+                //     open/close boundary, never during panel-to-panel transitions.
+
+                // Scrim Animatable — starts at correct value for the current state.
+                val scrimAnimatable = remember { Animatable(if (blurActive) 1f else 0f) }
+                LaunchedEffect(blurActive) {
+                    // Fires only when blurActive flips (main ↔ panel boundary).
+                    // Panel-to-panel: blurActive stays true → this never fires.
+                    scrimAnimatable.animateTo(
+                        targetValue = if (blurActive) 1f else 0f,
+                        animationSpec = tween(
+                            durationMillis = 380,
+                            easing = MotionTokens.Easing.silk
+                        )
                     )
-            ) { mainContent() }
+                }
+
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // ① mainContent — single composition, stable modifier.
+                    // Modifier.blur(40.dp) is applied/removed only at the true
+                    // open/close boundary (blurActive change). Between panels:
+                    // modifier is identical → Compose skips the layer update.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .then(
+                                if (canBlur && blurActive)
+                                    Modifier.blur(40.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                                else Modifier
+                            )
+                    ) { mainContent() }
+
+                    // ② Scrim — Color.Black rect, alpha driven by draw-phase read.
+                    // scrimAnimatable.value inside graphicsLayer {} is a deferred
+                    // State read: animation ticks only trigger redraws, not recompositions.
+                    // During panel-to-panel: scrimAnimatable.value == 1f (stable) →
+                    // same alpha emitted every draw → zero extra GPU or CPU work.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { alpha = scrimAnimatable.value * 0.45f }
+                            .background(Color.Black)
+                    )
+                }
+            } else {
+                // ── Real mode ─────────────────────────────────────────────────
+                // Blur radius animates 0→40dp every frame. GPU brute-forces it.
+                val bgBlurRadius by animateDpAsState(
+                    targetValue = if (blurActive) 40.dp else 0.dp,
+                    animationSpec = tween(
+                        durationMillis = 380,
+                        easing = MotionTokens.Easing.emphasized
+                    ),
+                    label = "bg_blur_radius"
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (bgBlurRadius > 0.dp)
+                                Modifier.blur(bgBlurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                            else Modifier
+                        )
+                ) { mainContent() }
+            }
 
 
             // Shizuku Help Dialog
@@ -1541,6 +1671,28 @@ fun GamaUI(
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showSuccessDialog = false
                     rendererSwitching = false
+                    // Ask about clearing recents now that the switch is done and GAMA is alive
+                    showClearRecentsDialog = true
+                },
+                isSmallScreen = isSmallScreen,
+                isLandscape = isLandscape,
+                isTablet = isTablet,
+                colors = colors,
+                cardBackground = cardBackground
+            )
+
+            ClearRecentsDialog(
+                visible = showClearRecentsDialog,
+                onDismiss = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showClearRecentsDialog = false
+                },
+                onConfirm = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showClearRecentsDialog = false
+                    scope.launch {
+                        try { ShizukuHelper.runCommand("am clear-recent-tasks") } catch (_: Exception) {}
+                    }
                 },
                 isSmallScreen = isSmallScreen,
                 isLandscape = isLandscape,
@@ -1617,12 +1769,18 @@ fun GamaUI(
                     pendingExternalLinkDescription = description
                     showExternalLinkConfirm = true
                 },
+                onInfoRequested = { title, body ->
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    integrationInfoTitle = title
+                    integrationInfoBody  = body
+                    showIntegrationInfoDialog = true
+                },
                 isSmallScreen = isSmallScreen,
                 isLandscape = isLandscape,
                 isTablet = isTablet,
                 colors = colors,
                 cardBackground = cardBackground,
-                isBlurred = showExternalLinkConfirm,
+                isBlurred = showExternalLinkConfirm || showIntegrationInfoDialog,
                 oledMode = oledMode
             )
 
@@ -1650,22 +1808,30 @@ fun GamaUI(
 
 
             SettingsPanel(
-                visible = showSettings && !showVisualEffects && !showColorCustomization && !showOLED && !showFunctionality && !showIntegrations && !showEffects && !showParticles && !showNotifications && !showBackup && !showCrashLog,
+                visible = showSettings && !showAppearance && !showColorCustomization && !showSystem && !showEffects && !showParticles && !showNotifications && !showBackup && !showCrashLog && !showRendererPanel,
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showSettings = false
                 },
-                onVisualEffectsClick = {
+                onAppearanceClick = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showVisualEffects = true
+                    showAppearance = true
                 },
-                onFunctionalityClick = {
+                onEffectsClick = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showFunctionality = true
+                    showEffects = true
                 },
-                onIntegrationsClick = {
+                onColorsClick = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showIntegrations = true
+                    showColorCustomization = true
+                },
+                onRendererClick = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showRendererPanel = true
+                },
+                onSystemClick = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showSystem = true
                 },
                 isSmallScreen = isSmallScreen,
                 isLandscape = isLandscape,
@@ -1676,29 +1842,7 @@ fun GamaUI(
                 oledMode = oledMode
             )
 
-            OLEDPanel(
-                visible = showOLED,
-                onDismiss = {
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showOLED = false
-                },
-                oledMode = oledMode,
-                onOledModeChange = { enabled ->
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    oledMode = enabled
-                    savePreferences()
-                },
-                isSmallScreen = isSmallScreen,
-                isLandscape = isLandscape,
-                isTablet = isTablet,
-                colors = colors,
-                cardBackground = cardBackground,
-                performHaptic = { performHaptic(HapticFeedbackConstants.CONTEXT_CLICK) }
-            )
-
-            // Blur wrapper for FunctionalityPanel when Aggressive Warning is shown.
-            // API-gated: blur requires API 31; on older devices the panel is simply
-            // visible unblurred behind the warning dialog — functionally identical.
+            // Blur wrapper for RendererPanel when Aggressive Warning is shown.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1709,96 +1853,100 @@ fun GamaUI(
                         else Modifier
                     )
             ) {
-                    FunctionalityPanel(
-                        visible = showFunctionality && !showBackup && !showCrashLog && !showAppSelector,
-                        onDismiss = {
-                            performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                            showFunctionality = false
-                        },
-                        verboseMode = verboseMode,
-                        onVerboseModeChange = { enabled ->
-                            performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                            verboseMode = enabled
-                            savePreferences()
-                        },
-                        aggressiveMode = aggressiveMode,
-                        onAggressiveModeChange = { enabled ->
-                            if (enabled && !aggressiveModeConfirmed && !dontShowAggressiveWarning) {
-                                aggressiveMode = true
-                                performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                showAggressiveWarning = true
-                            } else {
-                                aggressiveMode = enabled
-                                savePreferences()
-                                if (!enabled) {
-                                    aggressiveModeConfirmed = false
-                                }
-                            }
-                        },
-                        dismissOnClickOutside = dismissOnClickOutside,
-                        onDismissOnClickOutsideChange = { enabled ->
-                            performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                            dismissOnClickOutside = enabled
-                            savePreferences()
-                        },
-                        dozeMode = dozeMode,
-                        onDozeModeChange = { enabled ->
-                            performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                            dozeMode = enabled
-                            scope.launch {
-                                try {
-                                    val cmd = if (enabled)
-                                        "dumpsys deviceidle force-idle deep"
-                                    else
-                                        "dumpsys deviceidle unforce"
-                                    ShizukuHelper.runCommand(cmd)
-                                } catch (_: Exception) {}
-                            }
-                            savePreferences()
-                        },
-                        onAppSelectorClick = {
-                            performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                            // Start loading apps on IO immediately — before the panel opens —
-                            // so the list is ready by the time the enter animation finishes.
-                            if (cachedAppList.isEmpty() && !appListLoading) {
-                                appListLoading = true
-                                scope.launch {
-                                    cachedAppList = withContext(Dispatchers.IO) {
-                                        getAllInstalledPackages(context)
-                                    }
-                                    appListLoading = false
-                                }
-                            }
-                            showAppSelector = true
-                        },
-                        onShowAggressiveWarning = {
+                RendererPanel(
+                    visible = showRendererPanel,
+                    onDismiss = {
+                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                        showRendererPanel = false
+                    },
+                    aggressiveMode = aggressiveMode,
+                    onAggressiveModeChange = { enabled ->
+                        if (enabled && !aggressiveModeConfirmed && !dontShowAggressiveWarning) {
+                            aggressiveMode = true
                             performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                             showAggressiveWarning = true
-                        },
-                        onNotificationsClick = {
-                            performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                            showFunctionality = false
-                            showNotifications = true
-                        },
-                        onBackupClick = {
-                            performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                            showBackup = true
-                        },
-                        onCrashLogClick = {
-                            performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                            showCrashLog = true
-                        },
-                        userName = userName,
-                        isSmallScreen = isSmallScreen,
-                        isLandscape = isLandscape,
-                        isTablet = isTablet,
-                        colors = colors,
-                        cardBackground = cardBackground,
-                        oledMode = oledMode,
-                        performHaptic = { performHaptic(HapticFeedbackConstants.CONTEXT_CLICK) }
-                    )
-                }
-            } // End of FunctionalityPanel blur wrapper
+                        } else {
+                            aggressiveMode = enabled
+                            savePreferences()
+                            if (!enabled) aggressiveModeConfirmed = false
+                        }
+                    },
+                    killLauncher = killLauncher,
+                    onKillLauncherChange = { enabled ->
+                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                        killLauncher = enabled
+                        savePreferences()
+                    },
+                    dozeMode = dozeMode,
+                    onDozeModeChange = { enabled ->
+                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                        dozeMode = enabled
+                        scope.launch {
+                            try {
+                                val cmd = if (enabled)
+                                    "dumpsys deviceidle force-idle deep"
+                                else
+                                    "dumpsys deviceidle unforce"
+                                ShizukuHelper.runCommand(cmd)
+                            } catch (_: Exception) {}
+                        }
+                        savePreferences()
+                    },
+                    showGpuWatchButton = showGpuWatchButton,
+                    onShowGpuWatchButtonChange = { showGpuWatchButton = it; savePreferences() },
+                    onShowAggressiveWarning = {
+                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                        showAggressiveWarning = true
+                    },
+                    isSmallScreen = isSmallScreen,
+                    isLandscape = isLandscape,
+                    isTablet = isTablet,
+                    colors = colors,
+                    cardBackground = cardBackground,
+                    oledMode = oledMode,
+                    performHaptic = { performHaptic(HapticFeedbackConstants.CONTEXT_CLICK) }
+                )
+            } // End of blur wrapper
+        } // End of outer content Box
+
+            SystemPanel(
+                visible = showSystem && !showNotifications && !showBackup && !showCrashLog,
+                onDismiss = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showSystem = false
+                },
+                verboseMode = verboseMode,
+                onVerboseModeChange = { enabled ->
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    verboseMode = enabled
+                    savePreferences()
+                },
+                dismissOnClickOutside = dismissOnClickOutside,
+                onDismissOnClickOutsideChange = { enabled ->
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    dismissOnClickOutside = enabled
+                    savePreferences()
+                },
+                onNotificationsClick = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showNotifications = true
+                },
+                onBackupClick = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showBackup = true
+                },
+                onCrashLogClick = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showCrashLog = true
+                },
+                isSmallScreen = isSmallScreen,
+                isLandscape = isLandscape,
+                isTablet = isTablet,
+                colors = colors,
+                cardBackground = cardBackground,
+                oledMode = oledMode,
+                performHaptic = { performHaptic(HapticFeedbackConstants.CONTEXT_CLICK) }
+            )
 
             // Notifications panel (sub-panel of Functionality)
             NotificationsPanel(
@@ -1806,7 +1954,6 @@ fun GamaUI(
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showNotifications = false
-                    showFunctionality = true
                 },
                 notificationsEnabled = notificationsEnabled,
                 onNotificationsEnabledChange = { enabled ->
@@ -1859,7 +2006,6 @@ fun GamaUI(
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showBackup = false
-                    showFunctionality = true
                 },
                 onExport = {
                     scope.launch {
@@ -1894,6 +2040,9 @@ fun GamaUI(
                                 uiScale              = prefs.getInt("ui_scale", 1)
                                 verboseMode          = prefs.getBoolean("verbose_mode", false)
                                 aggressiveMode       = prefs.getBoolean("aggressive_mode", false)
+                                killLauncher         = prefs.getBoolean("kill_launcher", false)
+                                staggerEnabled       = prefs.getBoolean("stagger_enabled", true)
+                                nativeRefreshRate    = prefs.getBoolean("native_refresh_rate", false)
                                 oledMode             = prefs.getBoolean("oled_mode", false)
                                 oledAccentColor      = Color(prefs.getInt("oled_accent_color", 0xFF4895EF.toInt()))
                                 useDynamicColorOLED  = prefs.getBoolean("use_dynamic_color_oled", false)
@@ -1928,67 +2077,17 @@ fun GamaUI(
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showCrashLog = false
-                    showFunctionality = true
                 },
                 isSmallScreen = isSmallScreen,
                 isLandscape = isLandscape,
                 isTablet = isTablet,
                 colors = colors,
                 cardBackground = cardBackground,
-                oledMode = oledMode
+                oledMode = oledMode,
+                onExportCrashLog = onExportCrashLog
             )
 
-            IntegrationsPanel(
-                visible = showIntegrations,
-                onDismiss = {
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showIntegrations = false
-                },
-                onLinkSelected = { url, label, desc ->
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    pendingIntegrationLink      = url
-                    pendingIntegrationLinkLabel = label
-                    pendingIntegrationLinkDesc  = desc
-                    showIntegrationLinkConfirm  = true
-                },
-                onInfoRequested = { title, body ->
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    integrationInfoTitle      = title
-                    integrationInfoBody       = body
-                    showIntegrationInfoDialog = true
-                },
-                isBlurred = showIntegrationLinkConfirm || showIntegrationInfoDialog,
-                isSmallScreen = isSmallScreen,
-                isLandscape = isLandscape,
-                isTablet = isTablet,
-                colors = colors,
-                cardBackground = cardBackground,
-                oledMode = oledMode
-            )
-
-            // ── Integrations: external link confirm ───────────────────────────
-            ExternalLinkConfirmDialog(
-                visible = showIntegrationLinkConfirm,
-                label = pendingIntegrationLinkLabel,
-                description = pendingIntegrationLinkDesc,
-                onDismiss = {
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showIntegrationLinkConfirm = false
-                },
-                onConfirm = {
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(pendingIntegrationLink))
-                    context.startActivity(intent)
-                    showIntegrationLinkConfirm = false
-                },
-                isSmallScreen = isSmallScreen,
-                isLandscape = isLandscape,
-                isTablet = isTablet,
-                colors = colors,
-                cardBackground = cardBackground
-            )
-
-            // ── Integrations: info-only dialog (QS Tiles / Widget) ────────────
+            // ── Info dialog for QS Tiles / Widget (shown from Resources panel) ──
             IntegrationInfoDialog(
                 visible = showIntegrationInfoDialog,
                 title = integrationInfoTitle,
@@ -2059,16 +2158,16 @@ fun GamaUI(
                 timeOffsetHours = timeOffsetHours,
                 onTimeOffsetChange = { value ->
                     timeOffsetHours = value
-                    savePreferences()
+                    savePreferencesDebounced()
                 }
             )
 
 
             VisualEffectsPanel(
-                visible = showVisualEffects,
+                visible = showAppearance,
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showVisualEffects = false
+                    showAppearance = false
                 },
                 themePreference = themePreference,
                 onThemeChange = { newTheme ->
@@ -2091,41 +2190,21 @@ fun GamaUI(
                     prefs.edit().putString("user_name", newName).apply()
                 },
                 oledMode = oledMode,
-                onOledModeChange = { enabled ->
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    oledMode = enabled
-                    savePreferences()
-                },
-                onColorCustomizationClick = {
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showVisualEffects = false
-                    showColorCustomization = true
-                },
-                onEffectsClick = {
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showVisualEffects = false
-                    showEffects = true
-                },
-                onParticlesClick = {
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showVisualEffects = false
-                    showParticles = true
-                },
                 isSmallScreen = isSmallScreen,
                 isLandscape = isLandscape,
                 isTablet = isTablet,
                 colors = colors,
                 cardBackground = cardBackground,
+                staggerEnabled = staggerEnabled,
+                onStaggerEnabledChange = { staggerEnabled = it; savePreferences() },
                 performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) }
             )
 
             EffectsPanel(
-                visible = showEffects && !showBlurSettings,
+                visible = showEffects && !showBlurSettings && !showParticles,
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showEffects = false
-                    // Re-open parent
-                    showVisualEffects = true
                 },
                 gradientEnabled = gradientEnabled,
                 onGradientChange = { value ->
@@ -2139,7 +2218,6 @@ fun GamaUI(
                 },
                 onParticlesClick = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showEffects = false
                     showParticles = true
                 },
                 userName = userName,
@@ -2157,7 +2235,6 @@ fun GamaUI(
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showBlurSettings = false
-                    showEffects = true
                 },
                 blurEnabled = blurEnabled,
                 onBlurChange = { value ->
@@ -2184,7 +2261,6 @@ fun GamaUI(
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showParticles = false
-                    showEffects = true
                 },
                 particlesEnabled = particlesEnabled,
                 onParticlesChange = { value ->
@@ -2195,7 +2271,7 @@ fun GamaUI(
                 particleSpeed = particleSpeed,
                 onParticleSpeedChange = { value ->
                     particleSpeed = value
-                    savePreferences()
+                    savePreferencesDebounced()
                 },
                 particleParallaxEnabled = particleParallaxEnabled,
                 onParticleParallaxChange = { value ->
@@ -2205,12 +2281,12 @@ fun GamaUI(
                 particleParallaxSensitivity = particleParallaxSensitivity,
                 onParticleParallaxSensitivityChange = { value ->
                     particleParallaxSensitivity = value
-                    savePreferences()
+                    savePreferencesDebounced()
                 },
                 particleCount = particleCount,
                 onParticleCountChange = { value ->
                     particleCount = value
-                    savePreferences()
+                    savePreferencesDebounced()
                 },
                 particleStarMode = particleStarMode,
                 onParticleStarModeChange = { value ->
@@ -2223,6 +2299,11 @@ fun GamaUI(
                     if (value && particleStarMode) {
                         particleStarMode = false // Disable star mode when time mode is enabled
                     }
+                    savePreferences()
+                },
+                nativeRefreshRate = nativeRefreshRate,
+                onNativeRefreshRateChange = { value ->
+                    nativeRefreshRate = value
                     savePreferences()
                 },
                 userName = userName,
@@ -2240,7 +2321,12 @@ fun GamaUI(
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showColorCustomization = false
-                    showVisualEffects = true
+                },
+                oledMode = oledMode,
+                onOledModeChange = { enabled ->
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    oledMode = enabled
+                    savePreferences()
                 },
                 useDynamicColor = useDynamicColor,
                 onDynamicColorChange = { value ->
@@ -2257,17 +2343,17 @@ fun GamaUI(
                 customAccentColor = customAccentColor,
                 onAccentColorChange = { color ->
                     customAccentColor = color
-                    savePreferences()
+                    savePreferencesDebounced()
                 },
                 customGradientStart = customGradientStart,
                 onGradientStartChange = { color ->
                     customGradientStart = color
-                    savePreferences()
+                    savePreferencesDebounced()
                 },
                 customGradientEnd = customGradientEnd,
                 onGradientEndChange = { color ->
                     customGradientEnd = color
-                    savePreferences()
+                    savePreferencesDebounced()
                 },
                 isDarkTheme = isDarkTheme,
                 performHaptic = { performHaptic(HapticFeedbackConstants.CONTEXT_CLICK) },
@@ -2275,8 +2361,7 @@ fun GamaUI(
                 isLandscape = isLandscape,
                 isTablet = isTablet,
                 colors = colors,
-                cardBackground = cardBackground,
-                oledMode = oledMode
+                cardBackground = cardBackground
             )
 
             VerbosePanel(
@@ -2291,28 +2376,6 @@ fun GamaUI(
                 cardBackground = cardBackground,
                 blurEnabled = blurEnabled,
                 oledMode = oledMode
-            )
-
-            AppSelectorPanel(
-                visible = showAppSelector,
-                onDismiss = {
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showAppSelector = false
-                },
-                excludedApps = excludedAppsList,
-                onExcludedAppsChange = {
-                    savePreferences()
-                },
-                isSmallScreen = isSmallScreen,
-                colors = colors,
-                cardBackground = cardBackground,
-                blurEnabled = blurEnabled,
-                performHaptic = { performHaptic(HapticFeedbackConstants.CONTEXT_CLICK) },
-                oledMode = oledMode,
-                isLandscape = isLandscape,
-                isTablet = isTablet,
-                preloadedApps = cachedAppList,
-                isPreloading = appListLoading
             )
 
             AggressiveWarningDialog(

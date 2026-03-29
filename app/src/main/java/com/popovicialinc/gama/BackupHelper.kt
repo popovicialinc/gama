@@ -32,8 +32,9 @@ object BackupHelper {
         "gradient_enabled", "particles_enabled", "particle_parallax_enabled",
         "particle_star_mode", "particle_time_mode", "blur_enabled", "blur_optimised",
         "use_dynamic_color", "verbose_mode", "aggressive_mode",
+        "kill_launcher",
         "oled_mode", "use_dynamic_color_oled", "dismiss_on_click_outside",
-        "notif_enabled", "doze_mode"
+        "notif_enabled", "doze_mode", "show_gpuwatch_button", "stagger_enabled", "native_refresh_rate", "quarter_refresh_rate"
     )
     private val FLOAT_KEYS = listOf("time_offset_hours")
     private val LONG_KEYS  = listOf("notif_last_sent")

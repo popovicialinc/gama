@@ -363,6 +363,7 @@ val LocalAnimationLevel = compositionLocalOf { 0 }
 val LocalThemeColors = compositionLocalOf { ThemeColors.dark() }
 val LocalUIScale = compositionLocalOf { 1 } // 0=75%, 1=100%, 2=125%
 val LocalDismissOnClickOutside = compositionLocalOf { true } // New global setting for back behavior
+val LocalStaggerEnabled = compositionLocalOf { true } // true = cascading stagger, false = simultaneous fade+scale
 val LocalTypeScale = compositionLocalOf { AdaptiveTypeScale(
     displayLarge = 50.sp, displayMedium = 44.sp, displaySmall = 37.sp,
     headlineLarge = 28.sp, headlineMedium = 24.sp, headlineSmall = 21.sp,

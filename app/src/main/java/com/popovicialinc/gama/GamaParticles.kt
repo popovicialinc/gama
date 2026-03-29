@@ -163,16 +163,24 @@ data class ParticleState(
         val totalForceX = naturalForceX + parallaxInfluenceX
         val totalForceY = naturalForceY + parallaxInfluenceY
 
-        // Apply forces to velocity with acceleration
-        velocityX += totalForceX * deltaTime * 60f // Normalize for frame rate
+        // Apply forces to velocity.
+        // Forces are per-tick impulse magnitudes calibrated to a 60Hz reference.
+        // "* deltaTime * 60f" normalises them to any tick rate:
+        //   at 60Hz: deltaTime=1/60, so factor = 1.0x (identical to original)
+        //   at 120Hz: deltaTime=1/120, applied 2x more often → same per-second effect
+        //   at 30Hz: deltaTime=1/30, applied half as often → same per-second effect
+        velocityX += totalForceX * deltaTime * 60f
         velocityY += totalForceY * deltaTime * 60f
 
-        // Apply damping for smooth, natural movement
-        // Balanced damping on both axes for natural drift
-        val dampingX = 0.92f  // Lighter damping on X for horizontal drift
-        val dampingY = 0.92f  // Lighter damping on Y for smooth upward flow
-        velocityX *= dampingX
-        velocityY *= dampingY
+        // Frame-rate-independent damping, normalised to the 60Hz reference.
+        // Fixed damping (e.g. *= 0.92 every tick) is wrong at non-60Hz rates:
+        //   at 120Hz: 0.92^120/s = 0.000037 → particles stop almost instantly
+        //   at 30Hz:  0.92^30/s  = 0.077    → particles barely damp at all
+        // pow(0.92, deltaTime * 60) gives 0.92^1 at 60Hz (identical to original),
+        // 0.92^0.5 at 120Hz, 0.92^2 at 30Hz — all decaying at the same per-second rate.
+        val frameDamping = Math.pow(0.92, (deltaTime * 60f).toDouble()).toFloat()
+        velocityX *= frameDamping
+        velocityY *= frameDamping
 
         // Clamp velocity to prevent excessive speeds
         val maxVelocity = 15f * speedMultiplier
@@ -411,7 +419,9 @@ fun ParticlesOverlay(
     timeModeEnabled: Boolean = false, // Time-based sun & moon system
     timeOffsetHours: Float = 0f, // Developer: hours to add to current time
     anyPanelOpen: Boolean = false, // Hide celestials when panels are open
-    isLandscape: Boolean = false // NEW: Constrain celestials to left half in landscape
+    isLandscape: Boolean = false, // NEW: Constrain celestials to left half in landscape
+    nativeRefreshRate: Boolean = false, // true = render every vsync; false = skip every other (default, saves battery)
+    quarterRefreshRate: Boolean = false  // true = render at 1/4 native rate; only applies when nativeRefreshRate is false
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -681,33 +691,71 @@ fun ParticlesOverlay(
         physicsInputs.speed    = speedMultiplier
         physicsInputs.star     = starMode
         physicsInputs.timeMode = timeModeEnabled
-        physicsInputs.daytime  = isDaytime(timeOffsetHours)
+        // daytime is updated by the render trigger (once/sec) — no Calendar alloc here
     }
+
+    // ── Actual display refresh rate ───────────────────────────────────────────
+    //
+    // Queried once and shared by both the physics loop and the render trigger.
+    // Works for any Hz: 50, 60, 90, 120, 144, or anything adaptive — nothing
+    // below is hardcoded to a specific display rate.
+    val displayHz: Float = remember(context) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                context.display?.refreshRate ?: 60f
+            } else {
+                @Suppress("DEPRECATION")
+                (context.getSystemService(Context.WINDOW_SERVICE)
+                            as android.view.WindowManager).defaultDisplay.refreshRate
+            }
+        } catch (_: Exception) { 60f }
+    }.coerceAtLeast(1f)
+
+    // ── Vsync divisor ─────────────────────────────────────────────────────────
+    //
+    // Single number that controls how many display vsyncs are skipped between
+    // physics ticks and canvas redraws.  Everything flows from this:
+    //
+    //   nativeRefreshRate = true            → 1  (tick every vsync — full rate)
+    //   quarterRefreshRate = true           → 4  (tick every 4th vsync — 1/4 rate)
+    //   capable/mid device, half rate       → 2  (tick every other vsync)
+    //   very weak device (≤2 GB), half      → 3  (tick every third vsync)
+    //
+    // quarterRefreshRate is ignored when nativeRefreshRate is true.
+    //
+    // Example results at any display Hz:
+    //   120Hz display, native   → 120Hz physics, 8.3ms  render interval
+    //   120Hz display, half     → 60Hz  physics, 16.7ms render interval
+    //   120Hz display, quarter  → 30Hz  physics, 33.3ms render interval
+    //   90Hz  display, native   → 90Hz  physics, 11.1ms render interval
+    //   90Hz  display, half     → 45Hz  physics, 22.2ms render interval
+    //   90Hz  display, quarter  → 22Hz  physics, 44.4ms render interval
+    //   60Hz  display, quarter  → 15Hz  physics, 66.7ms render interval
+    val vsyncDivisor: Int = when {
+        nativeRefreshRate        -> 1
+        quarterRefreshRate       -> 4   // 1/4 native rate — lightest option
+        deviceParticleCap <= 100 -> 3   // very weak: 1/3 native rate
+        else                     -> 2   // standard: half rate
+    }
+
+    // Physics target Hz: display rate divided by divisor.
+    // Clamped so extreme displays (24Hz film, 240Hz gaming) stay sane.
+    val physicsHz: Long = (displayHz / vsyncDivisor).toLong().coerceIn(8L, 144L)
+
+    // Render interval in nanoseconds.
+    // At 90Hz + divisor 2: 2 * 1e9 / 90 = 22.2ms. Always correct, any Hz.
+    val renderIntervalNs: Long = (vsyncDivisor * 1_000_000_000L / displayHz).toLong()
 
     // ── Physics loop — Dispatchers.Default (background thread) ───────────────
     //
-    // Rate is scaled to device capability:
-    //   deviceParticleCap ≤ 100 (≤2 GB RAM) → 30fps physics
-    //   deviceParticleCap ≤ 150 (≤3 GB RAM) → 45fps physics
-    //   deviceParticleCap > 150 (> 3 GB RAM) → 60fps physics
-    //
-    // 30fps physics on a Snapdragon 450 with 50 particles is indistinguishable
-    // from 60fps — particles move slowly by design.  The saving is ~50% of the
-    // background thread CPU budget for the physics work.
-    //
-    // The MAX_DELTA clamp matches TARGET_NS so a lagging device can never
-    // accumulate a multi-frame debt and launch particles forward in a big jump.
-    LaunchedEffect(particles, enabled, deviceParticleCap) {
+    // Ticks at physicsHz derived from the actual display rate above.
+    // MAX_DELTA clamp prevents position jumps if the thread wakes late.
+    LaunchedEffect(particles, enabled, physicsHz) {
         if (!enabled) return@LaunchedEffect
 
         withContext(Dispatchers.Default) {
-            val physicsHz = when {
-                deviceParticleCap <= 100 -> 30L
-                deviceParticleCap <= 150 -> 45L
-                else                     -> 60L
-            }
-            val TARGET_NS  = 1_000_000_000L / physicsHz
-            val MAX_DELTA  = 1f / physicsHz.toFloat()
+            val TARGET_NS = 1_000_000_000L / physicsHz
+            val MAX_DELTA = 1f / physicsHz.toFloat()
             var lastPhysicsNs = 0L
 
             while (isActive) {
@@ -733,46 +781,24 @@ fun ParticlesOverlay(
                     }
                 }
 
-                // Sleep until the next physics tick — yields the thread to other work
+                // Sleep until the next physics tick
                 val sleepMs = maxOf(1L, (TARGET_NS - (System.nanoTime() - lastPhysicsNs)) / 1_000_000L)
                 delay(sleepMs)
             }
         }
     }
 
-    // ── Render trigger — main thread, scaled to device capability ────────────
+    // ── Render trigger — main thread ──────────────────────────────────────────
     //
-    // withFrameNanos fires at the display's native refresh rate.  We skip vsyncs
-    // so the render rate matches the physics rate on each device tier:
-    //
-    //   deviceParticleCap ≤ 100 (≤2 GB): render at 1/3 native  (60hz → 20fps)
-    //   deviceParticleCap ≤ 150 (≤3 GB): render at 1/2 native  (60hz → 30fps)
-    //   deviceParticleCap > 150 (> 3 GB): render at 1/2 native  (120hz → 60fps)
-    //
-    // Matching render and physics rates means no wasted Canvas redraws on frames
-    // where the physics hasn't advanced.
-
-    // Compute the vsync skip interval once.
-    val renderRefreshNs = remember(context, deviceParticleCap) {
-        val hz = try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                val wm = context.getSystemService(Context.WINDOW_SERVICE)
-                            as android.view.WindowManager
-                context.display?.refreshRate ?: 60f
-            } else {
-                @Suppress("DEPRECATION")
-                (context.getSystemService(Context.WINDOW_SERVICE)
-                            as android.view.WindowManager).defaultDisplay.refreshRate
-            }
-        } catch (_: Exception) { 60f }
-        val divisor = if (deviceParticleCap <= 100) 3L else 2L
-        (divisor * 1_000_000_000L / hz.coerceAtLeast(1f)).toLong()
-    }
-
-    LaunchedEffect(enabled) {
+    // withFrameNanos fires at the display's native refresh rate. We compare
+    // elapsed time against renderIntervalNs to skip vsyncs we don't need,
+    // matching canvas redraws to the physics tick rate exactly.
+    // Because renderIntervalNs flows from displayHz, this works correctly
+    // for any refresh rate without any special-casing.
+    LaunchedEffect(enabled, renderIntervalNs, timeOffsetHours) {
         if (!enabled) return@LaunchedEffect
 
-        val TARGET_RENDER_NS = renderRefreshNs
+        val TARGET_RENDER_NS = renderIntervalNs
         var lastRenderNs     = 0L
 
         while (isActive) {
@@ -782,13 +808,15 @@ fun ParticlesOverlay(
                 }
                 lastRenderNs = time
 
-                // Update once-per-second celestial position
+                // Update once-per-second state (celestial position + daytime flag).
+                // isDaytime() calls Calendar.getInstance() + trig — run it at most
+                // once per second inside this gate instead of every render frame.
                 val nowSec = time / 1_000_000_000L
-                if (nowSec != celestialTickSecond) celestialTickSecond = nowSec
-
-                // Sync daytime flag to physicsInputs (also used by Canvas)
-                frameIsDaytime = isDaytime(timeOffsetHours)
-                physicsInputs.daytime = frameIsDaytime
+                if (nowSec != celestialTickSecond) {
+                    celestialTickSecond = nowSec
+                    frameIsDaytime = isDaytime(timeOffsetHours)
+                    physicsInputs.daytime = frameIsDaytime
+                }
 
                 // Invalidate Canvas — particles have moved since the last render
                 frameCount++

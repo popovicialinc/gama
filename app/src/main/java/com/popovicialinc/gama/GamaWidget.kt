@@ -604,7 +604,6 @@ class WidgetActionCallback : ActionCallback {
                 when (action) {
                     "vulkan" -> {
                         ShizukuHelper.runCommand("setprop debug.hwui.renderer skiavk")
-                        ShizukuHelper.runCommand("am crash com.android.systemui")
                         prefs.edit()
                             .putString("last_renderer", "Vulkan")
                             .putLong("last_switch_time", System.currentTimeMillis())
@@ -613,7 +612,6 @@ class WidgetActionCallback : ActionCallback {
                     }
                     "opengl" -> {
                         ShizukuHelper.runCommand("setprop debug.hwui.renderer opengl")
-                        ShizukuHelper.runCommand("am crash com.android.systemui")
                         prefs.edit()
                             .putString("last_renderer", "OpenGL")
                             .putLong("last_switch_time", System.currentTimeMillis())

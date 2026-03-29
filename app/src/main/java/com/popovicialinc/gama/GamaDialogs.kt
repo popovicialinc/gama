@@ -196,6 +196,7 @@ fun WarningDialog(
     visible: Boolean,
     onDismiss: () -> Unit,
     onContinue: () -> Unit,
+    killLauncher: Boolean = false,
     isSmallScreen: Boolean,
     isLandscape: Boolean,
     isTablet: Boolean,
@@ -266,7 +267,10 @@ fun WarningDialog(
                 }
 
                 Text(
-                    text = "This will briefly restart System UI and other processes to apply the change. Your device will be back to normal in just a moment.",
+                    text = if (killLauncher)
+                        "This will briefly restart System UI, the launcher, and other processes to apply the change. Your device will be back to normal in just a moment."
+                    else
+                        "This will briefly restart System UI and other processes to apply the change. Your device will be back to normal in just a moment.",
                     fontSize = ts.bodyLarge,
                     lineHeight = (ts.bodyLarge.value * 1.4f).sp,
                     color = colors.textPrimary.copy(alpha = 0.85f),
@@ -290,6 +294,117 @@ fun WarningDialog(
                     DialogButton(
                         text = "Continue",
                         onClick = onContinue,
+                        modifier = Modifier.weight(1f),
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        accent = true
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ClearRecentsDialog — shown after a renderer switch completes, offers to wipe the recents stack
+@Composable
+fun ClearRecentsDialog(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    isSmallScreen: Boolean,
+    isLandscape: Boolean,
+    isTablet: Boolean,
+    colors: ThemeColors,
+    cardBackground: Color
+) {
+    val ts = LocalTypeScale.current
+    BouncyDialog(visible = visible, onDismiss = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
+                .widthIn(max = 500.dp)
+                .border(0.75.dp, colors.primaryAccent.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                .pointerInput(Unit) { detectTapGestures { } },
+            colors = CardDefaults.cardColors(containerColor = cardBackground),
+            shape = RoundedCornerShape(24.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(if (isSmallScreen) 24.dp else 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 20.dp else 24.dp)
+            ) {
+                // Recents / stack icon
+                Canvas(modifier = Modifier.size(if (isSmallScreen) 56.dp else 64.dp)) {
+                    val s = size.minDimension
+                    val stroke = 3.dp.toPx()
+                    val color = colors.primaryAccent
+                    val cardW = s * 0.52f
+                    val cardH = s * 0.38f
+                    val gap = s * 0.10f
+                    val cornerR = androidx.compose.ui.geometry.CornerRadius(s * 0.07f)
+                    // Back card (offset up-left)
+                    drawRoundRect(
+                        color = color.copy(alpha = 0.35f),
+                        topLeft = androidx.compose.ui.geometry.Offset((s - cardW) / 2f - gap * 0.6f, (s - cardH) / 2f - gap),
+                        size = androidx.compose.ui.geometry.Size(cardW, cardH),
+                        cornerRadius = cornerR,
+                        style = Stroke(width = stroke)
+                    )
+                    // Front card
+                    drawRoundRect(
+                        color = color,
+                        topLeft = androidx.compose.ui.geometry.Offset((s - cardW) / 2f + gap * 0.6f, (s - cardH) / 2f + gap),
+                        size = androidx.compose.ui.geometry.Size(cardW, cardH),
+                        cornerRadius = cornerR,
+                        style = Stroke(width = stroke)
+                    )
+                    // Small ✕ in the top-right of the front card
+                    val cx = (s - cardW) / 2f + gap * 0.6f + cardW - s * 0.12f
+                    val cy = (s - cardH) / 2f + gap + s * 0.07f
+                    val arm = s * 0.06f
+                    drawLine(color = color, start = androidx.compose.ui.geometry.Offset(cx - arm, cy - arm), end = androidx.compose.ui.geometry.Offset(cx + arm, cy + arm), strokeWidth = stroke, cap = StrokeCap.Round)
+                    drawLine(color = color, start = androidx.compose.ui.geometry.Offset(cx + arm, cy - arm), end = androidx.compose.ui.geometry.Offset(cx - arm, cy + arm), strokeWidth = stroke, cap = StrokeCap.Round)
+                }
+
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "Clear background apps?",
+                        fontSize = ts.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = quicksandFontFamily,
+                        color = colors.primaryAccent
+                    )
+                }
+
+                Text(
+                    text = "Clearing the Recents menu makes sure all apps restart fresh with the new renderer. Skip this if you want to keep your open apps.",
+                    fontSize = ts.bodyLarge,
+                    lineHeight = (ts.bodyLarge.value * 1.4f).sp,
+                    color = colors.textPrimary.copy(alpha = 0.85f),
+                    modifier = Modifier.fillMaxWidth(),
+                    fontFamily = quicksandFontFamily,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    DialogButton(
+                        text = "Skip",
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        accent = false
+                    )
+                    DialogButton(
+                        text = "Clear",
+                        onClick = onConfirm,
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground,

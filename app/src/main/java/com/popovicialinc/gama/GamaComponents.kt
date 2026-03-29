@@ -541,6 +541,7 @@ fun AnimatedElement(
     val resolvedTotal = if (totalItems > 0) totalItems
                         else staggerCounter?.total() ?: 0
     val animationLevel = LocalAnimationLevel.current
+    val staggerEnabled = LocalStaggerEnabled.current
     val density = LocalDensity.current
 
     // ── Performance-optimised stagger ────────────────────────────────────────
@@ -557,6 +558,9 @@ fun AnimatedElement(
     // Duration reduced: 680/460ms → 420/300ms — still feels smooth but doesn't
     // hold the render thread in animation work for nearly a second.
     // keyframes replaced with a single tween + CubicBezier — lighter to evaluate.
+    //
+    // When staggerEnabled is false, all items animate simultaneously with no
+    // cascade delay — faster perceived performance at the cost of the cascade effect.
 
     var localVisible by remember { mutableStateOf(if (resolvedIndex == 0) visible else !visible) }
     val progress = remember { Animatable(if (localVisible) 1f else 0f) }
@@ -568,7 +572,8 @@ fun AnimatedElement(
 
     LaunchedEffect(visible) {
         if (visible) {
-            if (resolvedIndex > 0 && animationLevel != 2) {
+            // Only delay for cascade if stagger is enabled AND we're not in reduced/off animation mode
+            if (resolvedIndex > 0 && animationLevel != 2 && staggerEnabled) {
                 delay(resolvedIndex * 60L)
             }
             localVisible = true
@@ -585,7 +590,8 @@ fun AnimatedElement(
                 )
             }
         } else {
-            if (resolvedTotal > 0 && resolvedIndex > 0 && animationLevel != 2) {
+            // On dismiss, only stagger the exit cascade if stagger is enabled
+            if (resolvedTotal > 0 && resolvedIndex > 0 && animationLevel != 2 && staggerEnabled) {
                 delay((resolvedTotal - resolvedIndex) * 40L)
             }
             localVisible = false
@@ -1136,6 +1142,7 @@ fun MainContentCards(
     onOpenGLClick: () -> Unit,
     onResourcesClick: () -> Unit,
     onGPUWatchClick: () -> Unit, // NEW CALLBACK
+    showGpuWatchButton: Boolean = false,
     oledMode: Boolean = false, // Added
     rendererLoading: Boolean = false,
     lastSwitchTime: Long = 0L
@@ -1182,25 +1189,16 @@ fun MainContentCards(
             // Row 3: 2×2 Action Button Grid (Delay 300)
             AnimatedElement(visible = isVisible, staggerIndex = 2,
                 totalItems = 4) {
-                val settingsVulkanScale by animateFloatAsState(
+                // Both buttons share identical scale/alpha — one animator each instead of four
+                val settingsButtonScale by animateFloatAsState(
                     targetValue = if (shizukuReady) 1f else 0.85f,
                     animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
-                    label = "settings_vulkan_scale"
+                    label = "settings_button_scale"
                 )
-                val settingsVulkanAlpha by animateFloatAsState(
+                val settingsButtonAlpha by animateFloatAsState(
                     targetValue = if (shizukuReady) 1f else 0.25f,
                     animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
-                    label = "settings_vulkan_alpha"
-                )
-                val settingsOpenglScale by animateFloatAsState(
-                    targetValue = if (shizukuReady) 1f else 0.85f,
-                    animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
-                    label = "settings_opengl_scale"
-                )
-                val settingsOpenglAlpha by animateFloatAsState(
-                    targetValue = if (shizukuReady) 1f else 0.25f,
-                    animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
-                    label = "settings_opengl_alpha"
+                    label = "settings_button_alpha"
                 )
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -1217,9 +1215,9 @@ fun MainContentCards(
                             modifier = Modifier
                                 .weight(1f)
                                 .graphicsLayer(
-                                    scaleX = settingsVulkanScale,
-                                    scaleY = settingsVulkanScale,
-                                    alpha = settingsVulkanAlpha
+                                    scaleX = settingsButtonScale,
+                                    scaleY = settingsButtonScale,
+                                    alpha = settingsButtonAlpha
                                 )
                                 .then(
                                     when {
@@ -1229,7 +1227,7 @@ fun MainContentCards(
                                     }
                                 ),
                             accent = true,
-                            enabled = shizukuReady,
+                            enabled = true,
                             colors = colors,
                             oledMode = oledMode,
                             iconType = "vulkan"
@@ -1240,9 +1238,9 @@ fun MainContentCards(
                             modifier = Modifier
                                 .weight(1f)
                                 .graphicsLayer(
-                                    scaleX = settingsOpenglScale,
-                                    scaleY = settingsOpenglScale,
-                                    alpha = settingsOpenglAlpha
+                                    scaleX = settingsButtonScale,
+                                    scaleY = settingsButtonScale,
+                                    alpha = settingsButtonAlpha
                                 )
                                 .then(
                                     when {
@@ -1252,7 +1250,7 @@ fun MainContentCards(
                                     }
                                 ),
                             accent = true,
-                            enabled = shizukuReady,
+                            enabled = true,
                             colors = colors,
                             oledMode = oledMode,
                             iconType = "opengl"
@@ -1266,23 +1264,25 @@ fun MainContentCards(
                         IllustratedButton(
                             text = "Resources",
                             onClick = onResourcesClick,
-                            modifier = Modifier.weight(1f),
+                            modifier = if (showGpuWatchButton) Modifier.weight(1f) else Modifier.fillMaxWidth(),
                             accent = false,
                             enabled = true,
                             colors = colors,
                             oledMode = oledMode,
                             iconType = "resources"
                         )
-                        IllustratedButton(
-                            text = "Open GPUWatch",
-                            onClick = onGPUWatchClick,
-                            modifier = Modifier.weight(1f),
-                            accent = false,
-                            enabled = true,
-                            colors = colors,
-                            oledMode = oledMode,
-                            iconType = "gpuwatch"
-                        )
+                        if (showGpuWatchButton) {
+                            IllustratedButton(
+                                text = "Open GPUWatch",
+                                onClick = onGPUWatchClick,
+                                modifier = Modifier.weight(1f),
+                                accent = false,
+                                enabled = true,
+                                colors = colors,
+                                oledMode = oledMode,
+                                iconType = "gpuwatch"
+                            )
+                        }
                     }
                 }
             }
@@ -1348,7 +1348,7 @@ fun RendererCard(
         remember { mutableFloatStateOf(0f) }
     }
 
-    val rendererTextAlpha by if (shizukuReady) {
+    val rendererTextAlpha by if (shizukuReady && animLevel != 2) {
         val t = rememberInfiniteTransition(label = "renderer_text")
         t.animateFloat(
             initialValue = 0.75f, targetValue = 1.0f,
@@ -1356,40 +1356,31 @@ fun RendererCard(
             label = "renderer_text_alpha"
         )
     } else {
-        remember { mutableFloatStateOf(0.75f) }
+        // animLevel 2 (reduced motion) or Shizuku not ready: static value, no ticker
+        remember { mutableFloatStateOf(if (shizukuReady) 0.875f else 0.75f) }
     }
 
-    // ── Press state ──────────────────────────────────────────────────────────
+    // ── Press state — single Animatable<Float> [0=rest, 1=pressed] drives all ──
+    // press visuals via draw-phase lerp, replacing 3 separate animateFloatAsState
+    // calls that all fired simultaneously with identical spring specs on every
+    // press/release.  Same pattern used by IllustratedButton and FlatButton.
     var isPressed by remember { mutableStateOf(false) }
-
-    val pressScale by animateFloatAsState(
-        targetValue = if (isPressed) MotionTokens.Scale.subtle else 1f,
-        animationSpec = if (animLevel == 2) snap() else spring(
-            dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-            stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-        ),
-        label = "renderer_press_scale"
-    )
-
-    // Renderer name pops on press, overshoots back on release
-    val nameScale by animateFloatAsState(
-        targetValue = if (isPressed) 1.08f else 1f,
-        animationSpec = if (animLevel == 2) snap() else spring(
-            dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-            stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-        ),
-        label = "renderer_name_scale"
-    )
-
-    // Label nudges on press, overshoots back on release
-    val nameTY by animateFloatAsState(
-        targetValue = if (isPressed) with(density) { -2.dp.toPx() } else 0f,
-        animationSpec = if (animLevel == 2) snap() else spring(
-            dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-            stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-        ),
-        label = "renderer_name_ty"
-    )
+    val rendererCardPress = remember { Animatable(0f) }
+    LaunchedEffect(isPressed) {
+        rendererCardPress.animateTo(
+            targetValue   = if (isPressed) 1f else 0f,
+            animationSpec = if (animLevel == 2) snap() else spring(
+                dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+            )
+        )
+    }
+    val rcp        = rendererCardPress.value  // single read; all visuals derived below
+    val nudgePx    = with(density) { -2.dp.toPx() }
+    // Derived press visuals — evaluated at draw-phase via graphicsLayer, zero recomposition
+    val pressScale = 1f - rcp * (1f - MotionTokens.Scale.subtle)
+    val nameScale  = 1f + rcp * 0.08f
+    val nameTY     = rcp * nudgePx
 
     // ── Colors ───────────────────────────────────────────────────────────────
     val borderColor = if (isPressed) {
@@ -2995,15 +2986,43 @@ fun BouncyDialog(
     }
 }
 
-fun getAllInstalledPackages(context: Context): List<Pair<String, String>> {
+/**
+ * Returns every installed package with its human-readable label.
+ *
+ * Uses ShizukuHelper.getAllPackageNames() (shell `pm list packages -a`) to
+ * get the COMPLETE package list, bypassing Android 11+ PackageManager
+ * visibility filtering which silently drops most third-party apps.
+ *
+ * Label resolution still uses PackageManager.  For packages PM can't see
+ * (which is fine — exclusions work by package name) the package name is
+ * used as the display label so the entry is still shown and selectable.
+ *
+ * Falls back to the PM-only approach if Shizuku is unavailable.
+ */
+suspend fun getAllInstalledPackages(context: Context): List<Pair<String, String>> {
     val pm = context.packageManager
-    // Get ALL installed packages, not just launcher activities
-    val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-    return packages.map {
-        val packageName = it.packageName
-        val label = it.loadLabel(pm).toString()
-        packageName to label
-    }.sortedBy { it.second }
+
+    // Try Shizuku first — gets every package regardless of visibility rules
+    val shellPackages = ShizukuHelper.getAllPackageNames()
+
+    if (shellPackages.isNotEmpty()) {
+        return shellPackages.map { pkg ->
+            val label = try {
+                @Suppress("DEPRECATION")
+                pm.getApplicationInfo(pkg, 0).loadLabel(pm).toString()
+            } catch (_: Exception) {
+                // PM can't see this package due to visibility filtering.
+                // Use the package name — it's still shown and can be excluded.
+                pkg
+            }
+            pkg to label
+        }.sortedBy { it.second.lowercase() }
+    }
+
+    // Shizuku unavailable — fall back to PackageManager (partial list on API 30+)
+    return pm.getInstalledApplications(PackageManager.GET_META_DATA).map {
+        it.packageName to it.loadLabel(pm).toString()
+    }.sortedBy { it.second.lowercase() }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

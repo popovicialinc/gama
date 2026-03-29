@@ -11,6 +11,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
@@ -189,6 +191,7 @@ object ShizukuHelper {
         label: String,
         context: Context,
         aggressiveMode: Boolean,
+        killLauncher: Boolean,
         excludedApps: Set<String>,
         targetedApps: Set<String>,
         onStatusUpdate: (String) -> Unit,
@@ -212,15 +215,35 @@ object ShizukuHelper {
                 runCommand("am force-stop $pkg").also { onVerboseOutput?.invoke("Output: $it\n") }
             }
         } else {
+            // Always restart settings and keyboard so they pick up the new renderer prop.
             listOf(
-                "am crash com.android.systemui",
                 "am force-stop com.android.settings",
-                "am force-stop com.sec.android.app.launcher",
-                "am force-stop com.samsung.android.app.aodservice",
-                "am crash com.google.android.inputmethod.latin"
+                "am force-stop com.google.android.inputmethod.latin"
             ).forEach { cmd ->
                 onVerboseOutput?.invoke("Running: $cmd\n")
                 runCommand(cmd).also { onVerboseOutput?.invoke("Output: $it\n\n") }
+            }
+
+            // ── Launcher restart (opt-in) ─────────────────────────────────────
+            // OFF by default.  On Xiaomi / MIUI / HyperOS, force-stopping the
+            // launcher from a third-party app twice in one session triggers the
+            // MIUI App Behavior Monitor and silently restricts GAMA's launch intents
+            // (app appears to "never open" until reinstalled — reboot does not fix it).
+            //
+            // The renderer prop is system-wide; any app that has not yet launched will
+            // automatically use the new renderer without a force-stop.  Users who want
+            // launchers restarted immediately (e.g. on stock AOSP / Pixel) can enable
+            // "Kill launcher on switch" in Functionality settings.
+            if (killLauncher) {
+                listOf(
+                    "am force-stop com.miui.home",
+                    "am force-stop com.sec.android.app.launcher",
+                    "am force-stop com.google.android.apps.nexuslauncher",
+                    "am force-stop com.android.launcher3"
+                ).forEach { cmd ->
+                    onVerboseOutput?.invoke("Running: $cmd\n")
+                    runCommand(cmd).also { onVerboseOutput?.invoke("Output: $it\n\n") }
+                }
             }
         }
         withContext(Dispatchers.Main) {
@@ -232,20 +255,22 @@ object ShizukuHelper {
     suspend fun runVulkanSuspend(
         context: Context,
         aggressiveMode: Boolean,
+        killLauncher: Boolean = false,
         excludedApps: Set<String>,
         targetedApps: Set<String>,
         onStatusUpdate: (String) -> Unit,
         onVerboseOutput: ((String) -> Unit)? = null
-    ) = switchRendererSuspend("skiavk", "Vulkan", context, aggressiveMode, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput)
+    ) = switchRendererSuspend("skiavk", "Vulkan", context, aggressiveMode, killLauncher, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput)
 
     suspend fun runOpenGLSuspend(
         context: Context,
         aggressiveMode: Boolean,
+        killLauncher: Boolean = false,
         excludedApps: Set<String>,
         targetedApps: Set<String>,
         onStatusUpdate: (String) -> Unit,
         onVerboseOutput: ((String) -> Unit)? = null
-    ) = switchRendererSuspend("opengl", "OpenGL", context, aggressiveMode, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput)
+    ) = switchRendererSuspend("opengl", "OpenGL", context, aggressiveMode, killLauncher, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput)
 
     // ── Per-app custom renderers ──────────────────────────────────────────────
 
@@ -273,41 +298,118 @@ object ShizukuHelper {
 
     // ── Public fun wrappers ───────────────────────────────────────────────────
 
+    // ── Public fun wrappers ───────────────────────────────────────────────────
+    // Single guard eliminates duplicated checkBinder/checkPermission boilerplate.
+
+    private fun guardedLaunch(
+        context: Context,
+        scope: CoroutineScope,
+        block: suspend () -> Unit
+    ) {
+        if (!checkBinder()) {
+            Toast.makeText(context, "Shizuku not running!", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!checkPermission()) {
+            requestPermissionFallback(context)
+            return
+        }
+        scope.launch { block() }
+    }
+
     fun runVulkan(
         context: Context, scope: CoroutineScope, aggressiveMode: Boolean,
+        killLauncher: Boolean = false,
         excludedApps: Set<String>, targetedApps: Set<String>,
         onStatusUpdate: (String) -> Unit, onVerboseOutput: ((String) -> Unit)? = null
-    ) {
-        if (!checkBinder()) { Toast.makeText(context, "Shizuku not running!", Toast.LENGTH_SHORT).show(); return }
-        if (!checkPermission()) { requestPermissionFallback(context); return }
-        scope.launch { runVulkanSuspend(context, aggressiveMode, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput) }
+    ) = guardedLaunch(context, scope) {
+        runVulkanSuspend(context, aggressiveMode, killLauncher, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput)
     }
 
     fun runOpenGL(
         context: Context, scope: CoroutineScope, aggressiveMode: Boolean,
+        killLauncher: Boolean = false,
         excludedApps: Set<String>, targetedApps: Set<String>,
         onStatusUpdate: (String) -> Unit, onVerboseOutput: ((String) -> Unit)? = null
-    ) {
-        if (!checkBinder()) { Toast.makeText(context, "Shizuku not running!", Toast.LENGTH_SHORT).show(); return }
-        if (!checkPermission()) { requestPermissionFallback(context); return }
-        scope.launch { runOpenGLSuspend(context, aggressiveMode, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput) }
+    ) = guardedLaunch(context, scope) {
+        runOpenGLSuspend(context, aggressiveMode, killLauncher, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput)
     }
 
     fun applyCustomRenderers(
         context: Context, scope: CoroutineScope,
         customRendererApps: Map<String, String>,
         onStatusUpdate: (String) -> Unit, onVerboseOutput: ((String) -> Unit)? = null
-    ) {
-        if (!checkBinder()) { Toast.makeText(context, "Shizuku not running!", Toast.LENGTH_SHORT).show(); return }
-        if (!checkPermission()) { requestPermissionFallback(context); return }
-        scope.launch { applyCustomRenderersSuspend(context, customRendererApps, onStatusUpdate, onVerboseOutput) }
+    ) = guardedLaunch(context, scope) {
+        applyCustomRenderersSuspend(context, customRendererApps, onStatusUpdate, onVerboseOutput)
     }
 
-    suspend fun getAllInstalledPackages(): List<String> {
-        if (!checkBinder() || !checkPermission()) return emptyList()
-        return runCommand("pm list packages").split("\n")
-            .filter { it.startsWith("package:") }.map { it.substring(8).trim() }
-            .filter { it.isNotEmpty() }.sorted()
+    /**
+     * Returns every package name on the device via `pm list packages -a`.
+     *
+     * This CANNOT use runCommand() because runCommand() calls waitFor() BEFORE
+     * reading stdout.  If the process output exceeds the OS pipe buffer (~64 KB),
+     * the process blocks trying to write, waitFor() never returns, the 3-second
+     * timeout fires, and we discard all output.  On MIUI devices with 500+ packages
+     * the output easily reaches 25–50 KB — close enough to the buffer limit that
+     * it triggers intermittently depending on ROM and kernel config.
+     *
+     * Fix: read stdout in a concurrent coroutine so the buffer drains continuously
+     * while the process runs.  Process can never block on a full buffer, so it
+     * always exits cleanly within the timeout.
+     */
+    suspend fun getAllPackageNames(): List<String> = withContext(Dispatchers.IO) {
+        if (!checkBinder() || !checkPermission()) return@withContext emptyList()
+        try {
+            val cls    = Shizuku::class.java
+            val method = cls.getDeclaredMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java
+            )
+            method.isAccessible = true
+            val remoteProcess = method.invoke(
+                null, arrayOf("sh", "-c", "pm list packages -a"), null, null
+            )
+            val process = remoteProcess as? Process ?: return@withContext emptyList()
+
+            try {
+                // Launch concurrent readers BEFORE calling waitFor so the pipe
+                // buffer never fills up regardless of how many packages exist.
+                // coroutineScope provides the scope that async requires.
+                val (outputText, _) = coroutineScope {
+                    val outputDeferred = async(Dispatchers.IO) {
+                        process.inputStream.bufferedReader().readText()
+                    }
+                    // stderr also needs draining to prevent a secondary buffer block
+                    val errorDeferred = async(Dispatchers.IO) {
+                        process.errorStream.bufferedReader().readText()
+                    }
+
+                    val finished = process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)
+
+                    if (!finished) {
+                        outputDeferred.cancel()
+                        errorDeferred.cancel()
+                        return@coroutineScope Pair("", "")
+                    }
+
+                    val out = try { outputDeferred.await() } catch (_: Exception) { "" }
+                    errorDeferred.cancel() // discard stderr — we only need package names
+                    Pair(out, "")
+                }
+
+                outputText
+                    .lines()
+                    .filter { it.startsWith("package:") }
+                    .map { it.removePrefix("package:").trim() }
+                    .filter { it.isNotEmpty() }
+            } finally {
+                process.destroy()
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 
     // ── Crash log fetching ────────────────────────────────────────────────────

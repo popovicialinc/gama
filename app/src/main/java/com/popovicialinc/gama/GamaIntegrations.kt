@@ -211,14 +211,14 @@ fun IntegrationsPanel(
                                 val tileAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
                                 IntegrationInfoCard(
                                     title = "QUICK SETTINGS TILES",
-                                    description = "Three tiles — Vulkan, OpenGL, and Doze. Each one lights up when active and switches instantly on tap, no menu needed",
+                                    description = "Three tiles: Vulkan, OpenGL, and Doze. Each one lights up when active and switches instantly on tap, no menu needed",
                                     statusLabel = if (tileAvailable) "3 tiles available" else "Requires Android 7+",
                                     statusOk = tileAvailable,
                                     actionLabel = if (tileAvailable) "How to add" else null,
                                     onAction = if (tileAvailable) ({
                                         onInfoRequested(
                                             "Adding QS Tiles",
-                                            "Pull down your notification shade and tap the Edit button (pencil icon). Scroll through the available tiles until you find the GAMA ones — Vulkan, OpenGL, and Doze. Drag whichever tiles you want into your active area, then tap Done. Each tile shows as highlighted when its mode is currently active."
+                                            "Pull down your notification shade and tap the Edit button (pencil icon). Scroll through the available tiles until you find the GAMA ones: Vulkan, OpenGL, and Doze. Drag whichever tiles you want into your active area, then tap Done. Each tile shows as highlighted when its mode is currently active."
                                         )
                                     }) else null,
                                     colors = colors,
@@ -256,14 +256,14 @@ fun IntegrationsPanel(
                         val tileAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
                         IntegrationInfoCard(
                             title = "QUICK SETTINGS TILES",
-                            description = "Three tiles — Vulkan, OpenGL, and Doze. Each one lights up when active and switches instantly on tap, no menu needed",
+                            description = "Three tiles: Vulkan, OpenGL, and Doze. Each one lights up when active and switches instantly on tap, no menu needed",
                             statusLabel = if (tileAvailable) "3 tiles available" else "Requires Android 7+",
                             statusOk = tileAvailable,
                             actionLabel = if (tileAvailable) "How to add" else null,
                             onAction = if (tileAvailable) ({
                                 onInfoRequested(
                                     "Adding QS Tiles",
-                                    "Pull down your notification shade and tap the Edit button (pencil icon). Scroll through the available tiles until you find the GAMA ones — Vulkan, OpenGL, and Doze. Drag whichever tiles you want into your active area, then tap Done. Each tile shows as highlighted when its mode is currently active."
+                                    "Pull down your notification shade and tap the Edit button (pencil icon). Scroll through the available tiles until you find the GAMA ones: Vulkan, OpenGL, and Doze. Drag whichever tiles you want into your active area, then tap Done. Each tile shows as highlighted when its mode is currently active."
                                 )
                             }) else null,
                             colors = colors,
@@ -278,7 +278,7 @@ fun IntegrationsPanel(
                 AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 4) {
                     IntegrationInfoCard(
                         title = "HOME SCREEN WIDGET",
-                        description = "Put a Vulkan / OpenGL toggle right on your home screen — one tap and you're switched",
+                        description = "Put a Vulkan / OpenGL toggle right on your home screen. One tap and you're switched",
                         statusLabel = "Available",
                         statusOk = true,
                         actionLabel = "How to add",

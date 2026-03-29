@@ -1,6 +1,7 @@
 package com.popovicialinc.gama
 
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -150,9 +151,11 @@ private fun PanelScaffold(
 fun SettingsPanel(
     visible: Boolean,
     onDismiss: () -> Unit,
-    onVisualEffectsClick: () -> Unit,
-    onFunctionalityClick: () -> Unit,
-    onIntegrationsClick: () -> Unit,
+    onAppearanceClick: () -> Unit,
+    onEffectsClick: () -> Unit,
+    onColorsClick: () -> Unit,
+    onRendererClick: () -> Unit,
+    onSystemClick: () -> Unit,
     isSmallScreen: Boolean,
     isLandscape: Boolean,
     isTablet: Boolean,
@@ -174,20 +177,47 @@ fun SettingsPanel(
             colors = colors, scrollOffset = scrollState.value
         )
 
-        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 2) {
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 5) {
             SettingsNavigationCard(
-                title = "VISUALS",
-                description = "Make it yours — tweak how GAMA looks and feels",
-                onClick = { performHaptic(); onVisualEffectsClick() },
+                title = "APPEARANCE",
+                description = "Theme, animations, UI scale, stagger, and your display name",
+                onClick = { performHaptic(); onAppearanceClick() },
                 isSmallScreen = isSmallScreen, colors = colors,
                 cardBackground = cardBackground, oledMode = oledMode
             )
         }
-        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 2) {
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 5) {
             SettingsNavigationCard(
-                title = "FUNCTIONALITY",
-                description = "Control how GAMA switches renderers and behaves",
-                onClick = { performHaptic(); onFunctionalityClick() },
+                title = "EFFECTS",
+                description = "Gradient background, frosted glass blur, and particle animations",
+                onClick = { performHaptic(); onEffectsClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 5) {
+            SettingsNavigationCard(
+                title = "COLORS",
+                description = "Accent color, gradient palette, OLED mode, and dynamic theming",
+                onClick = { performHaptic(); onColorsClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 5) {
+            SettingsNavigationCard(
+                title = "RENDERER",
+                description = "Aggressive mode, launcher restart, doze, and switching behavior",
+                onClick = { performHaptic(); onRendererClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 5) {
+            SettingsNavigationCard(
+                title = "SYSTEM",
+                description = "Notifications, integrations, backup, and advanced options",
+                onClick = { performHaptic(); onSystemClick() },
                 isSmallScreen = isSmallScreen, colors = colors,
                 cardBackground = cardBackground, oledMode = oledMode
             )
@@ -213,15 +243,13 @@ fun VisualEffectsPanel(
     userName: String,
     onUserNameChange: (String) -> Unit,
     oledMode: Boolean,
-    onOledModeChange: (Boolean) -> Unit,
-    onColorCustomizationClick: () -> Unit,
-    onEffectsClick: () -> Unit,
-    onParticlesClick: () -> Unit,
     isSmallScreen: Boolean,
     isLandscape: Boolean,
     isTablet: Boolean,
     colors: ThemeColors,
     cardBackground: Color,
+    staggerEnabled: Boolean,
+    onStaggerEnabledChange: (Boolean) -> Unit,
     performHaptic: () -> Unit
 ) {
     val ts = LocalTypeScale.current
@@ -232,24 +260,13 @@ fun VisualEffectsPanel(
         oledMode = oledMode, colors = colors
     ) { scrollState ->
         CleanTitle(
-            text = "VISUALS",
+            text = "APPEARANCE",
             fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
             colors = colors, scrollOffset = scrollState.value
         )
 
-        // Effects nav — FIRST at the top of Visuals
-        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 6) {
-            SettingsNavigationCard(
-                title = "EFFECTS",
-                description = "Frosted glass blur, animated gradient, and floating particles",
-                onClick = { performHaptic(); onEffectsClick() },
-                isSmallScreen = isSmallScreen, colors = colors,
-                cardBackground = cardBackground, oledMode = oledMode
-            )
-        }
-
         // Theme
-        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 6) {
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 5) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -282,7 +299,7 @@ fun VisualEffectsPanel(
         }
 
         // Animations
-        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 6) {
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 5) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -315,7 +332,7 @@ fun VisualEffectsPanel(
         }
 
         // UI Scale
-        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 6) {
+        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 5) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -347,27 +364,73 @@ fun VisualEffectsPanel(
             } // end Box
         }
 
-        // OLED toggle
-        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 6) {
+        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 5) {
             ToggleCard(
-                title = "OLED MODE",
-                description = "Turns backgrounds pure black — great for battery life on OLED screens",
-                checked = oledMode,
-                onCheckedChange = { performHaptic(); onOledModeChange(it) },
+                title = "STAGGER ANIMATIONS",
+                description = "Cards inside panels cascade in one by one. Turn this off for snappier panel opens",
+                checked = staggerEnabled,
+                onCheckedChange = { performHaptic(); onStaggerEnabledChange(it) },
                 colors = colors, cardBackground = cardBackground,
                 isSmallScreen = isSmallScreen, oledMode = oledMode
             )
         }
 
-        // Colors nav
-        AnimatedElement(visible = visible, staggerIndex = 6, totalItems = 6) {
-            SettingsNavigationCard(
-                title = "COLORS",
-                description = "Pick your accent color and customize the background gradient",
-                onClick = { performHaptic(); onColorCustomizationClick() },
-                isSmallScreen = isSmallScreen, colors = colors,
-                cardBackground = cardBackground, oledMode = oledMode
-            )
+        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 5) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        width = if (oledMode) 0.75.dp else 1.dp,
+                        color = if (oledMode) colors.primaryAccent.copy(alpha = 0.3f) else colors.border.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(18.dp)
+                    )
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = cardBackground),
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "YOUR NAME", fontSize = ts.labelLarge, fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp, fontFamily = quicksandFontFamily,
+                            color = colors.primaryAccent.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            text = "Used in greetings and notifications — completely optional",
+                            fontSize = ts.bodySmall, color = colors.textSecondary,
+                            fontFamily = quicksandFontFamily, fontWeight = FontWeight.Bold
+                        )
+                        OutlinedTextField(
+                            value = userName,
+                            onValueChange = { onUserNameChange(it) },
+                            placeholder = {
+                                Text(
+                                    "e.g. Alex",
+                                    fontFamily = quicksandFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = ts.bodyMedium,
+                                    color = colors.textSecondary.copy(alpha = 0.5f)
+                                )
+                            },
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                fontFamily = quicksandFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = ts.bodyMedium,
+                                color = colors.textPrimary
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor   = colors.primaryAccent,
+                                unfocusedBorderColor = colors.border.copy(alpha = 0.4f),
+                                cursorColor          = colors.primaryAccent
+                            ),
+                            shape  = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -541,9 +604,9 @@ fun BlurPanel(
                         )
                         Text(
                             text = if (blurOptimised)
-                                "Optimised — blur is pre-rendered and faded in with transparency. Fast, smooth, recommended."
+                                "Optimised: the blur is calculated once at full strength, then faded in and out using alpha. Fast and smooth on any device."
                             else
-                                "Real — the blur radius is animated from 0 to full strength. More accurate but heavier on the GPU.",
+                                "Real: the blur radius is recalculated every single frame as the panel opens. Accurate, but heavier on the GPU.",
                             fontSize = ts.bodySmall,
                             fontFamily = quicksandFontFamily,
                             fontWeight = FontWeight.Bold,
@@ -591,6 +654,8 @@ fun ParticlesPanel(
     onParticleStarModeChange: (Boolean) -> Unit,
     particleTimeMode: Boolean,
     onParticleTimeModeChange: (Boolean) -> Unit,
+    nativeRefreshRate: Boolean,
+    onNativeRefreshRateChange: (Boolean) -> Unit,
     userName: String,
     isSmallScreen: Boolean,
     isLandscape: Boolean,
@@ -608,14 +673,14 @@ fun ParticlesPanel(
     ) { _ ->
         CleanTitle(text = "PARTICLES", fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
 
-        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 6) {
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 7) {
             ToggleCard(
                 title = "PARTICLES", description = "Small dots drift around in the background — gives the app a living feel",
                 checked = particlesEnabled, onCheckedChange = { performHaptic(); onParticlesChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode
             )
         }
-        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 6) {
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 7) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -646,7 +711,7 @@ fun ParticlesPanel(
                 }
             } // end Box
         }
-        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 6) {
+        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 7) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -677,7 +742,7 @@ fun ParticlesPanel(
                 }
             } // end Box
         }
-        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 6) {
+        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 7) {
             ToggleCard(
                 title = "TIME MODE", description = "A sun and moon move across the sky based on the actual time of day",
                 checked = particleTimeMode,
@@ -686,7 +751,7 @@ fun ParticlesPanel(
                 oledMode = oledMode, enabled = particlesEnabled
             )
         }
-        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 6) {
+        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 7) {
             ToggleCard(
                 title = "STAR MODE", description = "Swaps regular particles for tiny twinkling stars — looks great at night",
                 checked = particleStarMode,
@@ -695,13 +760,24 @@ fun ParticlesPanel(
                 oledMode = oledMode, enabled = particlesEnabled && !particleTimeMode
             )
         }
-        AnimatedElement(visible = visible, staggerIndex = 6, totalItems = 6) {
+        AnimatedElement(visible = visible, staggerIndex = 6, totalItems = 7) {
             ToggleCard(
-                title = "PARALLAX", description = "Tilt your phone and the particles shift — adds a cool 3D depth effect",
+                title = "PARALLAX", description = "Tilt your device and the particles shift with it, adding a nice 3D depth effect",
                 checked = particleParallaxEnabled,
                 onCheckedChange = { performHaptic(); onParticleParallaxChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
                 oledMode = oledMode, enabled = particlesEnabled
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 7, totalItems = 7) {
+            ToggleCard(
+                title = "NATIVE REFRESH RATE",
+                description = "Runs particle physics at your display's full refresh rate. Silky smooth on 120Hz devices, but uses more battery. Leave this off on older or lower-end devices",
+                checked = nativeRefreshRate,
+                onCheckedChange = { performHaptic(); onNativeRefreshRateChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode,
+                enabled = particlesEnabled
             )
         }
     }
@@ -716,6 +792,8 @@ fun ParticlesPanel(
 fun ColorCustomizationPanel(
     visible: Boolean,
     onDismiss: () -> Unit,
+    oledMode: Boolean,
+    onOledModeChange: (Boolean) -> Unit,
     useDynamicColor: Boolean,
     onDynamicColorChange: (Boolean) -> Unit,
     advancedColorPicker: Boolean,
@@ -732,8 +810,7 @@ fun ColorCustomizationPanel(
     isLandscape: Boolean,
     isTablet: Boolean,
     colors: ThemeColors,
-    cardBackground: Color,
-    oledMode: Boolean
+    cardBackground: Color
 ) {
     val ts = LocalTypeScale.current
     val dynamicColorAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -745,7 +822,17 @@ fun ColorCustomizationPanel(
     ) { _ ->
         CleanTitle(text = "COLORS", fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
 
-        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 4) {
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 5) {
+            ToggleCard(
+                title = "OLED MODE",
+                description = "Turns backgrounds pure black — great for battery life on OLED screens",
+                checked = oledMode,
+                onCheckedChange = { performHaptic(); onOledModeChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 5) {
             ToggleCard(
                 title = "DYNAMIC COLOR",
                 description = if (dynamicColorAvailable) "Pulls accent colors from your wallpaper — changes automatically with Material You" else "Requires Android 12 or newer",
@@ -755,7 +842,7 @@ fun ColorCustomizationPanel(
                 oledMode = oledMode, enabled = dynamicColorAvailable
             )
         }
-        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 4) {
+        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 5) {
             ToggleCard(
                 title = "ADVANCED COLOR PICKER",
                 description = "Adds a hex input field so you can type any color directly — e.g. #4895EF",
@@ -765,7 +852,7 @@ fun ColorCustomizationPanel(
                 oledMode = oledMode, enabled = !useDynamicColor || !dynamicColorAvailable
             )
         }
-        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 4) {
+        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 5) {
             CompactColorPickerCard(
                 title = "ACCENT COLOR",
                 description = "Used for buttons, highlights, and borders throughout the app",
@@ -777,7 +864,7 @@ fun ColorCustomizationPanel(
                 enabled = !useDynamicColor || !dynamicColorAvailable, oledMode = oledMode
             )
         }
-        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 4) {
+        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 5) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 CompactColorPickerCard(
                     title = "GRADIENT START",
@@ -806,27 +893,18 @@ fun ColorCustomizationPanel(
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FunctionalityPanel
+// FunctionalityPanel  — top-level nav hub
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 fun FunctionalityPanel(
     visible: Boolean,
     onDismiss: () -> Unit,
-    verboseMode: Boolean,
-    onVerboseModeChange: (Boolean) -> Unit,
-    aggressiveMode: Boolean,
-    onAggressiveModeChange: (Boolean) -> Unit,
-    dismissOnClickOutside: Boolean,
-    onDismissOnClickOutsideChange: (Boolean) -> Unit,
-    dozeMode: Boolean,
-    onDozeModeChange: (Boolean) -> Unit,
-    onAppSelectorClick: () -> Unit,
-    onShowAggressiveWarning: () -> Unit,
+    onRendererClick: () -> Unit,
+    onBehaviorClick: () -> Unit,
     onNotificationsClick: () -> Unit,
     onBackupClick: () -> Unit,
     onCrashLogClick: () -> Unit,
-    userName: String,
     isSmallScreen: Boolean,
     isLandscape: Boolean,
     isTablet: Boolean,
@@ -841,55 +919,301 @@ fun FunctionalityPanel(
         isLandscape = isLandscape, isSmallScreen = isSmallScreen,
         oledMode = oledMode, colors = colors
     ) { _ ->
-        CleanTitle(text = "FUNCTIONALITY", fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
+        CleanTitle(
+            text = "FUNCTIONALITY",
+            fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
+            colors = colors
+        )
 
-        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 7) {
-            ToggleCard(
-                title = "VERBOSE MODE", description = "Shows the full shell output when switching — handy for debugging",
-                checked = verboseMode, onCheckedChange = { performHaptic(); onVerboseModeChange(it) },
-                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode
-            )
-        }
-        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 7) {
-            ToggleCard(
-                title = "AGGRESSIVE MODE", description = "Applies the renderer to every single installed package — more thorough, but read the warning first",
-                checked = aggressiveMode, onCheckedChange = { performHaptic(); onAggressiveModeChange(it) },
-                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode
-            )
-        }
-        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 7) {
-            ToggleCard(
-                title = "TAP OUTSIDE TO CLOSE", description = "Tap anywhere outside a panel to dismiss it — or turn this off if you prefer the back button",
-                checked = dismissOnClickOutside, onCheckedChange = { performHaptic(); onDismissOnClickOutsideChange(it) },
-                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode
-            )
-        }
-        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 7) {
-            ToggleCard(
-                title = "DOZE", description = "Forces Android into deep doze immediately — saves battery the moment you put the phone down",
-                checked = dozeMode, onCheckedChange = { performHaptic(); onDozeModeChange(it) },
-                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode
-            )
-        }
-        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 7) {
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 5) {
             SettingsNavigationCard(
-                title = "NOTIFICATIONS", description = "Get a nudge if you've been on OpenGL for a while and forget to switch back",
+                title = "RENDERER",
+                description = "Aggressive mode, launcher restart, and per-app exclusions",
+                onClick = { performHaptic(); onRendererClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 5) {
+            SettingsNavigationCard(
+                title = "BEHAVIOUR",
+                description = "Fine-tune how GAMA acts — verbose output, dismissal style, doze, and more",
+                onClick = { performHaptic(); onBehaviorClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 5) {
+            SettingsNavigationCard(
+                title = "NOTIFICATIONS",
+                description = "Get a nudge if you've been on OpenGL for a while and forget to switch back",
                 onClick = { performHaptic(); onNotificationsClick() },
-                isSmallScreen = isSmallScreen, colors = colors, cardBackground = cardBackground, oledMode = oledMode
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
             )
         }
-        AnimatedElement(visible = visible, staggerIndex = 6, totalItems = 7) {
+        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 5) {
             SettingsNavigationCard(
-                title = "BACKUP & RESTORE", description = "Save all your settings to a file or bring them back from a backup",
+                title = "BACKUP & RESTORE",
+                description = "Save all your settings to a file or bring them back from a backup",
                 onClick = { performHaptic(); onBackupClick() },
-                isSmallScreen = isSmallScreen, colors = colors, cardBackground = cardBackground, oledMode = oledMode
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
             )
         }
-        AnimatedElement(visible = visible, staggerIndex = 7, totalItems = 7) {
+        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 5) {
             SettingsNavigationCard(
-                title = "CRASH LOG", description = "Something went wrong? Check here for clues on what happened",
+                title = "CRASH LOG",
+                description = "Something went wrong? Check here for clues on what happened",
                 onClick = { performHaptic(); onCrashLogClick() },
-                isSmallScreen = isSmallScreen, colors = colors, cardBackground = cardBackground, oledMode = oledMode
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RendererPanel  — sub-panel of Functionality
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+fun RendererPanel(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    aggressiveMode: Boolean,
+    onAggressiveModeChange: (Boolean) -> Unit,
+    killLauncher: Boolean,
+    onKillLauncherChange: (Boolean) -> Unit,
+    dozeMode: Boolean,
+    onDozeModeChange: (Boolean) -> Unit,
+    showGpuWatchButton: Boolean,
+    onShowGpuWatchButtonChange: (Boolean) -> Unit,
+    onShowAggressiveWarning: () -> Unit,
+    isSmallScreen: Boolean,
+    isLandscape: Boolean,
+    isTablet: Boolean,
+    colors: ThemeColors,
+    cardBackground: Color,
+    oledMode: Boolean,
+    performHaptic: () -> Unit
+) {
+    val ts = LocalTypeScale.current
+    PanelScaffold(
+        visible = visible, onDismiss = onDismiss,
+        isLandscape = isLandscape, isSmallScreen = isSmallScreen,
+        oledMode = oledMode, colors = colors
+    ) { _ ->
+        CleanTitle(
+            text = "RENDERER",
+            fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
+            colors = colors
+        )
+
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 4) {
+            ToggleCard(
+                title = "AGGRESSIVE MODE",
+                description = "Applies the renderer to every installed package — more thorough, but make sure you've read the warning first",
+                checked = aggressiveMode,
+                onCheckedChange = { performHaptic(); onAggressiveModeChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 4) {
+            ToggleCard(
+                title = "KILL LAUNCHER ON SWITCH",
+                description = "Force-stops the launcher after switching so it picks up the new renderer immediately. Leave OFF on Xiaomi / MIUI — enabling it there can trigger MIUI's app restriction system.",
+                checked = killLauncher,
+                onCheckedChange = { performHaptic(); onKillLauncherChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 4) {
+            ToggleCard(
+                title = "DOZE",
+                description = "Forces your device into deep doze right away — great for squeezing out extra battery life",
+                checked = dozeMode,
+                onCheckedChange = { performHaptic(); onDozeModeChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 4) {
+            ToggleCard(
+                title = "SHOW GPUWATCH BUTTON",
+                description = "Shows the GPUWatch shortcut on the main screen alongside the Resources button",
+                checked = showGpuWatchButton,
+                onCheckedChange = { performHaptic(); onShowGpuWatchButtonChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode
+            )
+        }
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SystemPanel  — replaces FunctionalityPanel + BehaviorPanel
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+fun SystemPanel(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    verboseMode: Boolean,
+    onVerboseModeChange: (Boolean) -> Unit,
+    dismissOnClickOutside: Boolean,
+    onDismissOnClickOutsideChange: (Boolean) -> Unit,
+    onNotificationsClick: () -> Unit,
+    onBackupClick: () -> Unit,
+    onCrashLogClick: () -> Unit,
+    isSmallScreen: Boolean,
+    isLandscape: Boolean,
+    isTablet: Boolean,
+    colors: ThemeColors,
+    cardBackground: Color,
+    oledMode: Boolean,
+    performHaptic: () -> Unit
+) {
+    val ts = LocalTypeScale.current
+    PanelScaffold(
+        visible = visible, onDismiss = onDismiss,
+        isLandscape = isLandscape, isSmallScreen = isSmallScreen,
+        oledMode = oledMode, colors = colors
+    ) { _ ->
+        CleanTitle(
+            text = "SYSTEM",
+            fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
+            colors = colors
+        )
+
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 5) {
+            ToggleCard(
+                title = "VERBOSE MODE",
+                description = "Shows the full shell output while switching — great for seeing exactly what's happening",
+                checked = verboseMode,
+                onCheckedChange = { performHaptic(); onVerboseModeChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 5) {
+            ToggleCard(
+                title = "TAP OUTSIDE TO CLOSE",
+                description = "Tap anywhere outside a panel to close it — turn this off if you'd rather use the back button",
+                checked = dismissOnClickOutside,
+                onCheckedChange = { performHaptic(); onDismissOnClickOutsideChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 5) {
+            SettingsNavigationCard(
+                title = "NOTIFICATIONS",
+                description = "Get a nudge if you've been on OpenGL for a while and forget to switch back",
+                onClick = { performHaptic(); onNotificationsClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 5) {
+            SettingsNavigationCard(
+                title = "BACKUP & RESTORE",
+                description = "Save all your settings to a file or bring them back from a backup",
+                onClick = { performHaptic(); onBackupClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 5) {
+            SettingsNavigationCard(
+                title = "CRASH LOG",
+                description = "Something went wrong? Check here for clues on what happened",
+                onClick = { performHaptic(); onCrashLogClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BehaviorPanel  — kept for backward compat reference; superseded by SystemPanel
+
+@Composable
+fun BehaviorPanel(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    verboseMode: Boolean,
+    onVerboseModeChange: (Boolean) -> Unit,
+    dismissOnClickOutside: Boolean,
+    onDismissOnClickOutsideChange: (Boolean) -> Unit,
+    dozeMode: Boolean,
+    onDozeModeChange: (Boolean) -> Unit,
+    isSmallScreen: Boolean,
+    isLandscape: Boolean,
+    isTablet: Boolean,
+    colors: ThemeColors,
+    cardBackground: Color,
+    oledMode: Boolean,
+    showGpuWatchButton: Boolean,
+    onShowGpuWatchButtonChange: (Boolean) -> Unit,
+    performHaptic: () -> Unit
+) {
+    val ts = LocalTypeScale.current
+    PanelScaffold(
+        visible = visible, onDismiss = onDismiss,
+        isLandscape = isLandscape, isSmallScreen = isSmallScreen,
+        oledMode = oledMode, colors = colors
+    ) { _ ->
+        CleanTitle(
+            text = "BEHAVIOUR",
+            fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
+            colors = colors
+        )
+
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 4) {
+            ToggleCard(
+                title = "VERBOSE MODE",
+                description = "Shows the full shell output while switching — great for seeing exactly what's happening",
+                checked = verboseMode,
+                onCheckedChange = { performHaptic(); onVerboseModeChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 4) {
+            ToggleCard(
+                title = "TAP OUTSIDE TO CLOSE",
+                description = "Tap anywhere outside a panel to close it — turn this off if you'd rather use the back button",
+                checked = dismissOnClickOutside,
+                onCheckedChange = { performHaptic(); onDismissOnClickOutsideChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 4) {
+            ToggleCard(
+                title = "DOZE",
+                description = "Forces your device into deep doze right away — great for squeezing out extra battery life",
+                checked = dozeMode,
+                onCheckedChange = { performHaptic(); onDozeModeChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 4) {
+            ToggleCard(
+                title = "SHOW GPUWATCH BUTTON",
+                description = "Shows the GPUWatch shortcut on the main screen alongside the Resources button",
+                checked = showGpuWatchButton,
+                onCheckedChange = { performHaptic(); onShowGpuWatchButtonChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode
             )
         }
     }
@@ -1102,6 +1426,57 @@ fun BackupPanel(
 // CrashLogPanel
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * A single parsed GAMA crash entry, split out of crash_log.txt.
+ * Each entry corresponds to one ── timestamp ── header block.
+ */
+private data class GamaCrashEntry(
+    val timestamp: String,   // e.g. "2025-06-14 03:22:11"
+    val thread: String,      // e.g. "main"
+    val summary: String,     // first exception line, used as subtitle on list card
+    val fullText: String     // the entire block text, saved verbatim to .txt
+)
+
+/**
+ * Parse the raw crash_log.txt content into individual [GamaCrashEntry] objects.
+ * Entries are separated by the "── YYYY-MM-DD HH:mm:ss ─…" header written by
+ * the crash handler in MainActivity.
+ */
+private fun parseGamaCrashLog(raw: String): List<GamaCrashEntry> {
+    if (raw.isBlank()) return emptyList()
+    // Split on the separator line "── <timestamp> ──…"
+    val sections = raw.split(Regex("(?=── \\d{4}-\\d{2}-\\d{2})"))
+    return sections
+        .filter { it.isNotBlank() }
+        .mapNotNull { block ->
+            val lines = block.lines()
+            val headerLine = lines.firstOrNull()?.trim() ?: return@mapNotNull null
+            // Extract timestamp from "── 2025-06-14 03:22:11 ──…"
+            val ts = Regex("── (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})")
+                .find(headerLine)?.groupValues?.get(1) ?: "Unknown time"
+            // Thread line is "Thread: <name>"
+            val thread = lines.firstOrNull { it.startsWith("Thread:") }
+                ?.removePrefix("Thread:")?.trim() ?: "unknown"
+            // First exception or "at " line as the summary
+            val summary = lines
+                .firstOrNull { it.contains("Exception") || it.contains("Error:") || it.startsWith("\tat ") }
+                ?.trim()
+                ?: lines.firstOrNull { it.isNotBlank() && !it.startsWith("──") && !it.startsWith("Thread:") }
+                    ?.trim()
+                ?: "No details"
+            GamaCrashEntry(
+                timestamp = ts,
+                thread    = thread,
+                summary   = summary.take(160),
+                fullText  = block.trim()
+            )
+        }
+        // Newest first (the file is already written newest-first, but sort to be safe)
+        .sortedByDescending { it.timestamp }
+}
+
+// ── CrashLogPanel (list) ──────────────────────────────────────────────────────
+
 @Composable
 fun CrashLogPanel(
     visible: Boolean,
@@ -1111,39 +1486,352 @@ fun CrashLogPanel(
     isTablet: Boolean,
     colors: ThemeColors,
     cardBackground: Color,
-    oledMode: Boolean
+    oledMode: Boolean,
+    onExportCrashLog: (content: String, fileName: String) -> Unit = { _, _ -> }
 ) {
     val ts = LocalTypeScale.current
     val context = LocalContext.current
-    val logText = remember {
-        try {
-            val f = java.io.File(context.filesDir, "crash_log.txt")
-            if (f.exists()) f.readText() else "No crash logs recorded."
-        } catch (e: Exception) { "Unable to read crash log: ${e.message}" }
+
+    var gamaCrashes by remember { mutableStateOf<List<GamaCrashEntry>>(emptyList()) }
+    var rawLogExists by remember { mutableStateOf(false) }
+    var systemCrashes by remember { mutableStateOf<List<ShizukuHelper.CrashEntry>>(emptyList()) }
+    var systemCrashesLoading by remember { mutableStateOf(false) }
+
+    // Which detail sub-panel is open: "gama:<index>" or "system:<index>" or null
+    var openedEntryKey by remember { mutableStateOf<String?>(null) }
+
+    // Re-read both sources every time the panel becomes visible
+    LaunchedEffect(visible) {
+        if (!visible) return@LaunchedEffect
+        openedEntryKey = null
+
+        // GAMA file log — read & parse on IO
+        val rawText = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val f = java.io.File(context.filesDir, "crash_log.txt")
+                if (f.exists() && f.length() > 0) f.readText() else ""
+            } catch (_: Exception) { "" }
+        }
+        rawLogExists = rawText.isNotEmpty()
+        gamaCrashes = parseGamaCrashLog(rawText)
+
+        // System dropbox crashes — only attempt if Shizuku is available
+        if (ShizukuHelper.checkBinder() && ShizukuHelper.checkPermission()) {
+            systemCrashesLoading = true
+            systemCrashes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                ShizukuHelper.fetchCrashLogs()
+            }
+            systemCrashesLoading = false
+        }
     }
 
+    // anyDetailOpen drives both the blur on the list panel AND the stagger
+    // re-trigger: when it flips false the list cards see visible=true again
+    // after having seen visible=false, so AnimatedElement re-runs its enter cascade.
+    val anyDetailOpen = openedEntryKey != null
+
+    // ── Detail panels (one per entry type) ───────────────────────────────────
+    // Each detail panel gets its own BackHandler so the system back press only
+    // closes the detail, never the whole crash log behind it.
+    gamaCrashes.forEachIndexed { idx, entry ->
+        val isThisOpen = openedEntryKey == "gama:$idx"
+        BackHandler(enabled = isThisOpen) { openedEntryKey = null }
+        CrashDetailPanel(
+            visible       = isThisOpen,
+            onDismiss     = { openedEntryKey = null },
+            title         = entry.timestamp,
+            subtitle      = "Thread: ${entry.thread}",
+            fullText      = entry.fullText,
+            isSystemUI    = false,
+            isSmallScreen = isSmallScreen,
+            isLandscape   = isLandscape,
+            colors        = colors,
+            cardBackground = cardBackground,
+            oledMode      = oledMode,
+            onSave        = { onExportCrashLog(entry.fullText, "GAMA_crash_${entry.timestamp.replace(" ", "_").replace(":", "-")}.txt") }
+        )
+    }
+    systemCrashes.forEachIndexed { idx, entry ->
+        val isThisOpen = openedEntryKey == "system:$idx"
+        val fileTimestamp = remember(entry.timeMillis) {
+            if (entry.timeMillis > 0L)
+                java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.US)
+                    .format(java.util.Date(entry.timeMillis))
+            else "unknown"
+        }
+        val displayTimestamp = remember(entry.timeMillis) {
+            if (entry.timeMillis > 0L)
+                java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.US)
+                    .format(java.util.Date(entry.timeMillis))
+            else "unknown time"
+        }
+        BackHandler(enabled = isThisOpen) { openedEntryKey = null }
+        CrashDetailPanel(
+            visible       = isThisOpen,
+            onDismiss     = { openedEntryKey = null },
+            title         = entry.tag,
+            subtitle      = displayTimestamp,
+            fullText      = entry.fullText,
+            isSystemUI    = entry.isSystemUI,
+            isSmallScreen = isSmallScreen,
+            isLandscape   = isLandscape,
+            colors        = colors,
+            cardBackground = cardBackground,
+            oledMode      = oledMode,
+            onSave        = { onExportCrashLog(entry.fullText, "GAMA_system_crash_${entry.tag}_$fileTimestamp.txt") }
+        )
+    }
+
+    // ── List panel ────────────────────────────────────────────────────────────
+    // listItemsVisible flips false when a detail opens and back to true when it
+    // closes — this is what makes AnimatedElement re-run its stagger cascade on
+    // return, since LaunchedEffect(visible) only fires on value changes.
+    val listItemsVisible = visible && !anyDetailOpen
+
+    // Compute a stable total item count up-front so every AnimatedElement in
+    // this panel shares the same value (required for the exit stagger to work).
+    val gamaCount   = gamaCrashes.size
+    val systemCount = if (!systemCrashesLoading && ShizukuHelper.checkBinder() && ShizukuHelper.checkPermission())
+        systemCrashes.size.coerceAtMost(20) else 0
+    // Slots: 1 section header + gamaCount cards (or 1 empty card) + clear button
+    //      + 1 section header + systemCount cards (or 1 status card)
+    val emptyGamaSlots  = if (gamaCount == 0) 1 else gamaCount + 1   // cards + clear btn
+    val systemSlots     = if (systemCount == 0) 1 else systemCount
+    val totalListItems  = 1 + emptyGamaSlots + 1 + systemSlots        // two section headers
+
     PanelScaffold(
-        visible = visible, onDismiss = onDismiss,
-        isLandscape = isLandscape, isSmallScreen = isSmallScreen,
-        oledMode = oledMode, colors = colors
+        visible   = visible,
+        onDismiss = onDismiss,
+        isLandscape   = isLandscape,
+        isSmallScreen = isSmallScreen,
+        isBlurred = anyDetailOpen,
+        oledMode  = oledMode,
+        colors    = colors
     ) { _ ->
         CleanTitle(text = "CRASH LOG", fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
 
-        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 1) {
+        // ── GAMA crashes section header ───────────────────────────────────────
+        AnimatedElement(visible = listItemsVisible, staggerIndex = 0, totalItems = totalListItems) {
+            Text(
+                text = "GAMA CRASHES",
+                fontSize = ts.labelLarge, fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp, fontFamily = quicksandFontFamily,
+                color = colors.primaryAccent.copy(alpha = 0.7f)
+            )
+        }
+
+        if (gamaCount == 0) {
+            AnimatedElement(visible = listItemsVisible, staggerIndex = 1, totalItems = totalListItems) {
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                        .border(1.dp, colors.border, RoundedCornerShape(18.dp)),
+                    colors = CardDefaults.cardColors(containerColor = cardBackground),
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Text(
+                        text = "No GAMA crashes recorded.",
+                        modifier = Modifier.fillMaxWidth().padding(20.dp),
+                        fontSize = ts.labelSmall, fontFamily = quicksandFontFamily,
+                        color = colors.textSecondary, fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        } else {
+            gamaCrashes.forEachIndexed { idx, entry ->
+                // staggerIndex: header=0, cards start at 1
+                AnimatedElement(visible = listItemsVisible, staggerIndex = idx + 1, totalItems = totalListItems) {
+                    SettingsNavigationCard(
+                        title = entry.timestamp,
+                        description = entry.summary,
+                        onClick = { openedEntryKey = "gama:$idx" },
+                        isSmallScreen = isSmallScreen,
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        oledMode = oledMode
+                    )
+                }
+            }
+            // Clear button sits right after the last card
+            AnimatedElement(visible = listItemsVisible, staggerIndex = gamaCount + 1, totalItems = totalListItems) {
+                FlatButton(
+                    text = "Clear All GAMA Logs",
+                    onClick = {
+                        try {
+                            java.io.File(context.filesDir, "crash_log.txt").delete()
+                            gamaCrashes = emptyList()
+                            rawLogExists = false
+                        } catch (_: Exception) {}
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    accent = false, colors = colors, maxLines = 1
+                )
+            }
+        }
+
+        // ── System crashes section header ─────────────────────────────────────
+        // Its staggerIndex is always right after all the gama slots
+        val systemHeaderIdx = 1 + emptyGamaSlots
+        AnimatedElement(visible = listItemsVisible, staggerIndex = systemHeaderIdx, totalItems = totalListItems) {
+            Text(
+                text = "SYSTEM CRASHES",
+                fontSize = ts.labelLarge, fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp, fontFamily = quicksandFontFamily,
+                color = colors.primaryAccent.copy(alpha = 0.7f)
+            )
+        }
+
+        when {
+            systemCrashesLoading -> {
+                Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = colors.primaryAccent, modifier = Modifier.size(28.dp))
+                }
+            }
+            !ShizukuHelper.checkBinder() || !ShizukuHelper.checkPermission() -> {
+                AnimatedElement(visible = listItemsVisible, staggerIndex = systemHeaderIdx + 1, totalItems = totalListItems) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                            .border(1.dp, colors.border, RoundedCornerShape(18.dp)),
+                        colors = CardDefaults.cardColors(containerColor = cardBackground),
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Text(
+                            text = "Shizuku required to read system crash logs.",
+                            modifier = Modifier.fillMaxWidth().padding(20.dp),
+                            fontSize = ts.labelSmall, fontFamily = quicksandFontFamily,
+                            color = colors.textSecondary, fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+            systemCrashes.isEmpty() -> {
+                AnimatedElement(visible = listItemsVisible, staggerIndex = systemHeaderIdx + 1, totalItems = totalListItems) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                            .border(1.dp, colors.border, RoundedCornerShape(18.dp)),
+                        colors = CardDefaults.cardColors(containerColor = cardBackground),
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Text(
+                            text = "No relevant system crashes found.",
+                            modifier = Modifier.fillMaxWidth().padding(20.dp),
+                            fontSize = ts.labelSmall, fontFamily = quicksandFontFamily,
+                            color = colors.textSecondary, fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+            else -> {
+                systemCrashes.take(20).forEachIndexed { idx, entry ->
+                    val displayTimestamp = remember(entry.timeMillis) {
+                        if (entry.timeMillis > 0L)
+                            java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.US)
+                                .format(java.util.Date(entry.timeMillis))
+                        else "unknown time"
+                    }
+                    AnimatedElement(
+                        visible      = listItemsVisible,
+                        staggerIndex = systemHeaderIdx + 1 + idx,
+                        totalItems   = totalListItems
+                    ) {
+                        SettingsNavigationCard(
+                            title = entry.tag,
+                            description = "$displayTimestamp  ·  ${entry.summary}",
+                            onClick = { openedEntryKey = "system:$idx" },
+                            isSmallScreen = isSmallScreen,
+                            colors = if (entry.isSystemUI)
+                                colors.copy(border = colors.primaryAccent.copy(alpha = 0.4f))
+                            else colors,
+                            cardBackground = cardBackground,
+                            oledMode = oledMode
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── CrashDetailPanel (single-entry view) ─────────────────────────────────────
+
+@Composable
+private fun CrashDetailPanel(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    title: String,
+    subtitle: String,
+    fullText: String,
+    isSystemUI: Boolean,
+    isSmallScreen: Boolean,
+    isLandscape: Boolean,
+    colors: ThemeColors,
+    cardBackground: Color,
+    oledMode: Boolean,
+    onSave: () -> Unit
+) {
+    val ts = LocalTypeScale.current
+
+    PanelScaffold(
+        visible   = visible,
+        onDismiss = onDismiss,
+        isLandscape   = isLandscape,
+        isSmallScreen = isSmallScreen,
+        oledMode  = oledMode,
+        colors    = colors
+    ) { _ ->
+        // Title: timestamp or tag
+        CleanTitle(
+            text     = title,
+            fontSize = if (isLandscape) ts.displaySmall else ts.displayMedium,
+            colors   = colors
+        )
+
+        // Subtitle: thread or formatted time
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 3) {
+            Text(
+                text = subtitle,
+                fontSize = ts.bodyMedium,
+                fontFamily = quicksandFontFamily,
+                fontWeight = FontWeight.Bold,
+                color = if (isSystemUI) colors.primaryAccent.copy(alpha = 0.85f)
+                        else colors.textSecondary,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        // Full log body in a scrollable card
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 3) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, colors.border, RoundedCornerShape(18.dp)),
+                    .border(
+                        width = 1.dp,
+                        color = if (isSystemUI) colors.primaryAccent.copy(alpha = 0.4f) else colors.border,
+                        shape = RoundedCornerShape(18.dp)
+                    ),
                 colors = CardDefaults.cardColors(containerColor = cardBackground),
                 shape = RoundedCornerShape(18.dp)
             ) {
                 Text(
-                    text = logText,
+                    text = fullText,
                     modifier = Modifier.fillMaxWidth().padding(20.dp),
-                    fontSize = ts.labelSmall, fontFamily = quicksandFontFamily,
-                    color = colors.textSecondary, fontWeight = FontWeight.Bold
+                    fontSize = ts.labelSmall,
+                    fontFamily = quicksandFontFamily,
+                    color = colors.textSecondary,
+                    fontWeight = FontWeight.Bold
                 )
             }
+        }
+
+        // Save button — triggers SAF file picker via the parent callback
+        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 3) {
+            FlatButton(
+                text     = "Save Log",
+                onClick  = onSave,
+                modifier = Modifier.fillMaxWidth(),
+                accent   = true,
+                colors   = colors,
+                maxLines = 1
+            )
         }
     }
 }
@@ -1233,6 +1921,7 @@ fun ResourcesPanel(
     visible: Boolean,
     onDismiss: () -> Unit,
     onLinkSelected: (url: String, label: String, description: String) -> Unit,
+    onInfoRequested: (title: String, body: String) -> Unit,
     isSmallScreen: Boolean,
     isLandscape: Boolean,
     isTablet: Boolean,
@@ -1253,11 +1942,10 @@ fun ResourcesPanel(
             "Opens the official GAMA Discord server — ask questions, share feedback, and stay up to date."),
         Link("SHIZUKU", "GAMA needs this to run — grab it here if you haven't already",
             "https://shizuku.rikka.app",
-            "Opens the official Shizuku website. Shizuku is required for GAMA to execute renderer switching commands."),
-        Link("TASKER GUIDE", "Step-by-step guide to automating renderer switches with Tasker",
-            "https://github.com/popovicialinc/gama/blob/main/!assets/GAMA_Tasker_Guide.pdf",
-            "Opens the GAMA Tasker guide — covers automating renderer switching based on time, app launch, WiFi, and more.")
+            "Opens the official Shizuku website. Shizuku is required for GAMA to execute renderer switching commands.")
     )
+    // 3 link cards + 3 integration cards = 6 total
+    val totalItems = links.size + 3
 
     PanelScaffold(
         visible = visible, onDismiss = onDismiss,
@@ -1269,8 +1957,10 @@ fun ResourcesPanel(
             fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
             colors = colors, scrollOffset = scrollState.value
         )
+
+        // ── Links ─────────────────────────────────────────────────────────────
         links.forEachIndexed { i, link ->
-            AnimatedElement(visible = visible, staggerIndex = i + 1, totalItems = links.size) {
+            AnimatedElement(visible = visible, staggerIndex = i + 1, totalItems = totalItems) {
                 SettingsNavigationCard(
                     title = link.title, description = link.desc,
                     onClick = { onLinkSelected(link.url, link.title, link.linkDesc) },
@@ -1278,6 +1968,63 @@ fun ResourcesPanel(
                     cardBackground = cardBackground, oledMode = oledMode
                 )
             }
+        }
+
+        // ── Integrations ──────────────────────────────────────────────────────
+        AnimatedElement(visible = visible, staggerIndex = links.size + 1, totalItems = totalItems) {
+            IntegrationInfoCard(
+                title = "TASKER",
+                description = "Use broadcast intents to switch renderers automatically based on time, app launch, WiFi, or anything Tasker can do",
+                statusLabel = "Available",
+                statusOk = true,
+                actionLabel = "Open Guide",
+                onAction = {
+                    onLinkSelected(
+                        "https://github.com/popovicialinc/gama/blob/main/!assets/GAMA_Tasker_Guide.pdf",
+                        "Tasker Guide",
+                        "This will open the GAMA Tasker integration guide on GitHub. It covers how to use broadcast intents to automate renderer switching based on time, app launch, WiFi network, and more."
+                    )
+                },
+                colors = colors, cardBackground = cardBackground,
+                oledMode = oledMode, isSmallScreen = isSmallScreen
+            )
+        }
+
+        AnimatedElement(visible = visible, staggerIndex = links.size + 2, totalItems = totalItems) {
+            val tileAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
+            IntegrationInfoCard(
+                title = "QUICK SETTINGS TILES",
+                description = "Three tiles: Vulkan, OpenGL, and Doze. Each one lights up when active and switches instantly on tap, no menu needed",
+                statusLabel = if (tileAvailable) "3 tiles available" else "Requires Android 7+",
+                statusOk = tileAvailable,
+                actionLabel = if (tileAvailable) "How to add" else null,
+                onAction = if (tileAvailable) ({
+                    onInfoRequested(
+                        "Adding QS Tiles",
+                        "Pull down your notification shade and tap the Edit button (pencil icon). Scroll through the available tiles until you find the GAMA ones: Vulkan, OpenGL, and Doze. Drag whichever tiles you want into your active area, then tap Done. Each tile shows as highlighted when its mode is currently active."
+                    )
+                }) else null,
+                colors = colors, cardBackground = cardBackground,
+                oledMode = oledMode, isSmallScreen = isSmallScreen
+            )
+        }
+
+        AnimatedElement(visible = visible, staggerIndex = links.size + 3, totalItems = totalItems) {
+            IntegrationInfoCard(
+                title = "HOME SCREEN WIDGET",
+                description = "Put a Vulkan / OpenGL toggle right on your home screen. One tap and you're switched",
+                statusLabel = "Available",
+                statusOk = true,
+                actionLabel = "How to add",
+                onAction = {
+                    onInfoRequested(
+                        "Adding the Widget",
+                        "Long-press an empty area on your home screen and select Widgets from the menu that appears. Scroll through the list until you find GAMA, then long-press the widget and drag it to wherever you want it placed. The widget lets you switch between Vulkan and OpenGL with a single tap, right from your home screen."
+                    )
+                },
+                colors = colors, cardBackground = cardBackground,
+                oledMode = oledMode, isSmallScreen = isSmallScreen
+            )
         }
     }
 }
@@ -1328,169 +2075,3 @@ fun VerbosePanel(
 }
 
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AppSelectorPanel
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-fun AppSelectorPanel(
-    visible: Boolean,
-    onDismiss: () -> Unit,
-    excludedApps: List<String>,
-    onExcludedAppsChange: () -> Unit,
-    isSmallScreen: Boolean,
-    colors: ThemeColors,
-    cardBackground: Color,
-    blurEnabled: Boolean,
-    performHaptic: () -> Unit,
-    oledMode: Boolean,
-    isLandscape: Boolean,
-    isTablet: Boolean,
-    preloadedApps: List<Pair<String, String>>,
-    isPreloading: Boolean
-) {
-    val ts = LocalTypeScale.current
-    val dismissOnClickOutside = LocalDismissOnClickOutside.current
-    var searchQuery by remember { mutableStateOf("") }
-
-    val filteredApps = remember(preloadedApps, searchQuery) {
-        if (searchQuery.isBlank()) preloadedApps
-        else preloadedApps.filter { (pkg, label) ->
-            label.contains(searchQuery, ignoreCase = true) || pkg.contains(searchQuery, ignoreCase = true)
-        }
-    }
-
-    BouncyDialog(visible = visible, onDismiss = onDismiss, fullScreen = true) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(dismissOnClickOutside) {
-                    if (dismissOnClickOutside) detectTapGestures { onDismiss() }
-                    else detectTapGestures { }
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                modifier = Modifier
-                    .widthIn(max = if (isLandscape) 800.dp else 500.dp)
-                    .fillMaxHeight()
-                    .padding(horizontal = if (isLandscape) 32.dp else 24.dp)
-                    .pointerInput(Unit) { detectTapGestures { } },
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Spacer(modifier = Modifier.height(if (isLandscape) 24.dp else 40.dp))
-
-                CleanTitle(
-                    text = "APP SELECTOR",
-                    fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
-                    colors = colors
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Apps you exclude here won't have their renderer touched — useful for anything that doesn't play nice with Vulkan",
-                    fontSize = ts.bodyMedium, color = colors.textSecondary,
-                    fontFamily = quicksandFontFamily, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = searchQuery, onValueChange = { searchQuery = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text(
-                            "Search apps…", fontFamily = quicksandFontFamily,
-                            fontWeight = FontWeight.Bold, color = colors.textSecondary.copy(alpha = 0.5f)
-                        )
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = colors.primaryAccent,
-                        unfocusedBorderColor = colors.border,
-                        focusedTextColor = colors.textPrimary,
-                        unfocusedTextColor = colors.textPrimary,
-                        cursorColor = colors.primaryAccent,
-                        focusedContainerColor = cardBackground,
-                        unfocusedContainerColor = cardBackground
-                    ),
-                    textStyle = TextStyle(
-                        fontFamily = quicksandFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = ts.bodyMedium
-                    )
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (isPreloading) {
-                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = colors.primaryAccent)
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(filteredApps, key = { it.first }) { (pkg, label) ->
-                            val isExcluded = excludedApps.contains(pkg)
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .border(
-                                        1.dp,
-                                        if (isExcluded) colors.primaryAccent.copy(alpha = 0.5f)
-                                        else colors.border.copy(alpha = 0.3f),
-                                        RoundedCornerShape(14.dp)
-                                    )
-                                    .clickable {
-                                        performHaptic()
-                                        if (isExcluded) (excludedApps as? MutableList)?.remove(pkg)
-                                        else (excludedApps as? MutableList)?.add(pkg)
-                                        onExcludedAppsChange()
-                                    },
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isExcluded)
-                                        colors.primaryAccent.copy(alpha = 0.1f) else cardBackground
-                                ),
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = label, fontSize = ts.labelLarge, fontWeight = FontWeight.Bold,
-                                            fontFamily = quicksandFontFamily,
-                                            color = if (isExcluded) colors.primaryAccent else colors.textPrimary
-                                        )
-                                        Text(
-                                            text = pkg, fontSize = ts.labelSmall, fontFamily = quicksandFontFamily,
-                                            fontWeight = FontWeight.Bold, color = colors.textSecondary
-                                        )
-                                    }
-                                    if (isExcluded) {
-                                        Text(
-                                            text = "EXCLUDED", fontSize = ts.labelSmall, fontWeight = FontWeight.Bold,
-                                            letterSpacing = 1.sp, fontFamily = quicksandFontFamily,
-                                            color = colors.primaryAccent
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        item { Spacer(modifier = Modifier.height(80.dp)) }
-                    }
-                }
-            }
-
-            PanelBackButton(
-                onClick = onDismiss, colors = colors, oledMode = oledMode,
-                isSmallScreen = isSmallScreen,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 20.dp, bottom = 28.dp)
-            )
-        }
-    }
-}

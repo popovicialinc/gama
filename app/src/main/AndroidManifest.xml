@@ -4,6 +4,18 @@
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- ── Tasker permission — only apps explicitly granted this can trigger  -->
+    <!-- renderer switches via broadcast. protectionLevel="normal" means any   -->
+    <!-- app can declare it in their manifest, but apps that don't declare it  -->
+    <!-- are rejected by Android before onReceive() is even called.            -->
+    <!-- To grant Tasker access via ADB (one-time setup):                      -->
+    <!--   adb shell pm grant net.dinglisch.android.taskerm \                  -->
+    <!--       com.popovicialinc.gama.TASKER_PERMISSION                        -->
+    <permission
+        android:name="com.popovicialinc.gama.TASKER_PERMISSION"
+        android:protectionLevel="normal" />
 
     <application
         android:allowBackup="true"
@@ -49,22 +61,25 @@
                 android:resource="@xml/gama_widget_info" />
         </receiver>
 
-        <!-- Widget settings activity (long-press → Customise / Edit widget) -->
-        <activity
-            android:name=".GamaWidgetConfigureActivity"
-            android:exported="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
-            </intent-filter>
-        </activity>
-
         <!-- ── Tasker Integration ────────────────────────────────────────── -->
         <receiver
             android:name=".TaskerReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:permission="com.popovicialinc.gama.TASKER_PERMISSION">
             <intent-filter>
                 <action android:name="com.popovicialinc.gama.ACTION_SET_RENDERER" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ── Boot Receiver — re-applies renderer prop after every reboot ── -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
 

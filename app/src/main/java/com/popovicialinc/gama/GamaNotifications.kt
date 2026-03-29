@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -134,10 +135,18 @@ fun sendBootNotification(
     }
 
     val title = if (userName.isNotEmpty()) "Hey there, $userName! 👋" else "Hey there! 👋"
+
+    val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+    val pendingIntent = PendingIntent.getActivity(
+        context, 0, launchIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
     val builder = android.app.Notification.Builder(context, channelId)
-        .setSmallIcon(R.mipmap.ic_launcher)  // Use app icon
+        .setSmallIcon(R.mipmap.ic_launcher)
         .setContentTitle(title)
         .setContentText("Is now a good time to switch to Vulkan rendering?")
+        .setContentIntent(pendingIntent)
         .setAutoCancel(true)
 
     try {
@@ -175,12 +184,19 @@ fun sendOpenGLReminderNotification(context: Context, userName: String = ""): Boo
     )
 
     return try {
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        val pendingIntent = PendingIntent.getActivity(
+            context, 0, launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         nm.notify(
             2001,
             android.app.Notification.Builder(context, channelId)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(title)
                 .setContentText(messages.random())
+                .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
                 .build()
         )

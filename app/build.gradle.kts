@@ -16,8 +16,8 @@ android {
         applicationId = "com.popovicialinc.gama"
         minSdk = 29
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.2.3"
+        versionCode = 11
+        versionName = "1.3"
 
         vectorDrawables.useSupportLibrary = true
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -107,6 +107,9 @@ dependencies {
     // Glance (home screen widget)
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("androidx.glance:glance-material3:1.1.1")
+
+    // WorkManager (boot renderer retry)
+    implementation(libs.androidx.work.runtime.ktx)
 
     // Debug only
     debugImplementation(libs.androidx.compose.ui.tooling)
