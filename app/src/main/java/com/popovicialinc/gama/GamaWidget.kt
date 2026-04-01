@@ -192,7 +192,7 @@ private fun Root(r: String, s: Boolean, binderOk: Boolean, c: WC) {
     )
     when {
         sz.width <= S21.width && sz.height <= S21.height -> WNano(r, s, binderOk, c, op)
-        sz.width <= S22.width                            -> WSmall(r, s, binderOk, c, op)
+        sz.width <= S22.width && sz.height <= S22.height -> WSmall(r, s, binderOk, c, op)
         sz.width <= S32.width                            -> WMedium(r, s, binderOk, c, op)
         sz.height <= S42.height                          -> WWide(r, s, binderOk, c, op)
         sz.height <= S43.height                          -> WTall(r, s, binderOk, c, op)

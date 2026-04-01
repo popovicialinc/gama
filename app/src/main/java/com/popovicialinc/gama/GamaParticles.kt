@@ -149,7 +149,7 @@ data class ParticleState(
         // Natural forces - ALWAYS USE NORMAL RISING BEHAVIOR
         // Particles always rise from bottom to top with no horizontal drift
         val naturalForceX = 0f // No horizontal drift - all particles move straight up
-        val naturalForceY = -0.01f * speed * speedMultiplier // Negative = upward drift (multiplied by speed multiplier)
+        val naturalForceY = -0.018f * speed * speedMultiplier // Negative = upward drift — raised from 0.01 for snappier movement
 
         // Parallax influence based on ROTATION CHANGE (not absolute rotation)
         // Only moves particles when device is actively rotating
@@ -173,12 +173,14 @@ data class ParticleState(
         velocityY += totalForceY * deltaTime * 60f
 
         // Frame-rate-independent damping, normalised to the 60Hz reference.
-        // Fixed damping (e.g. *= 0.92 every tick) is wrong at non-60Hz rates:
-        //   at 120Hz: 0.92^120/s = 0.000037 → particles stop almost instantly
-        //   at 30Hz:  0.92^30/s  = 0.077    → particles barely damp at all
-        // pow(0.92, deltaTime * 60) gives 0.92^1 at 60Hz (identical to original),
-        // 0.92^0.5 at 120Hz, 0.92^2 at 30Hz — all decaying at the same per-second rate.
-        val frameDamping = Math.pow(0.92, (deltaTime * 60f).toDouble()).toFloat()
+        // Fixed damping (e.g. *= 0.94 every tick) is wrong at non-60Hz rates:
+        //   at 120Hz: 0.94^120/s = 0.00076 → particles stop almost instantly
+        //   at 30Hz:  0.94^30/s  = 0.161   → particles barely damp at all
+        // pow(0.94, deltaTime * 60) gives 0.94^1 at 60Hz (identical to original),
+        // 0.94^0.5 at 120Hz, 0.94^2 at 30Hz — all decaying at the same per-second rate.
+        // Raised from 0.92 → 0.94 so the stronger naturalForce above translates to
+        // visibly snappier movement rather than being absorbed before particles build speed.
+        val frameDamping = Math.pow(0.94, (deltaTime * 60f).toDouble()).toFloat()
         velocityX *= frameDamping
         velocityY *= frameDamping
 

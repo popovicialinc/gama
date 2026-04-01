@@ -7,6 +7,7 @@ import androidx.work.BackoffPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.workDataOf
 import java.util.concurrent.TimeUnit
 
 /**
@@ -53,6 +54,7 @@ class BootReceiver : BroadcastReceiver() {
         if (savedRenderer == "OpenGL") return
 
         val workRequest = OneTimeWorkRequestBuilder<BootRendererWorker>()
+            .setInitialDelay(20, TimeUnit.SECONDS)  // give Shizuku time to start before attempt 0
             .setBackoffCriteria(
                 BackoffPolicy.EXPONENTIAL,
                 30, TimeUnit.SECONDS  // first retry after 30 s, then 60, 120, 240…

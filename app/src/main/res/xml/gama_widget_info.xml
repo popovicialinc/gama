@@ -22,4 +22,4 @@
     android:initialLayout="@layout/widget_initial_layout"
     android:previewImage="@mipmap/ic_launcher"
     android:widgetCategory="home_screen"
-    android:widgetFeatures="reconfigurable" />
+    android:widgetFeatures="reconfigurable|configuration_optional" />

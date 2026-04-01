@@ -1044,7 +1044,7 @@ fun RendererPanel(
         AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 4) {
             ToggleCard(
                 title = "SHOW GPUWATCH BUTTON",
-                description = "Shows the GPUWatch shortcut on the main screen alongside the Resources button",
+                description = "Shows the GPUWatch shortcut on the main screen alongside the Resources button. Samsung devices only — requires Game Booster / Game Tools (enable in Developer Options).",
                 checked = showGpuWatchButton,
                 onCheckedChange = { performHaptic(); onShowGpuWatchButtonChange(it) },
                 colors = colors, cardBackground = cardBackground,
@@ -1209,7 +1209,7 @@ fun BehaviorPanel(
         AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 4) {
             ToggleCard(
                 title = "SHOW GPUWATCH BUTTON",
-                description = "Shows the GPUWatch shortcut on the main screen alongside the Resources button",
+                description = "Shows the GPUWatch shortcut on the main screen alongside the Resources button. Samsung devices only — requires Game Booster / Game Tools (enable in Developer Options).",
                 checked = showGpuWatchButton,
                 onCheckedChange = { performHaptic(); onShowGpuWatchButtonChange(it) },
                 colors = colors, cardBackground = cardBackground,
@@ -1938,7 +1938,7 @@ fun ResourcesPanel(
             "https://github.com/popovicialinc/gama",
             "Opens the GAMA GitHub repository where you can browse source code, report issues, and download releases."),
         Link("DISCORD", "Join the official GAMA community server",
-            "https://discord.gg/9FRQEFR7eE",
+            "https://discord.gg/YYXSedBAS9",
             "Opens the official GAMA Discord server — ask questions, share feedback, and stay up to date."),
         Link("SHIZUKU", "GAMA needs this to run — grab it here if you haven't already",
             "https://shizuku.rikka.app",
@@ -2057,7 +2057,7 @@ fun VerbosePanel(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 200.dp)
+                    .heightIn(min = 200.dp, max = 340.dp)
                     .border(1.dp, colors.border, RoundedCornerShape(18.dp)),
                 colors = CardDefaults.cardColors(containerColor = cardBackground),
                 shape = RoundedCornerShape(18.dp)

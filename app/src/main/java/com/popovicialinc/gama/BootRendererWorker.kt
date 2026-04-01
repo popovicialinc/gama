@@ -34,6 +34,9 @@ class BootRendererWorker(
 
     companion object {
         const val WORK_TAG = "gama_boot_renderer"
+        // WorkManager retries until Result.failure() is returned.  We fire the
+        // failure notification and stop retrying after this many attempts (0-indexed).
+        private const val MAX_ATTEMPTS = 5
     }
 
     override suspend fun doWork(): Result {
@@ -53,15 +56,19 @@ class BootRendererWorker(
         if (!shizukuReady) {
             // Not ready yet — if we still have retries, WorkManager will reschedule.
             // Don't corrupt the prefs here; let the retry handle it.
-            val isLastAttempt = runAttemptCount >= 4  // 0-indexed, max 5 attempts
+            val isLastAttempt = runAttemptCount >= MAX_ATTEMPTS - 1
             if (isLastAttempt) {
                 // All retries exhausted — give up and notify.
                 notifyBootResult(applicationContext, success = false, renderer = savedRenderer)
-                // Do NOT overwrite prefs to "OpenGL" here — keep the saved value so
-                // the user sees the correct renderer in the UI and can switch manually.
             }
             return if (isLastAttempt) Result.failure() else Result.retry()
         }
+
+        // Shizuku binder responded, but give it a short settling window before
+        // calling newProcess — the binder can ping OK ~300 ms before the remote
+        // process spawner is actually accepting connections, causing setprop to
+        // fail with a "broken pipe" error on the very first command.
+        delay(500L)
 
         // Shizuku is ready — apply the prop.
         val result = ShizukuHelper.runCommand("setprop debug.hwui.renderer $propValue")
@@ -77,20 +84,35 @@ class BootRendererWorker(
             // setprop returned an error string — check if the prop is already correct
             // (some ROMs persist props across reboots).
             val current = ShizukuHelper.getCurrentRenderer()
-            if (current == savedRenderer) {
-                // Already set — nothing to do, just stamp the uptime and succeed silently.
-                prefs.edit()
-                    .putLong("last_switch_uptime", android.os.SystemClock.elapsedRealtime())
-                    .apply()
-                Result.success()
-            } else {
-                // setprop genuinely failed but prop is wrong — retry.
-                val isLastAttempt = runAttemptCount >= 4
-                if (isLastAttempt) {
-                    notifyBootResult(applicationContext, success = false, renderer = savedRenderer)
-                    Result.failure()
-                } else {
-                    Result.retry()
+            when {
+                current == savedRenderer -> {
+                    // Already set — nothing to do, just stamp the uptime and succeed silently.
+                    prefs.edit()
+                        .putLong("last_switch_uptime", android.os.SystemClock.elapsedRealtime())
+                        .apply()
+                    Result.success()
+                }
+                current == "Unknown" -> {
+                    // Couldn't read the prop at all — Shizuku may still be settling.
+                    // Don't treat this as a confirmed failure; retry so the next
+                    // attempt can re-read once the binder is fully stable.
+                    val isLastAttempt = runAttemptCount >= MAX_ATTEMPTS - 1
+                    if (isLastAttempt) {
+                        notifyBootResult(applicationContext, success = false, renderer = savedRenderer)
+                        Result.failure()
+                    } else {
+                        Result.retry()
+                    }
+                }
+                else -> {
+                    // setprop genuinely failed and prop is confirmed wrong — retry.
+                    val isLastAttempt = runAttemptCount >= MAX_ATTEMPTS - 1
+                    if (isLastAttempt) {
+                        notifyBootResult(applicationContext, success = false, renderer = savedRenderer)
+                        Result.failure()
+                    } else {
+                        Result.retry()
+                    }
                 }
             }
         }

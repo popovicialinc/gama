@@ -1513,47 +1513,19 @@ fun GamaUI(
                 //     tween only when blurActive actually changes — i.e. only at the
                 //     open/close boundary, never during panel-to-panel transitions.
 
-                // Scrim Animatable — starts at correct value for the current state.
-                val scrimAnimatable = remember { Animatable(if (blurActive) 1f else 0f) }
-                LaunchedEffect(blurActive) {
-                    // Fires only when blurActive flips (main ↔ panel boundary).
-                    // Panel-to-panel: blurActive stays true → this never fires.
-                    scrimAnimatable.animateTo(
-                        targetValue = if (blurActive) 1f else 0f,
-                        animationSpec = tween(
-                            durationMillis = 380,
-                            easing = MotionTokens.Easing.silk
+                // mainContent — single composition, stable modifier.
+                // Modifier.blur(40.dp) is applied/removed only at the true
+                // open/close boundary (blurActive change). Between panels:
+                // modifier is identical → Compose skips the layer update.
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (canBlur && blurActive)
+                                Modifier.blur(40.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                            else Modifier
                         )
-                    )
-                }
-
-                Box(modifier = Modifier.fillMaxSize()) {
-                    // ① mainContent — single composition, stable modifier.
-                    // Modifier.blur(40.dp) is applied/removed only at the true
-                    // open/close boundary (blurActive change). Between panels:
-                    // modifier is identical → Compose skips the layer update.
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .then(
-                                if (canBlur && blurActive)
-                                    Modifier.blur(40.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                                else Modifier
-                            )
-                    ) { mainContent() }
-
-                    // ② Scrim — Color.Black rect, alpha driven by draw-phase read.
-                    // scrimAnimatable.value inside graphicsLayer {} is a deferred
-                    // State read: animation ticks only trigger redraws, not recompositions.
-                    // During panel-to-panel: scrimAnimatable.value == 1f (stable) →
-                    // same alpha emitted every draw → zero extra GPU or CPU work.
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer { alpha = scrimAnimatable.value * 0.45f }
-                            .background(Color.Black)
-                    )
-                }
+                ) { mainContent() }
             } else {
                 // ── Real mode ─────────────────────────────────────────────────
                 // Blur radius animates 0→40dp every frame. GPU brute-forces it.
