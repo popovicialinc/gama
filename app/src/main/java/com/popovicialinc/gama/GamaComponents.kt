@@ -198,15 +198,11 @@ fun GlideOptionSelector(
             }
         }
 
-        // Gesture Overlay
+        // Gesture Overlay — intercepts taps only; vertical scroll events are NOT consumed
+        // so they can propagate to a parent verticalScroll container.
         if (!enabled) {
             Box(modifier = Modifier.fillMaxSize().pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        awaitPointerEvent(PointerEventPass.Initial)
-                            .changes.forEach { it.consume() }
-                    }
-                }
+                detectTapGestures { }
             })
         }
         Box(
@@ -708,12 +704,8 @@ fun SettingsNavigationCard(
                 .heightIn(min = if (LocalConfiguration.current.screenWidthDp.dp < 360.dp) 72.dp else 80.dp)
                 .graphicsLayer(alpha = alpha)
                 .then(if (!enabled) Modifier.pointerInput(enabled) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            awaitPointerEvent(PointerEventPass.Initial)
-                                .changes.forEach { it.consume() }
-                        }
-                    }
+                    // Intercept taps only — vertical scroll events pass through to parent scrollable
+                    detectTapGestures { }
                 } else Modifier)
                 // Replace .clickable with pointerInput so we can track press/release
                 .pointerInput(enabled) {
@@ -1735,12 +1727,8 @@ fun CompactColorPickerCard(
                 .fillMaxWidth()
                 .graphicsLayer(alpha = colorCardAlpha)
                 .then(if (!enabled) Modifier.pointerInput(enabled) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            awaitPointerEvent(PointerEventPass.Initial)
-                                .changes.forEach { it.consume() }
-                        }
-                    }
+                    // Intercept taps only — vertical scroll events pass through to parent scrollable
+                    detectTapGestures { }
                 } else Modifier),
             colors = CardDefaults.cardColors(containerColor = cardBackground),
             shape = RoundedCornerShape(20.dp)
@@ -1838,9 +1826,11 @@ fun CompactColorPickerCard(
                         }
                     }
 
-                    // Hex input — animated in/out when Advanced Color Picker is toggled
+                    // Hex input — animated in/out when Advanced Color Picker is toggled.
+                    // Also hidden when the card is disabled (e.g. OLED mode disables gradient cards)
+                    // so toggling Advanced Color Picker while in OLED mode has no visible effect here.
                     AnimatedVisibility(
-                        visible = advancedPicker,
+                        visible = advancedPicker && enabled,
                         enter = fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing)) +
                                 expandVertically(animationSpec = tween(350, easing = FastOutSlowInEasing)),
                         exit = fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing)) +
@@ -2235,12 +2225,8 @@ fun ToggleCard(
                 shape = RoundedCornerShape(18.dp)
             )
             .then(if (!enabled) Modifier.pointerInput(enabled) {
-                awaitPointerEventScope {
-                    while (true) {
-                        awaitPointerEvent(PointerEventPass.Initial)
-                            .changes.forEach { it.consume() }
-                    }
-                }
+                // Intercept taps only — vertical scroll events pass through to parent scrollable
+                detectTapGestures { }
             } else Modifier)
     ) {
         Card(

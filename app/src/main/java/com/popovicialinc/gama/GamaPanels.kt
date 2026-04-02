@@ -12,7 +12,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.graphics.Color
@@ -25,7 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
+import androidx.compose.ui.Modifier
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared panel scaffold — full-screen BouncyDialog with scroll + back button
@@ -152,8 +151,6 @@ fun SettingsPanel(
     visible: Boolean,
     onDismiss: () -> Unit,
     onAppearanceClick: () -> Unit,
-    onEffectsClick: () -> Unit,
-    onColorsClick: () -> Unit,
     onRendererClick: () -> Unit,
     onSystemClick: () -> Unit,
     isSmallScreen: Boolean,
@@ -177,34 +174,16 @@ fun SettingsPanel(
             colors = colors, scrollOffset = scrollState.value
         )
 
-        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 5) {
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 3) {
             SettingsNavigationCard(
                 title = "APPEARANCE",
-                description = "Theme, animations, UI scale, stagger, and your display name",
+                description = "Theme, animations, effects, colors, and your display name",
                 onClick = { performHaptic(); onAppearanceClick() },
                 isSmallScreen = isSmallScreen, colors = colors,
                 cardBackground = cardBackground, oledMode = oledMode
             )
         }
-        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 5) {
-            SettingsNavigationCard(
-                title = "EFFECTS",
-                description = "Gradient background, frosted glass blur, and particle animations",
-                onClick = { performHaptic(); onEffectsClick() },
-                isSmallScreen = isSmallScreen, colors = colors,
-                cardBackground = cardBackground, oledMode = oledMode
-            )
-        }
-        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 5) {
-            SettingsNavigationCard(
-                title = "COLORS",
-                description = "Accent color, gradient palette, OLED mode, and dynamic theming",
-                onClick = { performHaptic(); onColorsClick() },
-                isSmallScreen = isSmallScreen, colors = colors,
-                cardBackground = cardBackground, oledMode = oledMode
-            )
-        }
-        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 5) {
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 3) {
             SettingsNavigationCard(
                 title = "RENDERER",
                 description = "Aggressive mode, launcher restart, doze, and switching behavior",
@@ -213,7 +192,7 @@ fun SettingsPanel(
                 cardBackground = cardBackground, oledMode = oledMode
             )
         }
-        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 5) {
+        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 3) {
             SettingsNavigationCard(
                 title = "SYSTEM",
                 description = "Notifications, integrations, backup, and advanced options",
@@ -250,6 +229,9 @@ fun VisualEffectsPanel(
     cardBackground: Color,
     staggerEnabled: Boolean,
     onStaggerEnabledChange: (Boolean) -> Unit,
+    onEffectsClick: () -> Unit,
+    onColorsClick: () -> Unit,
+    onOledModeChange: (Boolean) -> Unit,
     performHaptic: () -> Unit
 ) {
     val ts = LocalTypeScale.current
@@ -265,11 +247,37 @@ fun VisualEffectsPanel(
             colors = colors, scrollOffset = scrollState.value
         )
 
-        // Theme
-        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 5) {
+        // EFFECTS and COLORS — at the top so they're always easy to reach
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 8) {
+            SettingsNavigationCard(
+                title = "EFFECTS",
+                description = "Gradient background, frosted glass blur, and particle animations",
+                onClick = { performHaptic(); onEffectsClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 8) {
+            SettingsNavigationCard(
+                title = "COLORS",
+                description = "Accent color, gradient palette, OLED mode, and dynamic theming",
+                onClick = { performHaptic(); onColorsClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
+
+        // Theme — zooms out when OLED mode is active (locked to Dark, less relevant)
+        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 8) {
+            val themeCardScale by animateFloatAsState(
+                targetValue = if (oledMode) 0.92f else 1f,
+                animationSpec = tween(400, easing = FastOutSlowInEasing),
+                label = "theme_card_oled_scale"
+            )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .graphicsLayer(scaleX = themeCardScale, scaleY = themeCardScale)
                     .border(
                         width = if (oledMode) 0.75.dp else 1.dp,
                         color = if (oledMode) colors.primaryAccent.copy(alpha = 0.3f) else colors.border.copy(alpha = 0.2f),
@@ -285,21 +293,45 @@ fun VisualEffectsPanel(
                         Text(
                             text = "THEME", fontSize = ts.labelLarge, fontWeight = FontWeight.Bold,
                             letterSpacing = 2.sp, fontFamily = quicksandFontFamily,
-                            color = colors.primaryAccent.copy(alpha = 0.7f)
+                            color = colors.primaryAccent.copy(alpha = if (oledMode) 0.3f else 0.7f)
                         )
                         GlideOptionSelector(
                             options = listOf("Auto", "Dark", "Light"),
-                            selectedIndex = themePreference,
-                            onOptionSelected = { performHaptic(); onThemeChange(it) },
-                            colors = colors, modifier = Modifier.fillMaxWidth()
+                            selectedIndex = if (oledMode) 1 else themePreference,
+                            onOptionSelected = { if (!oledMode) { performHaptic(); onThemeChange(it) } },
+                            colors = colors, modifier = Modifier.fillMaxWidth(),
+                            enabled = !oledMode
                         )
+                        if (oledMode) {
+                            Text(
+                                text = "Forced to Dark while OLED mode is on",
+                                fontSize = ts.bodySmall, color = colors.textSecondary.copy(alpha = 0.5f),
+                                fontFamily = quicksandFontFamily, fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             } // end Box
         }
 
+        // OLED Mode — sits directly under Theme
+        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 8) {
+            ToggleCard(
+                title = "OLED MODE",
+                description = if (oledMode) "Active — backgrounds are pure black. Theme locked to Dark" else "Turns backgrounds pure black — great for battery life on OLED screens",
+                checked = oledMode,
+                onCheckedChange = { enabled ->
+                    performHaptic()
+                    onOledModeChange(enabled)
+                    if (enabled) onThemeChange(1) // Force Dark when OLED enabled
+                },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode
+            )
+        }
+
         // Animations
-        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 5) {
+        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 8) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -332,7 +364,7 @@ fun VisualEffectsPanel(
         }
 
         // UI Scale
-        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 5) {
+        AnimatedElement(visible = visible, staggerIndex = 6, totalItems = 8) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -364,7 +396,7 @@ fun VisualEffectsPanel(
             } // end Box
         }
 
-        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 5) {
+        AnimatedElement(visible = visible, staggerIndex = 7, totalItems = 8) {
             ToggleCard(
                 title = "STAGGER ANIMATIONS",
                 description = "Cards inside panels cascade in one by one. Turn this off for snappier panel opens",
@@ -375,7 +407,7 @@ fun VisualEffectsPanel(
             )
         }
 
-        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 5) {
+        AnimatedElement(visible = visible, staggerIndex = 8, totalItems = 8) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -518,14 +550,15 @@ fun EffectsPanel(
         }
         AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 3) {
             ToggleCard(
-                title = "GRADIENT BACKGROUND", description = "A slow, shifting color gradient behind the main screen",
-                checked = gradientEnabled, onCheckedChange = { performHaptic(); onGradientChange(it) },
-                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode
+                title = "GRADIENT BACKGROUND", description = if (oledMode) "Disabled in OLED mode — background is pure black" else "A slow, shifting color gradient behind the main screen",
+                checked = gradientEnabled && !oledMode, onCheckedChange = { if (!oledMode) { performHaptic(); onGradientChange(it) } },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode,
+                enabled = !oledMode
             )
         }
         AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 3) {
             SettingsNavigationCard(
-                title = "PARTICLES", description = "Little floating dots, stars, or a live sky — pick your vibe",
+                title = "PARTICLES", description = if (oledMode) "Visible in OLED mode — but some effects are limited" else "Little floating dots, stars, or a live sky — pick your vibe",
                 onClick = { performHaptic(); onParticlesClick() },
                 isSmallScreen = isSmallScreen, colors = colors, cardBackground = cardBackground, oledMode = oledMode
             )
@@ -633,7 +666,7 @@ fun BlurPanel(
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ParticlesPanel
+// ParticlesPanel  — hub with enable toggle + nav cards to sub-panels
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -642,21 +675,9 @@ fun ParticlesPanel(
     onDismiss: () -> Unit,
     particlesEnabled: Boolean,
     onParticlesChange: (Boolean) -> Unit,
-    particleSpeed: Int,
-    onParticleSpeedChange: (Int) -> Unit,
-    particleParallaxEnabled: Boolean,
-    onParticleParallaxChange: (Boolean) -> Unit,
-    particleParallaxSensitivity: Int,
-    onParticleParallaxSensitivityChange: (Int) -> Unit,
-    particleCount: Int,
-    onParticleCountChange: (Int) -> Unit,
-    particleStarMode: Boolean,
-    onParticleStarModeChange: (Boolean) -> Unit,
-    particleTimeMode: Boolean,
-    onParticleTimeModeChange: (Boolean) -> Unit,
-    nativeRefreshRate: Boolean,
-    onNativeRefreshRateChange: (Boolean) -> Unit,
-    userName: String,
+    onAppearanceClick: () -> Unit,
+    onMotionClick: () -> Unit,
+    onPerformanceClick: () -> Unit,
     isSmallScreen: Boolean,
     isLandscape: Boolean,
     isTablet: Boolean,
@@ -673,21 +694,164 @@ fun ParticlesPanel(
     ) { _ ->
         CleanTitle(text = "PARTICLES", fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
 
-        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 7) {
+        // Master enable toggle always at the top
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 4) {
             ToggleCard(
-                title = "PARTICLES", description = "Small dots drift around in the background — gives the app a living feel",
-                checked = particlesEnabled, onCheckedChange = { performHaptic(); onParticlesChange(it) },
-                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode
+                title = "PARTICLES",
+                description = "Small dots drift around in the background — gives the app a living feel",
+                checked = particlesEnabled,
+                onCheckedChange = { performHaptic(); onParticlesChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode
             )
         }
-        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 7) {
+
+        // Sub-panel nav cards — dimmed when particles are off so it's clear they depend on the toggle
+        val navAlpha by animateFloatAsState(
+            targetValue = if (particlesEnabled) 1f else 0.38f,
+            animationSpec = tween(300),
+            label = "particles_nav_alpha"
+        )
+
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 4) {
+            Modifier
+            Box(modifier = Modifier.fillMaxWidth().graphicsLayer(alpha = navAlpha)) {
+                SettingsNavigationCard(
+                    title = "APPEARANCE",
+                    description = "Star mode, time mode, and how particles look visually",
+                    onClick = { if (particlesEnabled) { performHaptic(); onAppearanceClick() } },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
+        }
+        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 4) {
+            Box(modifier = Modifier.fillMaxWidth().graphicsLayer(alpha = navAlpha)) {
+                SettingsNavigationCard(
+                    title = "MOTION",
+                    description = "Speed, parallax, and how particles move",
+                    onClick = { if (particlesEnabled) { performHaptic(); onMotionClick() } },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
+        }
+        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 4) {
+            Box(modifier = Modifier.fillMaxWidth().graphicsLayer(alpha = navAlpha)) {
+                SettingsNavigationCard(
+                    title = "PERFORMANCE",
+                    description = "Particle count and refresh rate settings",
+                    onClick = { if (particlesEnabled) { performHaptic(); onPerformanceClick() } },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
+        }
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ParticlesAppearancePanel  — star mode, time mode
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+fun ParticlesAppearancePanel(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    particlesEnabled: Boolean,
+    particleStarMode: Boolean,
+    onParticleStarModeChange: (Boolean) -> Unit,
+    particleTimeMode: Boolean,
+    onParticleTimeModeChange: (Boolean) -> Unit,
+    isSmallScreen: Boolean,
+    isLandscape: Boolean,
+    colors: ThemeColors,
+    cardBackground: Color,
+    performHaptic: () -> Unit,
+    oledMode: Boolean
+) {
+    val ts = LocalTypeScale.current
+    PanelScaffold(
+        visible = visible, onDismiss = onDismiss,
+        isLandscape = isLandscape, isSmallScreen = isSmallScreen,
+        oledMode = oledMode, colors = colors
+    ) { _ ->
+        CleanTitle(text = "APPEARANCE", fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
+
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 2) {
+            ToggleCard(
+                title = "TIME MODE",
+                description = "A sun and moon move across the sky based on the actual time of day",
+                checked = particleTimeMode,
+                onCheckedChange = { performHaptic(); onParticleTimeModeChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode,
+                enabled = particlesEnabled
+            )
+        }
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 2) {
+            ToggleCard(
+                title = "STAR MODE",
+                description = "Swaps regular particles for tiny twinkling stars — looks great at night",
+                checked = particleStarMode,
+                onCheckedChange = { performHaptic(); onParticleStarModeChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode,
+                enabled = particlesEnabled && !particleTimeMode
+            )
+        }
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ParticlesMotionPanel  — speed, parallax, parallax sensitivity
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+fun ParticlesMotionPanel(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    particlesEnabled: Boolean,
+    particleSpeed: Int,
+    onParticleSpeedChange: (Int) -> Unit,
+    particleParallaxEnabled: Boolean,
+    onParticleParallaxChange: (Boolean) -> Unit,
+    particleParallaxSensitivity: Int,
+    onParticleParallaxSensitivityChange: (Int) -> Unit,
+    isSmallScreen: Boolean,
+    isLandscape: Boolean,
+    colors: ThemeColors,
+    cardBackground: Color,
+    performHaptic: () -> Unit,
+    oledMode: Boolean
+) {
+    val ts = LocalTypeScale.current
+    PanelScaffold(
+        visible = visible, onDismiss = onDismiss,
+        isLandscape = isLandscape, isSmallScreen = isSmallScreen,
+        oledMode = oledMode, colors = colors
+    ) { _ ->
+        CleanTitle(text = "MOTION", fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
+
+        // Speed card
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 3) {
+            val cardAlpha by animateFloatAsState(
+                targetValue = if (particlesEnabled) 1f else 0.38f,
+                animationSpec = tween(300),
+                label = "speed_alpha"
+            )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(
-                        width = if (oledMode) 0.75.dp else 1.dp,
-                        color = if (oledMode) colors.primaryAccent.copy(alpha = 0.3f) else colors.border.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(18.dp)
+                    .graphicsLayer(alpha = cardAlpha)
+                    .then(
+                        if (particlesEnabled) Modifier.border(
+                            width = if (oledMode) 0.75.dp else 1.dp,
+                            color = if (oledMode) colors.primaryAccent.copy(alpha = 0.3f) else colors.border.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(18.dp)
+                        ) else Modifier
                     )
             ) {
                 Card(
@@ -695,30 +859,63 @@ fun ParticlesPanel(
                     colors = CardDefaults.cardColors(containerColor = cardBackground),
                     shape = RoundedCornerShape(18.dp)
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                         Text(
                             text = "SPEED", fontSize = ts.labelLarge, fontWeight = FontWeight.Bold,
                             letterSpacing = 2.sp, fontFamily = quicksandFontFamily,
                             color = colors.primaryAccent.copy(alpha = 0.7f)
                         )
+                        Text(
+                            text = "Slow is 1× · Medium is 3× · Fast is 6×",
+                            fontSize = ts.bodySmall, color = colors.textSecondary,
+                            fontFamily = quicksandFontFamily, fontWeight = FontWeight.Bold
+                        )
                         GlideOptionSelector(
                             options = listOf("Slow", "Medium", "Fast"),
                             selectedIndex = particleSpeed.coerceIn(0, 2),
                             onOptionSelected = { performHaptic(); onParticleSpeedChange(it) },
-                            colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled
+                            colors = colors, modifier = Modifier.fillMaxWidth(),
+                            enabled = particlesEnabled
                         )
                     }
                 }
-            } // end Box
+            }
         }
-        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 7) {
+
+        // Parallax toggle
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 3) {
+            ToggleCard(
+                title = "PARALLAX",
+                description = "Tilt your device and the particles shift with it, adding a nice 3D depth effect",
+                checked = particleParallaxEnabled,
+                onCheckedChange = { performHaptic(); onParticleParallaxChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode,
+                enabled = particlesEnabled
+            )
+        }
+
+        // Parallax sensitivity — only meaningful when parallax is enabled
+        AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 3) {
+            val sensEnabled = particlesEnabled && particleParallaxEnabled
+            val sensAlpha by animateFloatAsState(
+                targetValue = if (sensEnabled) 1f else 0.38f,
+                animationSpec = tween(300),
+                label = "sens_alpha"
+            )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(
-                        width = if (oledMode) 0.75.dp else 1.dp,
-                        color = if (oledMode) colors.primaryAccent.copy(alpha = 0.3f) else colors.border.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(18.dp)
+                    .graphicsLayer(alpha = sensAlpha)
+                    .then(
+                        if (sensEnabled) Modifier.border(
+                            width = if (oledMode) 0.75.dp else 1.dp,
+                            color = if (oledMode) colors.primaryAccent.copy(alpha = 0.3f) else colors.border.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(18.dp)
+                        ) else Modifier
                     )
             ) {
                 Card(
@@ -726,50 +923,110 @@ fun ParticlesPanel(
                     colors = CardDefaults.cardColors(containerColor = cardBackground),
                     shape = RoundedCornerShape(18.dp)
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                         Text(
-                            text = "COUNT", fontSize = ts.labelLarge, fontWeight = FontWeight.Bold,
+                            text = "PARALLAX SENSITIVITY", fontSize = ts.labelLarge, fontWeight = FontWeight.Bold,
                             letterSpacing = 2.sp, fontFamily = quicksandFontFamily,
                             color = colors.primaryAccent.copy(alpha = 0.7f)
                         )
                         GlideOptionSelector(
                             options = listOf("Low", "Medium", "High"),
-                            selectedIndex = particleCount.coerceIn(0, 2),
-                            onOptionSelected = { performHaptic(); onParticleCountChange(it) },
-                            colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled
+                            selectedIndex = particleParallaxSensitivity.coerceIn(0, 2),
+                            onOptionSelected = { performHaptic(); onParticleParallaxSensitivityChange(it) },
+                            colors = colors, modifier = Modifier.fillMaxWidth(),
+                            enabled = sensEnabled
                         )
                     }
                 }
-            } // end Box
+            }
         }
-        AnimatedElement(visible = visible, staggerIndex = 4, totalItems = 7) {
-            ToggleCard(
-                title = "TIME MODE", description = "A sun and moon move across the sky based on the actual time of day",
-                checked = particleTimeMode,
-                onCheckedChange = { performHaptic(); onParticleTimeModeChange(it) },
-                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
-                oledMode = oledMode, enabled = particlesEnabled
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ParticlesPerformancePanel  — count, native refresh rate
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+fun ParticlesPerformancePanel(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    particlesEnabled: Boolean,
+    particleCount: Int,
+    onParticleCountChange: (Int) -> Unit,
+    nativeRefreshRate: Boolean,
+    onNativeRefreshRateChange: (Boolean) -> Unit,
+    isSmallScreen: Boolean,
+    isLandscape: Boolean,
+    colors: ThemeColors,
+    cardBackground: Color,
+    performHaptic: () -> Unit,
+    oledMode: Boolean
+) {
+    val ts = LocalTypeScale.current
+    PanelScaffold(
+        visible = visible, onDismiss = onDismiss,
+        isLandscape = isLandscape, isSmallScreen = isSmallScreen,
+        oledMode = oledMode, colors = colors
+    ) { _ ->
+        CleanTitle(text = "PERFORMANCE", fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
+
+        // Count card
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 2) {
+            val cardAlpha by animateFloatAsState(
+                targetValue = if (particlesEnabled) 1f else 0.38f,
+                animationSpec = tween(300),
+                label = "count_alpha"
             )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer(alpha = cardAlpha)
+                    .then(
+                        if (particlesEnabled) Modifier.border(
+                            width = if (oledMode) 0.75.dp else 1.dp,
+                            color = if (oledMode) colors.primaryAccent.copy(alpha = 0.3f) else colors.border.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(18.dp)
+                        ) else Modifier
+                    )
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = cardBackground),
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "COUNT", fontSize = ts.labelLarge, fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp, fontFamily = quicksandFontFamily,
+                            color = colors.primaryAccent.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            text = "Low = 75 · Medium = 150 · High = 300",
+                            fontSize = ts.bodySmall, color = colors.textSecondary,
+                            fontFamily = quicksandFontFamily, fontWeight = FontWeight.Bold
+                        )
+                        GlideOptionSelector(
+                            options = listOf("Low", "Medium", "High"),
+                            selectedIndex = particleCount.coerceIn(0, 2),
+                            onOptionSelected = { performHaptic(); onParticleCountChange(it) },
+                            colors = colors, modifier = Modifier.fillMaxWidth(),
+                            enabled = particlesEnabled
+                        )
+                    }
+                }
+            }
         }
-        AnimatedElement(visible = visible, staggerIndex = 5, totalItems = 7) {
-            ToggleCard(
-                title = "STAR MODE", description = "Swaps regular particles for tiny twinkling stars — looks great at night",
-                checked = particleStarMode,
-                onCheckedChange = { performHaptic(); onParticleStarModeChange(it) },
-                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
-                oledMode = oledMode, enabled = particlesEnabled && !particleTimeMode
-            )
-        }
-        AnimatedElement(visible = visible, staggerIndex = 6, totalItems = 7) {
-            ToggleCard(
-                title = "PARALLAX", description = "Tilt your device and the particles shift with it, adding a nice 3D depth effect",
-                checked = particleParallaxEnabled,
-                onCheckedChange = { performHaptic(); onParticleParallaxChange(it) },
-                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
-                oledMode = oledMode, enabled = particlesEnabled
-            )
-        }
-        AnimatedElement(visible = visible, staggerIndex = 7, totalItems = 7) {
+
+        // Native refresh rate toggle
+        AnimatedElement(visible = visible, staggerIndex = 2, totalItems = 2) {
             ToggleCard(
                 title = "NATIVE REFRESH RATE",
                 description = "Runs particle physics at your display's full refresh rate. Silky smooth on 120Hz devices, but uses more battery. Leave this off on older or lower-end devices",
@@ -868,23 +1125,23 @@ fun ColorCustomizationPanel(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 CompactColorPickerCard(
                     title = "GRADIENT START",
-                    description = "The color the gradient fades from at the top of the screen",
+                    description = if (oledMode) "Disabled in OLED mode" else "The color the gradient fades from at the top of the screen",
                     currentColor = customGradientStart,
                     onColorChange = onGradientStartChange,
                     colors = colors, cardBackground = cardBackground,
                     isSmallScreen = isSmallScreen, isLandscape = isLandscape,
                     advancedPicker = advancedColorPicker,
-                    enabled = !useDynamicColor || !dynamicColorAvailable, oledMode = oledMode
+                    enabled = (!useDynamicColor || !dynamicColorAvailable) && !oledMode, oledMode = oledMode
                 )
                 CompactColorPickerCard(
                     title = "GRADIENT END",
-                    description = "The color the gradient fades into at the bottom of the screen",
+                    description = if (oledMode) "Disabled in OLED mode" else "The color the gradient fades into at the bottom of the screen",
                     currentColor = customGradientEnd,
                     onColorChange = onGradientEndChange,
                     colors = colors, cardBackground = cardBackground,
                     isSmallScreen = isSmallScreen, isLandscape = isLandscape,
                     advancedPicker = advancedColorPicker,
-                    enabled = !useDynamicColor || !dynamicColorAvailable, oledMode = oledMode
+                    enabled = (!useDynamicColor || !dynamicColorAvailable) && !oledMode, oledMode = oledMode
                 )
             }
         }

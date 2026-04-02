@@ -413,12 +413,66 @@ object ShizukuHelper {
     }
 
     // ── Crash log fetching ────────────────────────────────────────────────────
+    //
+    // fetchCrashLogs uses the same concurrent-reader pattern as getAllPackageNames
+    // because "dumpsys dropbox --print" on a full dropbox can easily produce
+    // hundreds of KB — far beyond the OS pipe buffer (~64 KB).
+    // runCommand() calls waitFor() before reading stdout, so on a full dropbox
+    // the subprocess would block writing while waitFor() waits for it to exit:
+    // a classic deadlock.  Draining stdout in a concurrent coroutine prevents this.
 
     suspend fun fetchCrashLogs(): List<CrashEntry> = withContext(Dispatchers.IO) {
         if (!checkBinder() || !checkPermission()) return@withContext emptyList()
-        val raw = runCommand("dumpsys dropbox --print")
-        if (raw.startsWith("Error") || raw.isEmpty()) return@withContext emptyList()
-        parseCrashLogs(raw)
+
+        try {
+            val cls    = Shizuku::class.java
+            val method = cls.getDeclaredMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java
+            )
+            method.isAccessible = true
+            val remoteProcess = method.invoke(
+                null,
+                arrayOf("sh", "-c", "dumpsys dropbox --print"),
+                null,
+                null
+            )
+            val process = remoteProcess as? Process ?: return@withContext emptyList()
+
+            val raw = try {
+                coroutineScope {
+                    val outputDeferred = async(Dispatchers.IO) {
+                        process.inputStream.bufferedReader().readText()
+                    }
+                    // Always drain stderr — even if we don't use it — to prevent
+                    // a secondary buffer block if the command writes to both streams.
+                    val errorDeferred = async(Dispatchers.IO) {
+                        process.errorStream.bufferedReader().readText()
+                    }
+
+                    val finished = process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)
+
+                    if (!finished) {
+                        outputDeferred.cancel()
+                        errorDeferred.cancel()
+                        return@coroutineScope ""
+                    }
+
+                    val out = try { outputDeferred.await() } catch (_: Exception) { "" }
+                    errorDeferred.cancel()
+                    out
+                }
+            } finally {
+                process.destroy()
+            }
+
+            if (raw.isEmpty()) return@withContext emptyList()
+            parseCrashLogs(raw)
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 
     private fun parseCrashLogs(raw: String): List<CrashEntry> {

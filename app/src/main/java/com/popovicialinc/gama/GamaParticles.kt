@@ -149,7 +149,7 @@ data class ParticleState(
         // Natural forces - ALWAYS USE NORMAL RISING BEHAVIOR
         // Particles always rise from bottom to top with no horizontal drift
         val naturalForceX = 0f // No horizontal drift - all particles move straight up
-        val naturalForceY = -0.018f * speed * speedMultiplier // Negative = upward drift — raised from 0.01 for snappier movement
+        val naturalForceY = -0.007f * speed * speedMultiplier // Negative = upward drift — reduced for much slower movement
 
         // Parallax influence based on ROTATION CHANGE (not absolute rotation)
         // Only moves particles when device is actively rotating
@@ -660,10 +660,10 @@ fun ParticlesOverlay(
     // Speed multiplier — converted from the 0/1/2 setting once here so the
     // physics thread and inputs-sync can both reference the same value.
     val speedMultiplier = when (particleSpeed) {
-        0 -> 1.5f
-        1 -> 3.0f
-        2 -> 4.5f
-        else -> 3.0f
+        0 -> 0.12f   // Slow  — 1× base speed (very gentle drift)
+        1 -> 0.36f   // Medium — 3× Slow
+        2 -> 0.72f   // Fast  — 6× Slow
+        else -> 0.22f
     }
 
     // frameCount — incremented by the render-trigger LaunchedEffect on the main

@@ -61,6 +61,7 @@ class VulkanTileService : TileService() {
 
         val prefs       = getSharedPreferences("gama_prefs", Context.MODE_PRIVATE)
         val aggressive  = prefs.getBoolean("aggressive_mode", false)
+        val killLauncher = prefs.getBoolean("kill_launcher", false)
         val excluded    = prefs.getStringSet("excluded_apps", emptySet()) ?: emptySet()
 
         scope.launch {
@@ -68,6 +69,7 @@ class VulkanTileService : TileService() {
                 ShizukuHelper.runVulkanSuspend(
                     context        = applicationContext,
                     aggressiveMode = aggressive,
+                    killLauncher   = killLauncher,
                     excludedApps   = excluded,
                     targetedApps   = emptySet(),
                     onStatusUpdate = {}
