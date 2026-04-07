@@ -26,7 +26,7 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
     * If your device is not listed, please kindly follow [this link](https://forms.gle/qYUHHhaQNLiY9i1MA) where you will be able to fill out a form - The relevant, collected data will be added to the [spreadsheet](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
 * ☕ If you want to support the development of GAMA, [**consider donating**](https://buymeacoffee.com/popovicialinc)!
 
-# Stargazers over time
+**Stargazers over time**
 [![Stargazers over time](https://starchart.cc/palincat/gama.svg?variant=adaptive)](https://starchart.cc/palincat/gama)
 
 <br>
