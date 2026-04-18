@@ -34,12 +34,12 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
 
 <br>
 
-# **Get started on your platform**
+# Get started on your platform
 
-* 🤖 [**Android**](https://github.com/popovicialinc/gama?tab=readme-ov-file#gama-on-android) - Native app
-* 🖥️ [**Windows**](https://github.com/popovicialinc/gama_windows?tab=readme-ov-file#gama-on-windows-batch)
-* 🍎 [**MacOS**](https://github.com/bialobrzeskid/gama-macos) (adapted by bialobrzeskid)
-* 🐧 [**Linux**](https://github.com/Ameen-Sha-Cheerangan/s23-vulkan-support) (adapted by Ameen Sha Cheerangan)
+- 🤖 [**Android**](https://github.com/popovicialinc/gama?tab=readme-ov-file#gama-on-android), native app
+- 🖥️ [**Windows**](https://github.com/popovicialinc/gama_windows?tab=readme-ov-file#gama-on-windows-batch), Batch version
+- 🍎 [**macOS**](https://github.com/bialobrzeskid/gama-macos), ported by [bialobrzeskid](https://github.com/bialobrzeskid)
+- 🐧 [**Linux**](https://github.com/Ameen-Sha-Cheerangan/s23-vulkan-support), ported by [Ameen Sha Cheerangan](https://github.com/Ameen-Sha-Cheerangan)
 
 <br>
 
@@ -126,18 +126,15 @@ If OneUI has already disabled your Good Lock modules, simply re-enable them in t
 <details>
 <summary><b>🔸 The Aggressive Profile</b></summary>
 <br>
-Using the **Aggressive** profile for stopping background apps is, dare I say, nuclear, and you probably shouldn't use it... but if you **do** plan on using it, please be aware of the side effects:
+Using the Aggressive profile for stopping background apps is, dare I say, kind of nuclear, and you shouldn't really use it... but if you do plan on using it, please be aware of the side effects:
 
-- **Resets Defaults** - Your default browser and keyboard will be reset.  
-  - There's nothing we can do to fix it. You will need to manually set everything back up. Sorry!
+- Resets Defaults - Your default browser and keyboard will be reset.  
+  - It's intended behaviour. You will need to manually set everything back up. Sorry for the inconvenience!
 
-- **Connectivity Loss** - Possible loss of WiFi-Calling / VoLTE capability.  
+- Connectivity Loss - Loss of WiFi-Calling / VoLTE capability.  
   - Go to *Settings > Connections > SIM manager*, then toggle SIM 1/2 off and on again.  
   - *Thanks to Fun-Flight4427 and ActualMountain7899 for the fix.*
 
-- ...and probably some other stuff we haven't documented yet.
-
-**After you switch APIs with this profile enabled:**  
-Go to *Settings > Connections > SIM manager*, then toggle SIM 1/2 off and back on.
+... and probably some other stuff we haven't documented yet.
 <br>
 </details>
