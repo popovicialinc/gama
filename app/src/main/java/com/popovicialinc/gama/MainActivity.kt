@@ -98,7 +98,54 @@ class MainActivity : ComponentActivity() {
             }
         } catch (_: Exception) {}
 
+        // ── Request maximum display refresh rate ──────────────────────────────
+        // On LTPO / adaptive-sync panels (Galaxy S23 Ultra, Pixel Fold, etc.)
+        // `Display.getRefreshRate()` returns the *current* live rate, which the
+        // OS adaptive governor can idle all the way down to 1–60 Hz when no
+        // explicit preference is set.  The two window-attribute fields below are
+        // the official Android API for telling SurfaceFlinger "this window wants
+        // the panel's maximum rate":
+        //
+        //   preferredRefreshRate    (API 23+) — a soft Hz hint; honoured when the
+        //       system has capacity and the display supports the rate.
+        //   preferredDisplayModeId  (API 26+) — a stronger mode-level request that
+        //       also pins resolution, not just Hz.  Takes precedence over the Hz hint
+        //       and is what the Android docs recommend for smooth-animation apps.
+        //
+        // We resolve the best mode from Display.getSupportedModes() — the only
+        // reliable source of the hardware ceiling on all API levels — and set both
+        // fields so older and newer devices each get the strongest applicable signal.
+        //
+        // This does NOT force 120 Hz system-wide; it only raises the governor's
+        // target for this window.  Battery Saver and the system frame-pacing
+        // subsystem can still override it if the device is thermally throttled.
+        try {
+            val supportedModes: Array<android.view.Display.Mode>? =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    display?.supportedModes
+                } else {
+                    @Suppress("DEPRECATION")
+                    windowManager.defaultDisplay?.supportedModes
+                }
+            val bestMode = supportedModes?.maxByOrNull { it.refreshRate }
+            if (bestMode != null) {
+                val attrs = window.attributes
+                // API 23+: soft Hz hint
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    attrs.preferredRefreshRate = bestMode.refreshRate
+                }
+                // API 26+: hard mode-ID request (includes resolution + Hz)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    attrs.preferredDisplayModeId = bestMode.modeId
+                }
+                window.attributes = attrs
+            }
+        } catch (_: Exception) {}
+
         setContent {
+            val prefs = remember {
+                getSharedPreferences("gama_prefs", android.content.Context.MODE_PRIVATE)
+            }
             // ── Notification permission ───────────────────────────────────────
             var notifPermTrigger by remember { mutableStateOf(0) }
             val notifPermLauncher = rememberLauncherForActivityResult(
@@ -159,25 +206,27 @@ class MainActivity : ComponentActivity() {
             }
 
             Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
-                GamaUI(
-                    onRequestNotificationPermission = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            notifPermTrigger++
+                GamaLocalizationProvider(prefs = prefs) {
+                    GamaUI(
+                        onRequestNotificationPermission = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                notifPermTrigger++
+                            }
+                        },
+                        onExportBackup = { jsonContent, fileName ->
+                            pendingBackupContent = jsonContent
+                            createDocLauncher.launch(fileName)
+                        },
+                        onImportBackup = { callback ->
+                            pendingRestoreCallback = callback
+                            openDocLauncher.launch(arrayOf("application/json"))
+                        },
+                        onExportCrashLog = { content, fileName ->
+                            pendingCrashLogContent = content
+                            createCrashLogLauncher.launch(fileName)
                         }
-                    },
-                    onExportBackup = { jsonContent, fileName ->
-                        pendingBackupContent = jsonContent
-                        createDocLauncher.launch(fileName)
-                    },
-                    onImportBackup = { callback ->
-                        pendingRestoreCallback = callback
-                        openDocLauncher.launch(arrayOf("application/json"))
-                    },
-                    onExportCrashLog = { content, fileName ->
-                        pendingCrashLogContent = content
-                        createCrashLogLauncher.launch(fileName)
-                    }
-                )
+                    )
+                }
             }
         }
     }

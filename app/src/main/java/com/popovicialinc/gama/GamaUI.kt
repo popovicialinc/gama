@@ -113,6 +113,8 @@ fun GamaUI(
     onExportCrashLog: (content: String, fileName: String) -> Unit = { _, _ -> }
 ) {
     val ts = LocalTypeScale.current
+    val strings = LocalStrings.current
+    val languageCode = LocalLanguageCode.current.value
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val view = LocalView.current
@@ -236,6 +238,7 @@ fun GamaUI(
     var showEffects by remember { mutableStateOf(false) }
     var showBlurSettings by remember { mutableStateOf(false) }
     var showColorCustomization by remember { mutableStateOf(false) }
+    var showGradient by remember { mutableStateOf(false) }
     var showSystem by remember { mutableStateOf(false) }
     var showRendererPanel by remember { mutableStateOf(false) }
     var showIntegrationInfoDialog   by remember { mutableStateOf(false) }
@@ -246,8 +249,13 @@ fun GamaUI(
     var showParticlesAppearance by remember { mutableStateOf(false) }
     var showParticlesMotion by remember { mutableStateOf(false) }
     var showParticlesPerformance by remember { mutableStateOf(false) }
+    var showMatrixSettings   by remember { mutableStateOf(false) }
+    var showMatrixAppearance by remember { mutableStateOf(false) }
+    var showMatrixMotion     by remember { mutableStateOf(false) }
+    var showParticlesSettings by remember { mutableStateOf(false) }
     var showBackup by remember { mutableStateOf(false) }
     var showCrashLog by remember { mutableStateOf(false) }
+    var showLanguage by remember { mutableStateOf(false) }
 
     // ── Notifications panel ───────────────────────────────────────────────────
     var showNotifications by remember { mutableStateOf(false) }
@@ -306,9 +314,14 @@ fun GamaUI(
 
     // ── Appearance sub-panels ─────────────────────────────────────────────────
 
-    BackHandler(enabled = showColorCustomization) {
+    BackHandler(enabled = showColorCustomization && !showGradient) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showColorCustomization = false
+    }
+
+    BackHandler(enabled = showGradient) {
+        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+        showGradient = false
     }
 
     BackHandler(enabled = showBlurSettings) {
@@ -330,8 +343,24 @@ fun GamaUI(
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showParticlesPerformance = false
     }
+    BackHandler(enabled = showMatrixAppearance) {
+        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+        showMatrixAppearance = false
+    }
+    BackHandler(enabled = showMatrixMotion) {
+        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+        showMatrixMotion = false
+    }
+    BackHandler(enabled = showMatrixSettings) {
+        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+        showMatrixSettings = false
+    }
+    BackHandler(enabled = showParticlesSettings) {
+        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+        showParticlesSettings = false
+    }
 
-    BackHandler(enabled = showParticles && !showParticlesAppearance && !showParticlesMotion && !showParticlesPerformance) {
+    BackHandler(enabled = showParticles && !showParticlesAppearance && !showParticlesMotion && !showParticlesPerformance && !showMatrixSettings && !showMatrixAppearance && !showMatrixMotion && !showParticlesSettings) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showParticles = false
     }
@@ -363,7 +392,12 @@ fun GamaUI(
         showCrashLog = false
     }
 
-    BackHandler(enabled = showSystem && !showNotifications && !showBackup && !showCrashLog) {
+    BackHandler(enabled = showLanguage) {
+        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+        showLanguage = false
+    }
+
+    BackHandler(enabled = showSystem && !showNotifications && !showBackup && !showCrashLog && !showLanguage) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showSystem = false
     }
@@ -377,7 +411,7 @@ fun GamaUI(
 
     // ── Top-level Settings ────────────────────────────────────────────────────
 
-    BackHandler(enabled = showSettings && !showAppearance && !showColorCustomization && !showEffects && !showBlurSettings && !showParticles && !showSystem && !showNotifications && !showRendererPanel) {
+    BackHandler(enabled = showSettings && !showAppearance && !showColorCustomization && !showGradient && !showEffects && !showBlurSettings && !showParticles && !showSystem && !showNotifications && !showRendererPanel && !showLanguage) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showSettings = false
     }
@@ -440,6 +474,12 @@ fun GamaUI(
     var timeOffsetHours by remember { mutableStateOf(prefs.getFloat("time_offset_hours", 0f)) } // Developer: time offset
     var particleCount by remember { mutableStateOf(prefs.getInt("particle_count", 0)) } // 0=low(75), 1=medium(150), 2=high(300), 3=custom (default: low)
     var particleCountCustom by remember { mutableStateOf(prefs.getInt("particle_count_custom", 150).toString()) }
+    var matrixMode          by remember { mutableStateOf(prefs.getBoolean("matrix_mode", false)) }
+    var matrixSpeed         by remember { mutableStateOf(prefs.getInt("matrix_speed", 1)) }          // 0=slow 1=medium 2=fast
+    var matrixDensity       by remember { mutableStateOf(prefs.getInt("matrix_density", 1)) }        // 0=sparse 1=medium 2=dense
+    var matrixFontSize      by remember { mutableStateOf(prefs.getInt("matrix_font_size", 1)) }      // 0=small 1=medium 2=large
+    var matrixFadeLength    by remember { mutableStateOf(prefs.getInt("matrix_fade_length", 1)) }    // 0=short 1=medium 2=full
+    var matrixBgAlpha       by remember { mutableStateOf(prefs.getFloat("matrix_bg_alpha", 0f)) }    // 0=transparent 1=black
     var themePreference by remember { mutableStateOf(prefs.getInt("theme_preference", 0)) }
 
     // New settings
@@ -451,7 +491,9 @@ fun GamaUI(
     var dozeMode by remember { mutableStateOf(prefs.getBoolean("doze_mode", false)) }
     var showGpuWatchButton by remember { mutableStateOf(prefs.getBoolean("show_gpuwatch_button", false)) }
     var staggerEnabled by remember { mutableStateOf(prefs.getBoolean("stagger_enabled", true)) }
-    var nativeRefreshRate by remember { mutableStateOf(prefs.getBoolean("native_refresh_rate", false)) }
+    var shadowsEnabled by remember { mutableStateOf(prefs.getBoolean("shadows_enabled", true)) }
+    var particleNativeRefreshRate  by remember { mutableStateOf(prefs.getBoolean("particle_native_refresh_rate", false)) }
+    var particleQuarterRefreshRate by remember { mutableStateOf(prefs.getBoolean("particle_quarter_refresh_rate", false)) }
     // Using SnapshotStateList for instant updates
     val excludedAppsList = remember { mutableStateListOf<String>().apply { addAll(prefs.getStringSet("excluded_apps", setOf()) ?: emptySet()) } }
     var oledMode by remember { mutableStateOf(prefs.getBoolean("oled_mode", false)) }
@@ -513,7 +555,7 @@ fun GamaUI(
             if (isDarkTheme) {
                 Color(context.getColor(android.R.color.system_accent1_700))
             } else {
-                Color(context.getColor(android.R.color.system_accent1_200))
+                Color(context.getColor(android.R.color.system_accent1_400))
             }
         } else {
             customGradientStart
@@ -532,10 +574,37 @@ fun GamaUI(
         }
     }
 
-    // Determine target colors (Normal or Success/Pastel Green or OLED)
+    // ── Matrix rain colors — driven by accent / Dynamic Color ─────────────────
+    // Head: bright version of the accent (near-white tint when dynamic)
+    // Rain: the accent itself
+    // Trail: a darkened version for the fading tail
+    val matrixHeadColor = remember(useDynamicColor, isDarkTheme, dynamicAccent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
+            // Lighten the dynamic accent toward white for the head highlight
+            Color(context.getColor(android.R.color.system_accent1_100))
+        } else {
+            Color(0xFFFFFFFF) // classic white head when no dynamic color
+        }
+    }
+    val matrixRainColor = remember(useDynamicColor, isDarkTheme, dynamicAccent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
+            if (isDarkTheme) Color(context.getColor(android.R.color.system_accent1_300))
+            else Color(context.getColor(android.R.color.system_accent1_600))
+        } else {
+            Color(0xFF00FF41) // classic matrix green
+        }
+    }
+    val matrixTrailColor = remember(useDynamicColor, isDarkTheme, dynamicAccent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
+            Color(context.getColor(android.R.color.system_accent1_900))
+        } else {
+            Color(0xFF003B00) // classic dark green tail
+        }
+    }
+
+    // Determine target colors (Normal or OLED — dark mode is overridden by OLED)
     val baseColors = when {
-        oledMode -> ThemeColors.oledMode(dynamicAccent)  // Use normal accent for OLED mode
-        isDarkTheme -> ThemeColors.dark(dynamicAccent, dynamicGradientStart, dynamicGradientEnd)
+        oledMode || isDarkTheme -> ThemeColors.oledMode(dynamicAccent)
         else -> ThemeColors.light(dynamicAccent, dynamicGradientStart, dynamicGradientEnd)
     }
 
@@ -638,7 +707,15 @@ fun GamaUI(
         val snapDoze             = dozeMode
         val snapShowGpuWatch     = showGpuWatchButton
         val snapStagger          = staggerEnabled
-        val snapNativeRefresh    = nativeRefreshRate
+        val snapShadows          = shadowsEnabled
+        val snapParticleNativeRefresh  = particleNativeRefreshRate
+        val snapParticleQuarterRefresh = particleQuarterRefreshRate
+        val snapMatrixMode       = matrixMode
+        val snapMatrixSpeed      = matrixSpeed
+        val snapMatrixDensity    = matrixDensity
+        val snapMatrixFontSize   = matrixFontSize
+        val snapMatrixFadeLength = matrixFadeLength
+        val snapMatrixBgAlpha    = matrixBgAlpha
         val snapOled             = oledMode
         val snapOledAccent       = oledAccentColor.toArgb()
         val snapDynColorOled     = useDynamicColorOLED
@@ -676,7 +753,17 @@ fun GamaUI(
                 putBoolean("doze_mode",                 snapDoze)
                 putBoolean("show_gpuwatch_button",      snapShowGpuWatch)
                 putBoolean("stagger_enabled",           snapStagger)
-                putBoolean("native_refresh_rate",       snapNativeRefresh)
+                putBoolean("shadows_enabled",           snapShadows)
+                putBoolean("particle_native_refresh_rate",  snapParticleNativeRefresh)
+                putBoolean("particle_quarter_refresh_rate", snapParticleQuarterRefresh)
+                putBoolean("matrix_native_refresh_rate",    false)
+                putBoolean("matrix_quarter_refresh_rate",   false)
+                putBoolean("matrix_mode",          snapMatrixMode)
+                putInt("matrix_speed",             snapMatrixSpeed)
+                putInt("matrix_density",           snapMatrixDensity)
+                putInt("matrix_font_size",         snapMatrixFontSize)
+                putInt("matrix_fade_length",       snapMatrixFadeLength)
+                putFloat("matrix_bg_alpha",        snapMatrixBgAlpha)
                 putStringSet("excluded_apps",           excludedAppsSnapshot)
                 putBoolean("oled_mode",                 snapOled)
                 putInt("oled_accent_color",             snapOledAccent)
@@ -716,26 +803,28 @@ fun GamaUI(
     val anyPanelOpen by remember {
         derivedStateOf {
             showWarningDialog || showGitHubDialog || showResourcesPanel || showExternalLinkConfirm ||
-            showSettings || showAppearance || showColorCustomization ||
+            showSettings || showAppearance || showColorCustomization || showGradient ||
             showSystem || showRendererPanel ||
             showShizukuHelp || showSuccessDialog || showClearRecentsDialog ||
             showVerbosePanel || showAggressiveWarning || showGPUWatchConfirm ||
             showDeveloper || showEasterEgg || showNotifications || showBackup || showCrashLog ||
             showEffects || showBlurSettings || showParticles || showParticlesAppearance ||
-            showParticlesMotion || showParticlesPerformance || showIntegrationInfoDialog
+            showParticlesMotion || showParticlesPerformance || showMatrixSettings || showMatrixAppearance ||
+            showMatrixMotion || showParticlesSettings || showIntegrationInfoDialog
         }
     }
 
     val anyFullPanelOpen by remember {
         derivedStateOf {
             showWarningDialog || showGitHubDialog || showResourcesPanel ||
-            showSettings || showAppearance || showColorCustomization ||
+            showSettings || showAppearance || showColorCustomization || showGradient ||
             showSystem || showRendererPanel ||
             showShizukuHelp || showSuccessDialog || showClearRecentsDialog ||
             showVerbosePanel || showAggressiveWarning || showGPUWatchConfirm ||
             showDeveloper || showEasterEgg || showNotifications || showBackup || showCrashLog ||
             showEffects || showBlurSettings || showParticles || showParticlesAppearance ||
-            showParticlesMotion || showParticlesPerformance
+            showParticlesMotion || showParticlesPerformance || showMatrixSettings || showMatrixAppearance ||
+            showMatrixMotion || showParticlesSettings
         }
     }
 
@@ -773,10 +862,11 @@ fun GamaUI(
         // Show main UI immediately
         isVisible = true
 
-        // Gradient ramps up slowly (0 -> 1 over 2000ms)
+        // Gradient ramps up slowly (0 -> 1 over 2000ms) — emphasizedDecelerate means
+        // it rushes in quickly then gently settles, giving the UI a confident first impression.
         gradientStartupAlpha.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 2000, easing = LinearOutSlowInEasing)
+            animationSpec = tween(durationMillis = 1800, easing = MotionTokens.Easing.emphasizedDecelerate)
         )
     }
 
@@ -801,12 +891,12 @@ fun GamaUI(
 
         shizukuStatus = if (shizukuRunning) {
             if (shizukuPermissionGranted) {
-                if (userName.isNotEmpty()) "You're all set, $userName! ✅" else "Shizuku is running ✅"
+                if (userName.isNotEmpty()) strings["main.shizuku_ready_named"].replace("%s", userName).ifEmpty { "You're all set, $userName! ✅" } else strings["main.shizuku_ready"].ifEmpty { "Shizuku is running ✅" }
             } else {
-                "Permission needed ⚠️"
+                strings["main.shizuku_permission_needed"].ifEmpty { "Permission needed ⚠️" }
             }
         } else {
-            "Shizuku isn't running ❌"
+            strings["main.shizuku_not_running"].ifEmpty { "Shizuku isn't running ❌" }
         }
 
         scope.launch {
@@ -932,6 +1022,7 @@ fun GamaUI(
         LocalUIScale provides uiScale,
         LocalDismissOnClickOutside provides dismissOnClickOutside,
         LocalStaggerEnabled provides staggerEnabled,
+        LocalShadowsEnabled provides (shadowsEnabled && !isDarkTheme && !oledMode),
         LocalTypeScale provides typeScale,
         LocalDensity provides Density(
             density = currentDensity.density * animatedUiScale,
@@ -968,7 +1059,7 @@ fun GamaUI(
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                alpha = if (isDarkTheme) breathingAlpha else 0.6f
+                                alpha = breathingAlpha * if (isDarkTheme) 1f else 0.65f
                             }
                             .background(
                                 brush = Brush.verticalGradient(
@@ -1027,20 +1118,42 @@ fun GamaUI(
             // Independent Particles Overlay (sun/moon/clouds)
             // OUTSIDE blur box so particles stay sharp when panels open
             // Disabled when OLED mode is enabled
+            if (particlesEnabled && matrixMode) {
+                // ── Matrix digital rain ───────────────────────────────────────
+                MatrixRainOverlay(
+                    enabled          = particlesEnabled,
+                    headColor        = matrixHeadColor,
+                    rainColor        = matrixRainColor,
+                    trailColor       = matrixTrailColor,
+                    backgroundColor  = Color.Black,
+                    backgroundAlpha  = matrixBgAlpha,
+                    speedLevel       = matrixSpeed,
+                    densityLevel     = matrixDensity,
+                    fontSizeLevel    = matrixFontSize,
+                    fadeLength       = matrixFadeLength
+                )
+            }
+            // ── Original parallax particles ───────────────────────────────────
+            // Always composed (even in matrix mode) so the sun/moon can fade out
+            // smoothly via its internal celestialAlpha animation (600 ms tween).
+            // When matrixMode is active: particles are disabled and timeModeEnabled
+            // is set to false, which drives celestialAlpha → 0 with the existing
+            // ease-in-out fade instead of removing the composable instantly.
             ParticlesOverlay(
-                enabled = particlesEnabled,
-                color = colors.primaryAccent,
-                particleSpeed = particleSpeed,
-                parallaxEnabled = particleParallaxEnabled,
-                particleCount = particleCount,
+                enabled          = particlesEnabled && !matrixMode,
+                color            = colors.primaryAccent,
+                particleSpeed    = particleSpeed,
+                parallaxEnabled  = particleParallaxEnabled,
+                particleCount    = particleCount,
                 particleCountCustom = particleCountCustom.toIntOrNull() ?: 150,
                 parallaxSensitivity = animatedParallaxSensitivity,
-                starMode = particleStarMode,
-                timeModeEnabled = particleTimeMode,
-                timeOffsetHours = timeOffsetHours,
-                anyPanelOpen = anyPanelOpen,
-                isLandscape = isLandscape,
-                nativeRefreshRate = nativeRefreshRate
+                starMode         = particleStarMode,
+                timeModeEnabled  = particleTimeMode && !matrixMode,
+                timeOffsetHours  = timeOffsetHours,
+                anyPanelOpen     = anyPanelOpen,
+                isLandscape      = isLandscape,
+                nativeRefreshRate  = particleNativeRefreshRate,
+                quarterRefreshRate = particleQuarterRefreshRate
             )
 
             // ── Main content ──────────────────────────────────────────────────
@@ -1056,130 +1169,344 @@ fun GamaUI(
                     contentAlignment = Alignment.TopCenter
                 ) {
                     if (isLandscape) {
-                        // Landscape Layout - Split screen with title on left, cards on right
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Start
-                        ) {
-                            // Left half: Title section (fills 50% width, 100% height, centered content)
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .weight(1f),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                // Row 1: Title (Delay 0)
-                                AnimatedElement(visible = isVisible, staggerIndex = 0,
-                                    totalItems = 7) {
-                                    TitleSection(
-                                        colors = colors,
-                                        isSmallScreen = isSmallScreen,
-                                        isLandscape = true,
-                                        userName = userName,
-                                        currentHour = currentHour,
-                                        onEasterEgg = {
-                                            performHaptic(HapticFeedbackConstants.LONG_PRESS)
-                                            showEasterEgg = true
-                                        }
-                                    )
-                                }
-                            }
+                        // Landscape Layout — portrait style, split left/right, perfectly fitted
+                        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                            val lsAvailH  = maxHeight
+                            val lsAvailW  = maxWidth
+                            // All spacing derived from available height so nothing ever overflows
+                            val lsItemSp  = (lsAvailH * 0.036f).coerceIn(6.dp,  14.dp)
+                            val lsVPad    = (lsAvailH * 0.07f ).coerceIn(10.dp, 28.dp)
+                            val lsHPad    = (lsAvailW * 0.025f).coerceIn(16.dp, 32.dp)
 
-                            // Right half: Action cards (fills 50% width, 100% height, centered content)
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .weight(1f)
-                                    .padding(end = 24.dp), // Right padding to balance
-                                contentAlignment = Alignment.Center
-                            ) {
-                                MainContentCards(
-                                    isVisible = isVisible,
-                                    isSmallScreen = isSmallScreen,
-                                    isTablet = isTablet,
-                                    colors = colors,
-                                    cardBackground = cardBackground,
-                                    currentRenderer = currentRenderer,
-                                    commandOutput = commandOutput,
-                                    shizukuStatus = shizukuStatus,
-                                    shizukuRunning = shizukuRunning,
-                                    shizukuPermissionGranted = shizukuPermissionGranted,
-                                    onShizukuStatusClick = {
-                                        if (shizukuStatus.contains("❌") || shizukuStatus.contains("⚠️")) {
-                                            performHaptic()
-                                            shizukuHelpType = when {
-                                                shizukuStatus.contains("❌") -> "not_running"
-                                                shizukuStatus.contains("⚠️") -> "permission"
-                                                else -> ""
+                            Row(modifier = Modifier.fillMaxSize()) {
+
+                                // ── LEFT HALF ────────────────────────────────────────────────
+                                // Greeting · GAMA title+bars · Standing by · Choose your path
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .weight(1f)
+                                        .padding(horizontal = lsHPad, vertical = lsVPad),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement  = Arrangement.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement  = Arrangement.spacedBy(lsItemSp)
+                                    ) {
+                                        // Greeting — same compact pools as portrait
+                                        val lsGreeting = remember(currentHour, userName, strings) {
+                                            val pool: Array<String> = when (currentHour) {
+                                                in 0..5   -> if (userName.isNotEmpty()) arrayOf(strings["greetings.compact_late_named_1"].replace("%s",userName).ifEmpty{"Still up, $userName? 🌙"},strings["greetings.compact_late_named_2"].replace("%s",userName).ifEmpty{"Late night session, $userName? 🌙"},strings["greetings.compact_late_named_3"].replace("%s",userName).ifEmpty{"The world is quiet, $userName. 🌙"},strings["greetings.compact_late_named_4"].replace("%s",userName).ifEmpty{"Somewhere between today and tomorrow, $userName. 🌙"}) else arrayOf(strings["greetings.compact_late_1"].ifEmpty{"Still up? 🌙"},strings["greetings.compact_late_2"].ifEmpty{"Late night session? 🌙"},strings["greetings.compact_late_3"].ifEmpty{"The world is quiet. 🌙"},strings["greetings.compact_late_4"].ifEmpty{"Somewhere between today and tomorrow. 🌙"})
+                                                in 6..11  -> if (userName.isNotEmpty()) arrayOf(strings["greetings.compact_morning_named_1"].replace("%s",userName).ifEmpty{"Good morning, $userName! ☀️"},strings["greetings.compact_morning_named_2"].replace("%s",userName).ifEmpty{"Morning, $userName! ☀️"},strings["greetings.compact_morning_named_3"].replace("%s",userName).ifEmpty{"Rise and shine, $userName! ☀️"},strings["greetings.compact_morning_named_4"].replace("%s",userName).ifEmpty{"A fresh start, $userName. ☀️"},strings["greetings.compact_morning_named_5"].replace("%s",userName).ifEmpty{"Up early, $userName? ☀️"}) else arrayOf(strings["greetings.compact_morning_1"].ifEmpty{"Good morning! ☀️"},strings["greetings.compact_morning_2"].ifEmpty{"Morning! ☀️"},strings["greetings.compact_morning_3"].ifEmpty{"Rise and shine! ☀️"},strings["greetings.compact_morning_4"].ifEmpty{"A fresh start. ☀️"},strings["greetings.compact_morning_5"].ifEmpty{"Up early? ☀️"})
+                                                in 12..16 -> if (userName.isNotEmpty()) arrayOf(strings["greetings.compact_afternoon_named_1"].replace("%s",userName).ifEmpty{"Hey, $userName! 👋"},strings["greetings.compact_afternoon_named_2"].replace("%s",userName).ifEmpty{"Good afternoon, $userName! 👋"},strings["greetings.compact_afternoon_named_3"].replace("%s",userName).ifEmpty{"Welcome back, $userName. 👋"},strings["greetings.compact_afternoon_named_4"].replace("%s",userName).ifEmpty{"There you are, $userName! 👋"},strings["greetings.compact_afternoon_named_5"].replace("%s",userName).ifEmpty{"Good to see you, $userName. 👋"}) else arrayOf(strings["greetings.compact_afternoon_1"].ifEmpty{"Hey! 👋"},strings["greetings.compact_afternoon_2"].ifEmpty{"Good afternoon! 👋"},strings["greetings.compact_afternoon_3"].ifEmpty{"Welcome back. 👋"},strings["greetings.compact_afternoon_4"].ifEmpty{"There you are! 👋"},strings["greetings.compact_afternoon_5"].ifEmpty{"Good to see you. 👋"})
+                                                in 17..22 -> if (userName.isNotEmpty()) arrayOf(strings["greetings.compact_evening_named_1"].replace("%s",userName).ifEmpty{"Good evening, $userName! 🌙"},strings["greetings.compact_evening_named_2"].replace("%s",userName).ifEmpty{"Evening, $userName. 🌙"},strings["greetings.compact_evening_named_3"].replace("%s",userName).ifEmpty{"Winding down, $userName? 🌙"},strings["greetings.compact_evening_named_4"].replace("%s",userName).ifEmpty{"End of the day, $userName. 🌙"},strings["greetings.compact_evening_named_5"].replace("%s",userName).ifEmpty{"Hope it was a good one, $userName. 🌙"}) else arrayOf(strings["greetings.compact_evening_1"].ifEmpty{"Good evening! 🌙"},strings["greetings.compact_evening_2"].ifEmpty{"Evening. 🌙"},strings["greetings.compact_evening_3"].ifEmpty{"Winding down? 🌙"},strings["greetings.compact_evening_4"].ifEmpty{"End of the day. 🌙"},strings["greetings.compact_evening_5"].ifEmpty{"Hope it was a good one. 🌙"})
+                                                else      -> if (userName.isNotEmpty()) arrayOf(strings["greetings.compact_midnight_named_1"].replace("%s",userName).ifEmpty{"Still at it, $userName? 🌙"},strings["greetings.compact_midnight_named_2"].replace("%s",userName).ifEmpty{"The quiet hours, $userName. 🌙"},strings["greetings.compact_midnight_named_3"].replace("%s",userName).ifEmpty{"Almost tomorrow, $userName. 🌙"},strings["greetings.compact_midnight_named_4"].replace("%s",userName).ifEmpty{"Some nights are for thinking, $userName. 🌙"},strings["greetings.compact_midnight_named_5"].replace("%s",userName).ifEmpty{"The world can wait, $userName. 🌙"}) else arrayOf(strings["greetings.compact_midnight_1"].ifEmpty{"Still at it? 🌙"},strings["greetings.compact_midnight_2"].ifEmpty{"The quiet hours. 🌙"},strings["greetings.compact_midnight_3"].ifEmpty{"Almost tomorrow. 🌙"},strings["greetings.compact_midnight_4"].ifEmpty{"Some nights are for thinking. 🌙"},strings["greetings.compact_midnight_5"].ifEmpty{"The world can wait. 🌙"})
                                             }
-                                            showShizukuHelp = true
+                                            pool.random()
                                         }
-                                    },
-                                    onVulkanClick = {
-                                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                        if (!shizukuRunning || !shizukuPermissionGranted) {
-                                            shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
-                                            showShizukuHelp = true
-                                            return@MainContentCards
-                                        }
-                                        pendingRendererName = "Vulkan"
-                                        pendingRendererSwitch = {
-                                            verboseOutput = ""
-                                            if (verboseMode) showVerbosePanel = true
-                                            ShizukuHelper.runVulkan(
-                                                context,
-                                                scope,
-                                                aggressiveMode,
-                                                killLauncher,
-                                                excludedAppsList.toSet(),
-                                                emptySet(),
-                                                { commandOutput = it },
-                                                if (verboseMode) { output -> verboseOutput += output } else null
+                                        AnimatedElement(visible = isVisible, staggerIndex = 0, totalItems = 8) {
+                                            Text(
+                                                text = lsGreeting,
+                                                fontSize = ts.bodyLarge,
+                                                fontFamily = quicksandFontFamily,
+                                                color = colors.textSecondary.copy(alpha = 0.8f),
+                                                textAlign = TextAlign.Center,
+                                                fontWeight = FontWeight.Bold
                                             )
                                         }
-                                        successDialogMessage = "Vulkan has been applied!"
-                                        showWarningDialog = true
-                                    },
-                                    onOpenGLClick = {
-                                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                        if (!shizukuRunning || !shizukuPermissionGranted) {
-                                            shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
-                                            showShizukuHelp = true
-                                            return@MainContentCards
+
+                                        // GAMA title with decorative bars — identical to portrait
+                                        AnimatedElement(visible = isVisible, staggerIndex = 1, totalItems = 8) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.Center
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .height(4.dp)
+                                                        .background(
+                                                            brush = Brush.horizontalGradient(
+                                                                colors = listOf(
+                                                                    colors.primaryAccent.copy(alpha = 0f),
+                                                                    colors.primaryAccent.copy(alpha = 1f)
+                                                                )
+                                                            )
+                                                        )
+                                                )
+                                                val lsGamaTextSize = (ts.displayLarge.value * 1.22f).sp
+                                                val lsGamaGlowPaint = remember(colors.textPrimary, lsGamaTextSize) {
+                                                    android.graphics.Paint().apply {
+                                                        isAntiAlias = true
+                                                        color = android.graphics.Color.TRANSPARENT
+                                                        setShadowLayer(200f, 0f, 0f, colors.textPrimary.toArgb())
+                                                        textAlign = android.graphics.Paint.Align.CENTER
+                                                        isDither = true
+                                                    }
+                                                }
+                                                Text(
+                                                    text = "GAMA",
+                                                    fontSize = lsGamaTextSize,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = quicksandFontFamily,
+                                                    color = colors.textPrimary,
+                                                    textAlign = TextAlign.Center,
+                                                    modifier = Modifier
+                                                        .padding(horizontal = 24.dp)
+                                                        .pointerInput(Unit) {
+                                                            detectTapGestures(
+                                                                onLongPress = {
+                                                                    performHaptic(HapticFeedbackConstants.LONG_PRESS)
+                                                                    showEasterEgg = true
+                                                                }
+                                                            )
+                                                        }
+                                                        .drawWithContent {
+                                                            drawIntoCanvas { canvas ->
+                                                                lsGamaGlowPaint.textSize = lsGamaTextSize.toPx()
+                                                                canvas.nativeCanvas.drawText(
+                                                                    "GAMA",
+                                                                    size.width / 2,
+                                                                    size.height / 2 + (lsGamaTextSize.toPx() * 0.25f),
+                                                                    lsGamaGlowPaint
+                                                                )
+                                                            }
+                                                            drawContent()
+                                                        }
+                                                )
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .height(4.dp)
+                                                        .background(
+                                                            brush = Brush.horizontalGradient(
+                                                                colors = listOf(
+                                                                    colors.primaryAccent.copy(alpha = 1f),
+                                                                    colors.primaryAccent.copy(alpha = 0f)
+                                                                )
+                                                            )
+                                                        )
+                                                )
+                                            }
                                         }
-                                        pendingRendererName = "OpenGL"
-                                        pendingRendererSwitch = {
-                                            verboseOutput = ""
-                                            if (verboseMode) showVerbosePanel = true
-                                            ShizukuHelper.runOpenGL(
-                                                context,
-                                                scope,
-                                                aggressiveMode,
-                                                killLauncher,
-                                                excludedAppsList.toSet(),
-                                                emptySet(),
-                                                { commandOutput = it },
-                                                if (verboseMode) { output -> verboseOutput += output } else null
+
+                                        // Standing by — identical to portrait
+                                        AnimatedElement(visible = isVisible, staggerIndex = 2, totalItems = 8) {
+                                            Text(
+                                                text = strings["main.standing_by"].ifEmpty { "Standing by and awaiting your command" },
+                                                fontSize = ts.bodyLarge,
+                                                fontFamily = quicksandFontFamily,
+                                                color = colors.textSecondary,
+                                                textAlign = TextAlign.Center,
+                                                fontWeight = FontWeight.Bold
                                             )
                                         }
-                                        successDialogMessage = "OpenGL has been applied!"
-                                        showWarningDialog = true
-                                    },
-                                    onResourcesClick = {
-                                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                        showResourcesPanel = true
-                                    },
-                                    onGPUWatchClick = {
-                                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                        showGPUWatchConfirm = true // Correctly show dialog first
-                                    },
-                                    showGpuWatchButton = showGpuWatchButton,
-                                    oledMode = oledMode,
-                                    rendererLoading = rendererLoading,
-                                    lastSwitchTime = lastSwitchTime
-                                )
+
+                                        // Choose your path — identical to portrait
+                                        AnimatedElement(visible = isVisible, staggerIndex = 3, totalItems = 8) {
+                                            Text(
+                                                text = strings["main.whats_next"].ifEmpty { "CHOOSE YOUR PATH." },
+                                                fontSize = ts.bodyLarge,
+                                                fontFamily = quicksandFontFamily,
+                                                color = colors.primaryAccent.copy(alpha = 0.7f),
+                                                fontWeight = FontWeight.Bold,
+                                                letterSpacing = 2.sp,
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // ── RIGHT HALF ───────────────────────────────────────────────
+                                // Unified frosted-glass box — identical to portrait's single card
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .weight(1f)
+                                        .padding(start = 0.dp, top = lsVPad, end = lsHPad, bottom = lsVPad),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    AnimatedElement(
+                                        visible = isVisible, staggerIndex = 4, cardShadow = true,
+                                        totalItems = 8, enabled = shizukuRunning && shizukuPermissionGranted
+                                    ) {
+                                        val lsShizukuReady = shizukuRunning && shizukuPermissionGranted
+
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(44.dp))
+                                        ) {
+                                            // Layer 1: blurred tinted background
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .matchParentSize()
+                                                        .blur(20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                                                        .background(
+                                                            if (oledMode) Color.Black.copy(alpha = 0.70f)
+                                                            else cardBackground.copy(alpha = 0.60f)
+                                                        )
+                                                )
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .matchParentSize()
+                                                        .background(
+                                                            if (oledMode) Color.Black.copy(alpha = 0.70f)
+                                                            else cardBackground.copy(alpha = 0.55f)
+                                                        )
+                                                )
+                                            }
+                                            // Layer 2: accent tint + glowing gradient border
+                                            Box(
+                                                modifier = Modifier
+                                                    .matchParentSize()
+                                                    .background(colors.primaryAccent.copy(alpha = if (oledMode) 0.03f else 0.05f))
+                                                    .border(
+                                                        width = 1.dp,
+                                                        brush = Brush.linearGradient(
+                                                            colors = listOf(
+                                                                colors.primaryAccent.copy(alpha = 0.45f),
+                                                                colors.border.copy(alpha = 0.12f),
+                                                                colors.primaryAccent.copy(alpha = 0.28f)
+                                                            )
+                                                        ),
+                                                        shape = RoundedCornerShape(44.dp)
+                                                    )
+                                            )
+                                            // Layer 3: RendererCard + buttons
+                                            Column(
+                                                modifier = Modifier.padding(16.dp),
+                                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                                            ) {
+                                                RendererCard(
+                                                    currentRenderer = currentRenderer,
+                                                    commandOutput = commandOutput,
+                                                    isSmallScreen = isSmallScreen,
+                                                    colors = colors,
+                                                    cardBackground = cardBackground,
+                                                    shizukuReady = lsShizukuReady,
+                                                    shizukuRunning = shizukuRunning,
+                                                    shizukuStatus = shizukuStatus,
+                                                    onShizukuErrorClick = {
+                                                        if (shizukuStatus.contains("❌") || shizukuStatus.contains("⚠️")) {
+                                                            performHaptic()
+                                                            shizukuHelpType = when {
+                                                                shizukuStatus.contains("❌") -> "not_running"
+                                                                shizukuStatus.contains("⚠️") -> "permission"
+                                                                else -> ""
+                                                            }
+                                                            showShizukuHelp = true
+                                                        }
+                                                    },
+                                                    oledMode = oledMode,
+                                                    rendererLoading = rendererLoading,
+                                                    lastSwitchTime = lastSwitchTime
+                                                )
+                                                // Vulkan | OpenGL
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                                ) {
+                                                    BigRendererButton(
+                                                        text = strings["renderer.vulkan"].ifEmpty { "Vulkan" },
+                                                        onClick = {
+                                                            performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                            if (!shizukuRunning || !shizukuPermissionGranted) {
+                                                                shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
+                                                                showShizukuHelp = true
+                                                                return@BigRendererButton
+                                                            }
+                                                            pendingRendererName = "Vulkan"
+                                                            pendingRendererSwitch = {
+                                                                verboseOutput = ""
+                                                                if (verboseMode) showVerbosePanel = true
+                                                                ShizukuHelper.runVulkan(
+                                                                    context, scope, aggressiveMode,
+                                                                    killLauncher,
+                                                                    excludedAppsList.toSet(), emptySet(),
+                                                                    { commandOutput = it },
+                                                                    if (verboseMode) { output -> verboseOutput += output } else null
+                                                                )
+                                                            }
+                                                            successDialogMessage = strings["main.vulkan_applied"].ifEmpty { "Vulkan has been applied!" }
+                                                            showWarningDialog = true
+                                                        },
+                                                        modifier = Modifier.weight(1f),
+                                                        isSelected = currentRenderer == "Vulkan",
+                                                        forceHighlight = true,
+                                                        enabled = lsShizukuReady,
+                                                        colors = colors,
+                                                        oledMode = oledMode,
+                                                        iconType = "vulkan"
+                                                    )
+                                                    BigRendererButton(
+                                                        text = strings["renderer.opengl"].ifEmpty { "OpenGL" },
+                                                        onClick = {
+                                                            performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                            if (!shizukuRunning || !shizukuPermissionGranted) {
+                                                                shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
+                                                                showShizukuHelp = true
+                                                                return@BigRendererButton
+                                                            }
+                                                            pendingRendererName = "OpenGL"
+                                                            pendingRendererSwitch = {
+                                                                verboseOutput = ""
+                                                                if (verboseMode) showVerbosePanel = true
+                                                                ShizukuHelper.runOpenGL(
+                                                                    context, scope, aggressiveMode,
+                                                                    killLauncher,
+                                                                    excludedAppsList.toSet(), emptySet(),
+                                                                    { commandOutput = it },
+                                                                    if (verboseMode) { output -> verboseOutput += output } else null
+                                                                )
+                                                            }
+                                                            successDialogMessage = strings["main.opengl_applied"].ifEmpty { "OpenGL has been applied!" }
+                                                            showWarningDialog = true
+                                                        },
+                                                        modifier = Modifier.weight(1f),
+                                                        isSelected = false,
+                                                        enabled = lsShizukuReady,
+                                                        colors = colors,
+                                                        oledMode = oledMode,
+                                                        iconType = "opengl"
+                                                    )
+                                                }
+                                                // Resources | GPUWatch
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                                ) {
+                                                    IllustratedButton(
+                                                        text = strings["integrations.widget_action"].ifEmpty { "Library" },
+                                                        onClick = {
+                                                            performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                            showResourcesPanel = true
+                                                        },
+                                                        modifier = if (showGpuWatchButton) Modifier.weight(1f) else Modifier.fillMaxWidth(),
+                                                        accent = false, enabled = true,
+                                                        colors = colors, oledMode = oledMode, iconType = "resources"
+                                                    )
+                                                    if (showGpuWatchButton) {
+                                                        IllustratedButton(
+                                                            text = strings["renderer.show_gpuwatch"].ifEmpty { "Open GPUWatch" },
+                                                            onClick = {
+                                                                performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                                showGPUWatchConfirm = true
+                                                            },
+                                                            modifier = Modifier.weight(1f),
+                                                            accent = false, enabled = true,
+                                                            colors = colors, oledMode = oledMode, iconType = "gpuwatch"
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     } else {
@@ -1199,18 +1526,18 @@ fun GamaUI(
                                 // Greeting — selected once per hour/name change, stable during the entrance animation.
                                 // pool.random() is called inside remember so it only runs when keys change,
                                 // not on every recomposition that happens during the 585 ms fade-in.
-                                val greeting = remember(currentHour, userName) {
+                                val greeting = remember(currentHour, userName, strings) {
                                     val pool: Array<String> = when (currentHour) {
-                                        in 0..5   -> if (userName.isNotEmpty()) arrayOf("Still up, $userName? 🌙","Late night session, $userName? 🌙","The world is quiet, $userName. 🌙","Somewhere between today and tomorrow, $userName. 🌙") else arrayOf("Still up? 🌙","Late night session? 🌙","The world is quiet. 🌙","Somewhere between today and tomorrow. 🌙")
-                                        in 6..11  -> if (userName.isNotEmpty()) arrayOf("Good morning, $userName! ☀️","Morning, $userName! ☀️","Rise and shine, $userName! ☀️","A fresh start, $userName. ☀️","Up early, $userName? ☀️") else arrayOf("Good morning! ☀️","Morning! ☀️","Rise and shine! ☀️","A fresh start. ☀️","Up early? ☀️")
-                                        in 12..16 -> if (userName.isNotEmpty()) arrayOf("Hey, $userName! 👋","Good afternoon, $userName! 👋","Welcome back, $userName. 👋","There you are, $userName! 👋","Good to see you, $userName. 👋") else arrayOf("Hey! 👋","Good afternoon! 👋","Welcome back. 👋","There you are! 👋","Good to see you. 👋")
-                                        in 17..22 -> if (userName.isNotEmpty()) arrayOf("Good evening, $userName! 🌙","Evening, $userName. 🌙","Winding down, $userName? 🌙","End of the day, $userName. 🌙","Hope it was a good one, $userName. 🌙") else arrayOf("Good evening! 🌙","Evening. 🌙","Winding down? 🌙","End of the day. 🌙","Hope it was a good one. 🌙")
-                                        else      -> if (userName.isNotEmpty()) arrayOf("Still at it, $userName? 🌙","The quiet hours, $userName. 🌙","Almost tomorrow, $userName. 🌙","Some nights are for thinking, $userName. 🌙","The world can wait, $userName. 🌙") else arrayOf("Still at it? 🌙","The quiet hours. 🌙","Almost tomorrow. 🌙","Some nights are for thinking. 🌙","The world can wait. 🌙")
+                                        in 0..5   -> if (userName.isNotEmpty()) arrayOf(strings["greetings.compact_late_named_1"].replace("%s",userName).ifEmpty{"Still up, $userName? 🌙"},strings["greetings.compact_late_named_2"].replace("%s",userName).ifEmpty{"Late night session, $userName? 🌙"},strings["greetings.compact_late_named_3"].replace("%s",userName).ifEmpty{"The world is quiet, $userName. 🌙"},strings["greetings.compact_late_named_4"].replace("%s",userName).ifEmpty{"Somewhere between today and tomorrow, $userName. 🌙"}) else arrayOf(strings["greetings.compact_late_1"].ifEmpty{"Still up? 🌙"},strings["greetings.compact_late_2"].ifEmpty{"Late night session? 🌙"},strings["greetings.compact_late_3"].ifEmpty{"The world is quiet. 🌙"},strings["greetings.compact_late_4"].ifEmpty{"Somewhere between today and tomorrow. 🌙"})
+                                        in 6..11  -> if (userName.isNotEmpty()) arrayOf(strings["greetings.compact_morning_named_1"].replace("%s",userName).ifEmpty{"Good morning, $userName! ☀️"},strings["greetings.compact_morning_named_2"].replace("%s",userName).ifEmpty{"Morning, $userName! ☀️"},strings["greetings.compact_morning_named_3"].replace("%s",userName).ifEmpty{"Rise and shine, $userName! ☀️"},strings["greetings.compact_morning_named_4"].replace("%s",userName).ifEmpty{"A fresh start, $userName. ☀️"},strings["greetings.compact_morning_named_5"].replace("%s",userName).ifEmpty{"Up early, $userName? ☀️"}) else arrayOf(strings["greetings.compact_morning_1"].ifEmpty{"Good morning! ☀️"},strings["greetings.compact_morning_2"].ifEmpty{"Morning! ☀️"},strings["greetings.compact_morning_3"].ifEmpty{"Rise and shine! ☀️"},strings["greetings.compact_morning_4"].ifEmpty{"A fresh start. ☀️"},strings["greetings.compact_morning_5"].ifEmpty{"Up early? ☀️"})
+                                        in 12..16 -> if (userName.isNotEmpty()) arrayOf(strings["greetings.compact_afternoon_named_1"].replace("%s",userName).ifEmpty{"Hey, $userName! 👋"},strings["greetings.compact_afternoon_named_2"].replace("%s",userName).ifEmpty{"Good afternoon, $userName! 👋"},strings["greetings.compact_afternoon_named_3"].replace("%s",userName).ifEmpty{"Welcome back, $userName. 👋"},strings["greetings.compact_afternoon_named_4"].replace("%s",userName).ifEmpty{"There you are, $userName! 👋"},strings["greetings.compact_afternoon_named_5"].replace("%s",userName).ifEmpty{"Good to see you, $userName. 👋"}) else arrayOf(strings["greetings.compact_afternoon_1"].ifEmpty{"Hey! 👋"},strings["greetings.compact_afternoon_2"].ifEmpty{"Good afternoon! 👋"},strings["greetings.compact_afternoon_3"].ifEmpty{"Welcome back. 👋"},strings["greetings.compact_afternoon_4"].ifEmpty{"There you are! 👋"},strings["greetings.compact_afternoon_5"].ifEmpty{"Good to see you. 👋"})
+                                        in 17..22 -> if (userName.isNotEmpty()) arrayOf(strings["greetings.compact_evening_named_1"].replace("%s",userName).ifEmpty{"Good evening, $userName! 🌙"},strings["greetings.compact_evening_named_2"].replace("%s",userName).ifEmpty{"Evening, $userName. 🌙"},strings["greetings.compact_evening_named_3"].replace("%s",userName).ifEmpty{"Winding down, $userName? 🌙"},strings["greetings.compact_evening_named_4"].replace("%s",userName).ifEmpty{"End of the day, $userName. 🌙"},strings["greetings.compact_evening_named_5"].replace("%s",userName).ifEmpty{"Hope it was a good one, $userName. 🌙"}) else arrayOf(strings["greetings.compact_evening_1"].ifEmpty{"Good evening! 🌙"},strings["greetings.compact_evening_2"].ifEmpty{"Evening. 🌙"},strings["greetings.compact_evening_3"].ifEmpty{"Winding down? 🌙"},strings["greetings.compact_evening_4"].ifEmpty{"End of the day. 🌙"},strings["greetings.compact_evening_5"].ifEmpty{"Hope it was a good one. 🌙"})
+                                        else      -> if (userName.isNotEmpty()) arrayOf(strings["greetings.compact_midnight_named_1"].replace("%s",userName).ifEmpty{"Still at it, $userName? 🌙"},strings["greetings.compact_midnight_named_2"].replace("%s",userName).ifEmpty{"The quiet hours, $userName. 🌙"},strings["greetings.compact_midnight_named_3"].replace("%s",userName).ifEmpty{"Almost tomorrow, $userName. 🌙"},strings["greetings.compact_midnight_named_4"].replace("%s",userName).ifEmpty{"Some nights are for thinking, $userName. 🌙"},strings["greetings.compact_midnight_named_5"].replace("%s",userName).ifEmpty{"The world can wait, $userName. 🌙"}) else arrayOf(strings["greetings.compact_midnight_1"].ifEmpty{"Still at it? 🌙"},strings["greetings.compact_midnight_2"].ifEmpty{"The quiet hours. 🌙"},strings["greetings.compact_midnight_3"].ifEmpty{"Almost tomorrow. 🌙"},strings["greetings.compact_midnight_4"].ifEmpty{"Some nights are for thinking. 🌙"},strings["greetings.compact_midnight_5"].ifEmpty{"The world can wait. 🌙"})
                                     }
                                     pool.random()
                                 }
                                 AnimatedElement(visible = isVisible, staggerIndex = 0,
-                                    totalItems = 7) {
+                                    totalItems = 8) {
                                     Text(
                                         text = greeting,
                                         fontSize = ts.bodyLarge,
@@ -1223,7 +1550,7 @@ fun GamaUI(
 
                                 // GAMA Title with bars
                                 AnimatedElement(visible = isVisible, staggerIndex = 1,
-                                    totalItems = 7) {
+                                    totalItems = 8) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -1314,9 +1641,9 @@ fun GamaUI(
 
                                 // Standing by text
                                 AnimatedElement(visible = isVisible, staggerIndex = 2,
-                                    totalItems = 7) {
+                                    totalItems = 8) {
                                     Text(
-                                        text = "Standing by and awaiting your command",
+                                        text = strings["main.standing_by"].ifEmpty { "Standing by and awaiting your command" },
                                         fontSize = ts.bodyLarge,  // Reduced from 18/21
                                         fontFamily = quicksandFontFamily,
                                         color = colors.textSecondary,
@@ -1327,10 +1654,10 @@ fun GamaUI(
 
                                 // What's Next
                                 AnimatedElement(visible = isVisible, staggerIndex = 3,
-                                    totalItems = 7) {
+                                    totalItems = 8) {
                                     Text(
-                                        text = "WHAT'S NEXT?",
-                                        fontSize = ts.bodyMedium,  // Reduced from 16/19
+                                        text = strings["main.whats_next"].ifEmpty { "CHOOSE YOUR PATH." },
+                                        fontSize = ts.bodyLarge,  // slightly bigger than before
                                         fontFamily = quicksandFontFamily,
                                         color = colors.primaryAccent.copy(alpha = 0.7f),
                                         fontWeight = FontWeight.Bold,
@@ -1339,39 +1666,9 @@ fun GamaUI(
                                     )
                                 }
 
-                                // Renderer Card
-                                AnimatedElement(visible = isVisible, staggerIndex = 4,
-                                    totalItems = 7) {
-                                    RendererCard(
-                                        currentRenderer = currentRenderer,
-                                        commandOutput = commandOutput,
-                                        isSmallScreen = isSmallScreen,
-                                        colors = colors,
-                                        cardBackground = cardBackground,
-                                        shizukuReady = shizukuRunning && shizukuPermissionGranted,
-                                        shizukuRunning = shizukuRunning,
-                                        shizukuStatus = shizukuStatus,
-                                        onShizukuErrorClick = {
-                                            if (shizukuStatus.contains("❌") || shizukuStatus.contains("⚠️")) {
-                                                performHaptic()
-                                                shizukuHelpType = when {
-                                                    shizukuStatus.contains("❌") -> "not_running"
-                                                    shizukuStatus.contains("⚠️") -> "permission"
-                                                    else -> ""
-                                                }
-                                                showShizukuHelp = true
-                                            }
-                                        },
-                                        oledMode = oledMode,
-                                        rendererLoading = rendererLoading,
-                                        lastSwitchTime = lastSwitchTime
-                                    )
-                                }
-
-                                // 2×2 Button Grid
-                                AnimatedElement(visible = isVisible, staggerIndex = 5,
-                                    totalItems = 7) {
-                                    // Both buttons share identical scale/alpha — one animator each instead of four
+                                // Unified frosted glass box: RendererCard + Vulkan | OpenGL + Resources | GPUWatch
+                                AnimatedElement(visible = isVisible, staggerIndex = 4, cardShadow = true,
+                                    totalItems = 8, enabled = shizukuRunning && shizukuPermissionGranted) {
                                     val buttonScale by animateFloatAsState(
                                         targetValue = if (shizukuRunning && shizukuPermissionGranted) 1f else 0.85f,
                                         animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
@@ -1383,100 +1680,181 @@ fun GamaUI(
                                         label = "button_alpha"
                                     )
                                     val shizukuReady = shizukuRunning && shizukuPermissionGranted
-                                    Column(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+
+                                    // Frosted glass wrapper — clips everything, stacks blur + border + content
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(44.dp))
                                     ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                                        ) {
-                                            IllustratedButton(
-                                                text = "Vulkan",
-                                                onClick = {
-                                                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                                    if (!shizukuRunning || !shizukuPermissionGranted) {
-                                                        shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
-                                                        showShizukuHelp = true
-                                                        return@IllustratedButton
-                                                    }
-                                                    pendingRendererName = "Vulkan"
-                                                    pendingRendererSwitch = {
-                                                        verboseOutput = ""
-                                                        if (verboseMode) showVerbosePanel = true
-                                                        ShizukuHelper.runVulkan(
-                                                            context, scope, aggressiveMode,
-                                                            killLauncher,
-                                                            excludedAppsList.toSet(), emptySet(),
-                                                            { commandOutput = it },
-                                                            if (verboseMode) { output -> verboseOutput += output } else null
-                                                        )
-                                                    }
-                                                    successDialogMessage = "Vulkan has been applied!"
-                                                    showWarningDialog = true
-                                                },
+                                        // Layer 1: blurred tinted background (API 31+), plain tint fallback below
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                            Box(
                                                 modifier = Modifier
-                                                    .weight(1f)
-                                                    .graphicsLayer(scaleX = buttonScale, scaleY = buttonScale, alpha = buttonAlpha),
-                                                accent = false, enabled = true,
-                                                colors = colors, oledMode = oledMode, iconType = "vulkan"
+                                                    .matchParentSize()
+                                                    .blur(20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                                                    .background(
+                                                        if (oledMode) Color.Black.copy(alpha = 0.70f)
+                                                        else cardBackground.copy(alpha = 0.60f)
+                                                    )
                                             )
-                                            IllustratedButton(
-                                                text = "OpenGL",
-                                                onClick = {
-                                                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                                    if (!shizukuRunning || !shizukuPermissionGranted) {
-                                                        shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
-                                                        showShizukuHelp = true
-                                                        return@IllustratedButton
-                                                    }
-                                                    pendingRendererName = "OpenGL"
-                                                    pendingRendererSwitch = {
-                                                        verboseOutput = ""
-                                                        if (verboseMode) showVerbosePanel = true
-                                                        ShizukuHelper.runOpenGL(
-                                                            context, scope, aggressiveMode,
-                                                            killLauncher,
-                                                            excludedAppsList.toSet(), emptySet(),
-                                                            { commandOutput = it },
-                                                            if (verboseMode) { output -> verboseOutput += output } else null
-                                                        )
-                                                    }
-                                                    successDialogMessage = "OpenGL has been applied!"
-                                                    showWarningDialog = true
-                                                },
+                                        } else {
+                                            Box(
                                                 modifier = Modifier
-                                                    .weight(1f)
-                                                    .graphicsLayer(scaleX = buttonScale, scaleY = buttonScale, alpha = buttonAlpha),
-                                                accent = false, enabled = true,
-                                                colors = colors, oledMode = oledMode, iconType = "opengl"
+                                                    .matchParentSize()
+                                                    .background(
+                                                        if (oledMode) Color.Black.copy(alpha = 0.70f)
+                                                        else cardBackground.copy(alpha = 0.55f)
+                                                    )
                                             )
                                         }
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+
+                                        // Layer 2: accent tint + glowing gradient border
+                                        Box(
+                                            modifier = Modifier
+                                                .matchParentSize()
+                                                .background(colors.primaryAccent.copy(alpha = if (oledMode) 0.03f else 0.05f))
+                                                .border(
+                                                    width = 1.dp,
+                                                    brush = Brush.linearGradient(
+                                                        colors = listOf(
+                                                            colors.primaryAccent.copy(alpha = 0.45f),
+                                                            colors.border.copy(alpha = 0.12f),
+                                                            colors.primaryAccent.copy(alpha = 0.28f)
+                                                        )
+                                                    ),
+                                                    shape = RoundedCornerShape(44.dp)
+                                                )
+                                        )
+
+                                        // Layer 3: buttons
+                                        Column(
+                                            modifier = Modifier.padding(16.dp),
+                                            verticalArrangement = Arrangement.spacedBy(12.dp)
                                         ) {
-                                            IllustratedButton(
-                                                text = "Resources",
-                                                onClick = {
-                                                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                                    showResourcesPanel = true
+                                            // RendererCard at the top of the box
+                                            RendererCard(
+                                                currentRenderer = currentRenderer,
+                                                commandOutput = commandOutput,
+                                                isSmallScreen = isSmallScreen,
+                                                colors = colors,
+                                                cardBackground = cardBackground,
+                                                shizukuReady = shizukuRunning && shizukuPermissionGranted,
+                                                shizukuRunning = shizukuRunning,
+                                                shizukuStatus = shizukuStatus,
+                                                onShizukuErrorClick = {
+                                                    if (shizukuStatus.contains("❌") || shizukuStatus.contains("⚠️")) {
+                                                        performHaptic()
+                                                        shizukuHelpType = when {
+                                                            shizukuStatus.contains("❌") -> "not_running"
+                                                            shizukuStatus.contains("⚠️") -> "permission"
+                                                            else -> ""
+                                                        }
+                                                        showShizukuHelp = true
+                                                    }
                                                 },
-                                                modifier = if (showGpuWatchButton) Modifier.weight(1f) else Modifier.fillMaxWidth(),
-                                                accent = false, enabled = true,
-                                                colors = colors, oledMode = oledMode, iconType = "resources"
+                                                oledMode = oledMode,
+                                                rendererLoading = rendererLoading,
+                                                lastSwitchTime = lastSwitchTime
                                             )
-                                            if (showGpuWatchButton) {
-                                                IllustratedButton(
-                                                    text = "GPUWatch",
+
+                                            // Row 1: Vulkan | OpenGL — big square cards
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                            ) {
+                                                BigRendererButton(
+                                                    text = strings["renderer.vulkan"].ifEmpty { "Vulkan" },
                                                     onClick = {
                                                         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                                        showGPUWatchConfirm = true
+                                                        if (!shizukuRunning || !shizukuPermissionGranted) {
+                                                            shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
+                                                            showShizukuHelp = true
+                                                            return@BigRendererButton
+                                                        }
+                                                        pendingRendererName = "Vulkan"
+                                                        pendingRendererSwitch = {
+                                                            verboseOutput = ""
+                                                            if (verboseMode) showVerbosePanel = true
+                                                            ShizukuHelper.runVulkan(
+                                                                context, scope, aggressiveMode,
+                                                                killLauncher,
+                                                                excludedAppsList.toSet(), emptySet(),
+                                                                { commandOutput = it },
+                                                                if (verboseMode) { output -> verboseOutput += output } else null
+                                                            )
+                                                        }
+                                                        successDialogMessage = strings["main.vulkan_applied"].ifEmpty { "Vulkan has been applied!" }
+                                                        showWarningDialog = true
                                                     },
                                                     modifier = Modifier.weight(1f),
-                                                    accent = false, enabled = true,
-                                                    colors = colors, oledMode = oledMode, iconType = "gpuwatch"
+                                                    isSelected = currentRenderer == "Vulkan",
+                                                    forceHighlight = true,
+                                                    enabled = shizukuReady,
+                                                    colors = colors,
+                                                    oledMode = oledMode,
+                                                    iconType = "vulkan"
                                                 )
+                                                BigRendererButton(
+                                                    text = strings["renderer.opengl"].ifEmpty { "OpenGL" },
+                                                    onClick = {
+                                                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                        if (!shizukuRunning || !shizukuPermissionGranted) {
+                                                            shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
+                                                            showShizukuHelp = true
+                                                            return@BigRendererButton
+                                                        }
+                                                        pendingRendererName = "OpenGL"
+                                                        pendingRendererSwitch = {
+                                                            verboseOutput = ""
+                                                            if (verboseMode) showVerbosePanel = true
+                                                            ShizukuHelper.runOpenGL(
+                                                                context, scope, aggressiveMode,
+                                                                killLauncher,
+                                                                excludedAppsList.toSet(), emptySet(),
+                                                                { commandOutput = it },
+                                                                if (verboseMode) { output -> verboseOutput += output } else null
+                                                            )
+                                                        }
+                                                        successDialogMessage = strings["main.opengl_applied"].ifEmpty { "OpenGL has been applied!" }
+                                                        showWarningDialog = true
+                                                    },
+                                                    modifier = Modifier.weight(1f),
+                                                    isSelected = false,
+                                                    enabled = shizukuReady,
+                                                    colors = colors,
+                                                    oledMode = oledMode,
+                                                    iconType = "opengl"
+                                                )
+                                            }
+
+                                            // Row 2: Resources | GPUWatch
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                            ) {
+                                                IllustratedButton(
+                                                    text = strings["integrations.widget_action"].ifEmpty { "Library" },
+                                                    onClick = {
+                                                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                        showResourcesPanel = true
+                                                    },
+                                                    modifier = if (showGpuWatchButton) Modifier.weight(1f) else Modifier.fillMaxWidth(),
+                                                    accent = false, enabled = true,
+                                                    colors = colors, oledMode = oledMode, iconType = "resources"
+                                                )
+                                                if (showGpuWatchButton) {
+                                                    IllustratedButton(
+                                                        text = strings["renderer.show_gpuwatch"].ifEmpty { "Open GPUWatch" },
+                                                        onClick = {
+                                                            performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                            showGPUWatchConfirm = true
+                                                        },
+                                                        modifier = Modifier.weight(1f),
+                                                        accent = false, enabled = true,
+                                                        colors = colors, oledMode = oledMode, iconType = "gpuwatch"
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -1520,8 +1898,13 @@ fun GamaUI(
                 // transitions are inert, only the open/close boundary animates.
                 val bgBlurRadiusOpt by animateDpAsState(
                     targetValue = if (blurActive) 40.dp else 0.dp,
+                    // Open: blur rushes in quickly (emphasizedDecelerate = fast start, soft landing).
+                    // Close: blur dissipates at a measured pace so the reveal feels intentional.
                     animationSpec = if (animationLevel != 2)
-                        tween(durationMillis = 380, easing = MotionTokens.Easing.emphasized)
+                        tween(
+                            durationMillis = if (blurActive) 320 else 420,
+                            easing = if (blurActive) MotionTokens.Easing.emphasizedDecelerate else MotionTokens.Easing.emphasized
+                        )
                     else snap(),
                     label = "bg_blur_opt_radius"
                 )
@@ -1540,8 +1923,8 @@ fun GamaUI(
                 val bgBlurRadius by animateDpAsState(
                     targetValue = if (blurActive) 40.dp else 0.dp,
                     animationSpec = tween(
-                        durationMillis = 380,
-                        easing = MotionTokens.Easing.emphasized
+                        durationMillis = if (blurActive) 320 else 420,
+                        easing = if (blurActive) MotionTokens.Easing.emphasizedDecelerate else MotionTokens.Easing.emphasized
                     ),
                     label = "bg_blur_radius"
                 )
@@ -1755,7 +2138,7 @@ fun GamaUI(
 
 
             SettingsPanel(
-                visible = showSettings && !showAppearance && !showColorCustomization && !showSystem && !showEffects && !showParticles && !showNotifications && !showBackup && !showCrashLog && !showRendererPanel,
+                visible = showSettings && !showAppearance && !showColorCustomization && !showGradient && !showSystem && !showEffects && !showParticles && !showNotifications && !showBackup && !showCrashLog && !showRendererPanel && !showLanguage,
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showSettings = false
@@ -1858,7 +2241,7 @@ fun GamaUI(
             //    Modifier.blur never covered their backgrounds and z-order was fragile)
 
             SystemPanel(
-                visible = showSystem && !showNotifications && !showBackup && !showCrashLog,
+                visible = showSystem && !showNotifications && !showBackup && !showCrashLog && !showLanguage,
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showSystem = false
@@ -1886,6 +2269,10 @@ fun GamaUI(
                 onCrashLogClick = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showCrashLog = true
+                },
+                onLanguageClick = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showLanguage = true
                 },
                 isSmallScreen = isSmallScreen,
                 isLandscape = isLandscape,
@@ -1990,7 +2377,14 @@ fun GamaUI(
                                 aggressiveMode       = prefs.getBoolean("aggressive_mode", false)
                                 killLauncher         = prefs.getBoolean("kill_launcher", false)
                                 staggerEnabled       = prefs.getBoolean("stagger_enabled", true)
-                                nativeRefreshRate    = prefs.getBoolean("native_refresh_rate", false)
+                                particleNativeRefreshRate  = prefs.getBoolean("particle_native_refresh_rate", false)
+                                particleQuarterRefreshRate = prefs.getBoolean("particle_quarter_refresh_rate", false)
+                                matrixMode       = prefs.getBoolean("matrix_mode", false)
+                                matrixSpeed      = prefs.getInt("matrix_speed", 1)
+                                matrixDensity    = prefs.getInt("matrix_density", 1)
+                                matrixFontSize   = prefs.getInt("matrix_font_size", 1)
+                                matrixFadeLength = prefs.getInt("matrix_fade_length", 1)
+                                matrixBgAlpha    = prefs.getFloat("matrix_bg_alpha", 0f)
                                 oledMode             = prefs.getBoolean("oled_mode", false)
                                 oledAccentColor      = Color(prefs.getInt("oled_accent_color", 0xFF4895EF.toInt()))
                                 useDynamicColorOLED  = prefs.getBoolean("use_dynamic_color_oled", false)
@@ -2033,6 +2427,22 @@ fun GamaUI(
                 cardBackground = cardBackground,
                 oledMode = oledMode,
                 onExportCrashLog = onExportCrashLog
+            )
+
+            // ── Language panel ─────────────────────────────────────────────
+            LanguagePanel(
+                visible = showLanguage,
+                onDismiss = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showLanguage = false
+                },
+                isSmallScreen = isSmallScreen,
+                isLandscape = isLandscape,
+                isTablet = isTablet,
+                colors = colors,
+                cardBackground = cardBackground,
+                performHaptic = { performHaptic() },
+                oledMode = oledMode
             )
 
             // ── Info dialog for QS Tiles / Widget (shown from Resources panel) ──
@@ -2112,7 +2522,7 @@ fun GamaUI(
 
 
             VisualEffectsPanel(
-                visible = showAppearance && !showEffects && !showColorCustomization && !showBlurSettings && !showParticles,
+                visible = showAppearance && !showEffects && !showColorCustomization && !showGradient && !showBlurSettings && !showParticles,
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showAppearance = false
@@ -2145,6 +2555,8 @@ fun GamaUI(
                 cardBackground = cardBackground,
                 staggerEnabled = staggerEnabled,
                 onStaggerEnabledChange = { staggerEnabled = it; savePreferences() },
+                shadowsEnabled = shadowsEnabled,
+                onShadowsEnabledChange = { shadowsEnabled = it; savePreferences() },
                 onEffectsClick = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showEffects = true
@@ -2170,12 +2582,6 @@ fun GamaUI(
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showEffects = false
-                },
-                gradientEnabled = gradientEnabled,
-                onGradientChange = { value ->
-                    performHaptic(HapticFeedbackConstants.CLOCK_TICK)
-                    gradientEnabled = value
-                    savePreferences()
                 },
                 onBlurSettingsClick = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
@@ -2223,7 +2629,9 @@ fun GamaUI(
 
             // ── Particles hub — visible when no sub-panel is open ─────────────
             ParticlesPanel(
-                visible = showParticles && !showParticlesAppearance && !showParticlesMotion && !showParticlesPerformance,
+                visible = showParticles && !showParticlesAppearance && !showParticlesMotion
+                        && !showParticlesPerformance && !showMatrixSettings && !showMatrixAppearance
+                        && !showMatrixMotion && !showParticlesSettings,
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showParticles = false
@@ -2234,6 +2642,36 @@ fun GamaUI(
                     particlesEnabled = value
                     savePreferences()
                 },
+                matrixMode = matrixMode,
+                onMatrixModeChange = { value ->
+                    matrixMode = value
+                    savePreferences()
+                },
+                onParticlesSettingsClick = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showParticlesSettings = true
+                },
+                onMatrixSettingsClick = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showMatrixSettings = true
+                },
+                isSmallScreen = isSmallScreen,
+                isLandscape   = isLandscape,
+                isTablet      = isTablet,
+                colors        = colors,
+                cardBackground = cardBackground,
+                performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
+                oledMode      = oledMode
+            )
+
+            // ── Particles Settings sub-panel ──────────────────────────────────
+            ParticlesSettingsPanel(
+                visible = showParticlesSettings,
+                onDismiss = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showParticlesSettings = false
+                },
+                particlesEnabled = particlesEnabled,
                 onAppearanceClick = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showParticlesAppearance = true
@@ -2247,12 +2685,11 @@ fun GamaUI(
                     showParticlesPerformance = true
                 },
                 isSmallScreen = isSmallScreen,
-                isLandscape = isLandscape,
-                isTablet = isTablet,
-                colors = colors,
+                isLandscape   = isLandscape,
+                colors        = colors,
                 cardBackground = cardBackground,
                 performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
-                oledMode = oledMode
+                oledMode      = oledMode
             )
 
             // ── Particles › Appearance sub-panel ─────────────────────────────
@@ -2326,9 +2763,14 @@ fun GamaUI(
                     particleCount = value
                     savePreferencesDebounced()
                 },
-                nativeRefreshRate = nativeRefreshRate,
+                nativeRefreshRate = particleNativeRefreshRate,
                 onNativeRefreshRateChange = { value ->
-                    nativeRefreshRate = value
+                    particleNativeRefreshRate = value
+                    savePreferences()
+                },
+                quarterRefreshRate = particleQuarterRefreshRate,
+                onQuarterRefreshRateChange = { value ->
+                    particleQuarterRefreshRate = value
                     savePreferences()
                 },
                 isSmallScreen = isSmallScreen,
@@ -2339,8 +2781,71 @@ fun GamaUI(
                 oledMode = oledMode
             )
 
+            // ── Matrix rain settings panel ────────────────────────────────────
+            MatrixSettingsPanel(
+                visible           = showMatrixSettings && !showMatrixAppearance && !showMatrixMotion,
+                onDismiss = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showMatrixSettings = false
+                },
+                particlesEnabled  = particlesEnabled,
+                onAppearanceClick = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showMatrixAppearance = true
+                },
+                onMotionClick = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showMatrixMotion = true
+                },
+                isSmallScreen     = isSmallScreen,
+                isLandscape       = isLandscape,
+                colors            = colors,
+                cardBackground    = cardBackground,
+                performHaptic     = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
+                oledMode          = oledMode
+            )
+
+            MatrixAppearancePanel(
+                visible                    = showMatrixAppearance,
+                onDismiss = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showMatrixAppearance = false
+                },
+                particlesEnabled              = particlesEnabled,
+                matrixFontSize                = matrixFontSize,
+                onMatrixFontSizeChange        = { matrixFontSize = it; savePreferences() },
+                isSmallScreen                 = isSmallScreen,
+                isLandscape                   = isLandscape,
+                colors                        = colors,
+                cardBackground                = cardBackground,
+                performHaptic                 = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
+                oledMode                      = oledMode
+            )
+
+            MatrixMotionPanel(
+                visible                  = showMatrixMotion,
+                onDismiss = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showMatrixMotion = false
+                },
+                particlesEnabled         = particlesEnabled,
+                matrixSpeed              = matrixSpeed,
+                onMatrixSpeedChange      = { matrixSpeed = it;      savePreferences() },
+                matrixDensity            = matrixDensity,
+                onMatrixDensityChange    = { matrixDensity = it;    savePreferences() },
+                matrixFadeLength         = matrixFadeLength,
+                onMatrixFadeLengthChange = { matrixFadeLength = it; savePreferences() },
+                isSmallScreen            = isSmallScreen,
+                isLandscape              = isLandscape,
+                colors                   = colors,
+                cardBackground           = cardBackground,
+                performHaptic            = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
+                oledMode                 = oledMode
+            )
+
+
             ColorCustomizationPanel(
-                visible = showColorCustomization,
+                visible = showColorCustomization && !showGradient,
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showColorCustomization = false
@@ -2368,6 +2873,31 @@ fun GamaUI(
                     customAccentColor = color
                     savePreferencesDebounced()
                 },
+                onGradientClick = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showGradient = true
+                },
+                isDarkTheme = isDarkTheme,
+                performHaptic = { performHaptic(HapticFeedbackConstants.CONTEXT_CLICK) },
+                isSmallScreen = isSmallScreen,
+                isLandscape = isLandscape,
+                isTablet = isTablet,
+                colors = colors,
+                cardBackground = cardBackground
+            )
+
+            GradientPanel(
+                visible = showGradient,
+                onDismiss = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showGradient = false
+                },
+                gradientEnabled = gradientEnabled,
+                onGradientChange = { value ->
+                    performHaptic(HapticFeedbackConstants.CLOCK_TICK)
+                    gradientEnabled = value
+                    savePreferences()
+                },
                 customGradientStart = customGradientStart,
                 onGradientStartChange = { color ->
                     customGradientStart = color
@@ -2378,13 +2908,15 @@ fun GamaUI(
                     customGradientEnd = color
                     savePreferencesDebounced()
                 },
-                isDarkTheme = isDarkTheme,
-                performHaptic = { performHaptic(HapticFeedbackConstants.CONTEXT_CLICK) },
+                useDynamicColor = useDynamicColor,
+                advancedColorPicker = advancedColorPicker,
+                oledMode = oledMode,
                 isSmallScreen = isSmallScreen,
                 isLandscape = isLandscape,
                 isTablet = isTablet,
                 colors = colors,
-                cardBackground = cardBackground
+                cardBackground = cardBackground,
+                performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) }
             )
 
             VerbosePanel(
@@ -2486,7 +3018,7 @@ fun GamaUI(
                 ) {
                     // Version number
                     AnimatedElement(visible = isVisible, staggerIndex = 4,
-                        totalItems = 7, modifier = Modifier.align(Alignment.BottomCenter)) {
+                        totalItems = 8, modifier = Modifier.align(Alignment.BottomCenter)) {
                         Text(
                             text = "v$currentVersion",
                             fontSize = ts.labelMedium,
@@ -2498,7 +3030,7 @@ fun GamaUI(
 
                     // Settings button (bottom-end)
                     AnimatedElement(visible = isVisible, staggerIndex = 4,
-                        totalItems = 7, modifier = Modifier.align(Alignment.BottomEnd)) {
+                        totalItems = 8, modifier = Modifier.align(Alignment.BottomEnd)) {
                         val btnSize = if (isSmallScreen) 48.dp else 52.dp
                         val iconSize = if (isSmallScreen) 24.dp else 28.dp
 
@@ -2508,24 +3040,21 @@ fun GamaUI(
                         // caused a recomposition every frame on the idle main screen.
                         val settingsGlowAlpha = 0.25f
                         var settingsPressed by remember { mutableStateOf(false) }
-                        val settingsPressScale by animateFloatAsState(
-                            targetValue = if (settingsPressed) MotionTokens.Scale.subtle else 1f,
-                            animationSpec = spring(
-                                dampingRatio = if (settingsPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                                stiffness    = if (settingsPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-                            ),
-                            label = "settings_press"
-                        )
-                        val settingsBorderAlpha by animateFloatAsState(
-                            targetValue = if (settingsPressed) 1f else 0.4f,
-                            animationSpec = tween(durationMillis = if (settingsPressed) MotionTokens.Duration.flash else MotionTokens.Duration.quick, easing = FastOutSlowInEasing),
-                            label = "settings_border_a"
-                        )
-                        val settingsBorderWidth by animateDpAsState(
-                            targetValue = if (settingsPressed) 2.dp else 1.5.dp,
-                            animationSpec = tween(durationMillis = if (settingsPressed) MotionTokens.Duration.flash else MotionTokens.Duration.quick, easing = FastOutSlowInEasing),
-                            label = "settings_border_w"
-                        )
+                        // ── Single Animatable replaces 3 separate animators ───
+                        val settingsPressProgress = remember { Animatable(0f) }
+                        LaunchedEffect(settingsPressed) {
+                            settingsPressProgress.animateTo(
+                                targetValue   = if (settingsPressed) 1f else 0f,
+                                animationSpec = spring(
+                                    dampingRatio = if (settingsPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                                    stiffness    = if (settingsPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+                                )
+                            )
+                        }
+                        val spp = settingsPressProgress.value
+                        val settingsPressScale  = 1f - spp * (1f - MotionTokens.Scale.subtle)
+                        val settingsBorderAlpha = 0.4f + spp * 0.6f
+                        val settingsBorderWidth = (1.5f + spp * 0.5f).dp
                         val glowSize = btnSize * 1.8f
 
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -2611,11 +3140,13 @@ fun GamaUI(
                         // One-time label
                         androidx.compose.animation.AnimatedVisibility(
                             visible = showButtonLabels,
-                            enter = fadeIn(animationSpec = tween(400)),
-                            exit  = fadeOut(animationSpec = tween(600))
+                            enter = fadeIn(animationSpec = tween(260, easing = MotionTokens.Easing.enter)) +
+                                    slideInVertically(animationSpec = tween(260, easing = MotionTokens.Easing.emphasizedDecelerate)) { it / 3 },
+                            exit  = fadeOut(animationSpec = tween(180, easing = MotionTokens.Easing.exit)) +
+                                    slideOutVertically(animationSpec = tween(180, easing = MotionTokens.Easing.exit)) { it / 4 }
                         ) {
                             Text(
-                                text = "Settings",
+                                text = strings["settings.title"].replace("S", "S").let { it.ifEmpty { "Settings" }.lowercase().replaceFirstChar { c -> c.uppercase() } },
                                 fontSize = ts.labelSmall,
                                 fontFamily = quicksandFontFamily,
                                 fontWeight = FontWeight.Bold,

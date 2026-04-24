@@ -24,6 +24,19 @@ import kotlinx.coroutines.launch
  * if the screen was turned on (which exits doze automatically).
  */
 @RequiresApi(Build.VERSION_CODES.N)
+
+// ── Tile localization helper ──────────────────────────────────────────────────
+private fun android.content.Context.tileStr(section: String, key: String, fallback: String): String {
+    return try {
+        val prefs = getSharedPreferences("gama_prefs", android.content.Context.MODE_PRIVATE)
+        val code = prefs.getString("selected_language", "en") ?: "en"
+        if (code == "en") return fallback
+        val raw = assets.open("translations/$code.json").bufferedReader().readText()
+        org.json.JSONObject(raw).optJSONObject(section)?.optString(key)?.takeIf { it.isNotEmpty() } ?: fallback
+    } catch (_: Exception) { fallback }
+}
+
+
 class DozeTileService : TileService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -42,15 +55,15 @@ class DozeTileService : TileService() {
         super.onClick()
 
         if (!ShizukuHelper.checkBinder()) {
-            setTile(Tile.STATE_INACTIVE, "Shizuku not running")
+            setTile(Tile.STATE_INACTIVE, applicationContext.tileStr("tile","state_shizuku_not_running","Shizuku not running"))
             return
         }
         if (!ShizukuHelper.checkPermission()) {
-            setTile(Tile.STATE_INACTIVE, "Permission needed")
+            setTile(Tile.STATE_INACTIVE, applicationContext.tileStr("tile","state_permission_needed","Permission needed"))
             return
         }
 
-        setTile(Tile.STATE_UNAVAILABLE, "Applying…")
+        setTile(Tile.STATE_UNAVAILABLE, applicationContext.tileStr("tile","state_switching","Applying…"))
 
         scope.launch {
             try {
@@ -82,11 +95,11 @@ class DozeTileService : TileService() {
                     } else {
                         // State didn't change — clean up battery reporting and report failure
                         ShizukuHelper.runCommand("dumpsys battery reset")
-                        setTile(Tile.STATE_INACTIVE, "Failed — screen on?")
+                        setTile(Tile.STATE_INACTIVE, applicationContext.tileStr("tile","state_failed","Failed — screen on?"))
                     }
                 }
             } catch (e: Exception) {
-                setTile(Tile.STATE_INACTIVE, "Error — tap to retry")
+                setTile(Tile.STATE_INACTIVE, applicationContext.tileStr("tile","state_failed","Error — tap to retry"))
             }
         }
     }
@@ -104,13 +117,13 @@ class DozeTileService : TileService() {
 
     private fun setTile(state: Int, subtitle: String?) {
         val tile = qsTile ?: return
-        tile.label = "GAMA · Doze"
+        tile.label = applicationContext.tileStr("tile","label","GAMA · Doze")
         tile.state = state
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             tile.subtitle = subtitle ?: when (state) {
-                Tile.STATE_ACTIVE      -> "Deep doze active"
-                Tile.STATE_UNAVAILABLE -> "Working…"
-                else                   -> "Tap to force doze"
+                Tile.STATE_ACTIVE      -> applicationContext.tileStr("tile","state_active","Deep doze active")
+                Tile.STATE_UNAVAILABLE -> applicationContext.tileStr("common","working","Working…")
+                else                   -> applicationContext.tileStr("tile","state_tap_to_enable","Tap to force doze")
             }
         }
         tile.updateTile()

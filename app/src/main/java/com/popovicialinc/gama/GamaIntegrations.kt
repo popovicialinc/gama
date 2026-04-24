@@ -163,7 +163,7 @@ fun IntegrationsPanel(
                 Spacer(modifier = Modifier.height(if (isLandscape) 24.dp else 40.dp))
 
                 CleanTitle(
-                    text = "INTEGRATIONS",
+                    text = LocalStrings.current["integrations.title"].ifEmpty { "INTEGRATIONS" },
                     fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
                     colors = colors,
                     reverseGradient = false,
@@ -171,7 +171,7 @@ fun IntegrationsPanel(
                 )
 
                 Text(
-                    text = "Plug GAMA into your existing Android automations and shortcuts",
+                    text = LocalStrings.current["integrations.subtitle"].ifEmpty { "Plug GAMA into your existing Android automations and shortcuts" },
                     fontSize = ts.labelLarge,
                     color = colors.textSecondary,
                     fontFamily = quicksandFontFamily,
@@ -189,8 +189,8 @@ fun IntegrationsPanel(
                         ) {
                             Box(modifier = Modifier.weight(1f)) {
                                 IntegrationInfoCard(
-                                    title = "TASKER",
-                                    description = "Use broadcast intents to switch renderers automatically based on time, app launch, WiFi, or anything Tasker can do",
+                                    title = LocalStrings.current["integrations.tasker"].ifEmpty { "TASKER" },
+                                    description = LocalStrings.current["integrations.tasker_desc"].ifEmpty { "Use broadcast intents to switch renderers automatically based on time, app launch, WiFi, or anything Tasker can do" },
                                     statusLabel = "Available",
                                     statusOk = true,
                                     actionLabel = "Open Guide",
@@ -210,8 +210,8 @@ fun IntegrationsPanel(
                             Box(modifier = Modifier.weight(1f)) {
                                 val tileAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
                                 IntegrationInfoCard(
-                                    title = "QUICK SETTINGS TILES",
-                                    description = "Three tiles: Vulkan, OpenGL, and Doze. Each one lights up when active and switches instantly on tap, no menu needed",
+                                    title = LocalStrings.current["integrations.qs_tiles"].ifEmpty { "QUICK SETTINGS TILES" },
+                                    description = LocalStrings.current["integrations.qs_tiles_desc"].ifEmpty { "Three tiles: Vulkan, OpenGL, and Doze. Each one lights up when active and switches instantly on tap, no menu needed" },
                                     statusLabel = if (tileAvailable) "3 tiles available" else "Requires Android 7+",
                                     statusOk = tileAvailable,
                                     actionLabel = if (tileAvailable) "How to add" else null,
@@ -230,8 +230,8 @@ fun IntegrationsPanel(
                         }
                     } else {
                         IntegrationInfoCard(
-                            title = "TASKER",
-                            description = "Use broadcast intents to switch renderers automatically based on time, app launch, WiFi, or anything Tasker can do",
+                            title = LocalStrings.current["integrations.tasker"].ifEmpty { "TASKER" },
+                            description = LocalStrings.current["integrations.tasker_desc"].ifEmpty { "Use broadcast intents to switch renderers automatically based on time, app launch, WiFi, or anything Tasker can do" },
                             statusLabel = "Available",
                             statusOk = true,
                             actionLabel = "Open Guide",
@@ -255,8 +255,8 @@ fun IntegrationsPanel(
                     if (!isLandscape) {
                         val tileAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
                         IntegrationInfoCard(
-                            title = "QUICK SETTINGS TILES",
-                            description = "Three tiles: Vulkan, OpenGL, and Doze. Each one lights up when active and switches instantly on tap, no menu needed",
+                            title = LocalStrings.current["integrations.qs_tiles"].ifEmpty { "QUICK SETTINGS TILES" },
+                            description = LocalStrings.current["integrations.qs_tiles_desc"].ifEmpty { "Three tiles: Vulkan, OpenGL, and Doze. Each one lights up when active and switches instantly on tap, no menu needed" },
                             statusLabel = if (tileAvailable) "3 tiles available" else "Requires Android 7+",
                             statusOk = tileAvailable,
                             actionLabel = if (tileAvailable) "How to add" else null,
@@ -277,8 +277,8 @@ fun IntegrationsPanel(
                 // ── Home Screen Widget ──────────────────────────────────────
                 AnimatedElement(visible = visible, staggerIndex = 3, totalItems = 4) {
                     IntegrationInfoCard(
-                        title = "HOME SCREEN WIDGET",
-                        description = "Put a Vulkan / OpenGL toggle right on your home screen. One tap and you're switched",
+                        title = LocalStrings.current["integrations.widget"].ifEmpty { "HOME SCREEN WIDGET" },
+                        description = LocalStrings.current["integrations.widget_desc"].ifEmpty { "Put a Vulkan / OpenGL toggle right on your home screen. One tap and you're switched" },
                         statusLabel = "Available",
                         statusOk = true,
                         actionLabel = "How to add",
@@ -370,7 +370,7 @@ fun IntegrationInfoDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 DialogButton(
-                    text = "Close",
+                    text = LocalStrings.current["dialogs.btn_close"].ifEmpty { "Close" },
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth(),
                     colors = colors,
@@ -405,7 +405,7 @@ fun IntegrationInfoCard(
     val borderColor = when {
         isPressed && onAction != null -> colors.primaryAccent
         oledMode                      -> colors.primaryAccent.copy(alpha = 0.3f)
-        else                          -> colors.border
+        else                          -> colors.primaryAccent.copy(alpha = 0.55f)
     }
     val borderWidth by animateDpAsState(
         targetValue = if (isPressed && onAction != null) 2.dp else if (oledMode) 0.75.dp else 1.dp,
@@ -426,7 +426,7 @@ fun IntegrationInfoCard(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer(scaleX = pressScale, scaleY = pressScale)
-            .border(borderWidth, borderColor, RoundedCornerShape(18.dp))
+            .border(borderWidth, borderColor, RoundedCornerShape(28.dp))
     ) {
         Card(
             modifier = Modifier
@@ -440,13 +440,13 @@ fun IntegrationInfoCard(
                     } else Modifier
                 ),
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(18.dp)
+            shape = RoundedCornerShape(28.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(if (isSmallScreen) 18.dp else 22.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(if (isSmallScreen) 18.dp else 22.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -477,6 +477,8 @@ fun IntegrationInfoCard(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(4.dp))
+
                 Text(
                     text = description,
                     color = colors.textSecondary,
@@ -487,6 +489,7 @@ fun IntegrationInfoCard(
                 )
 
                 if (actionLabel != null && onAction != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End

@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
  *   <service
  *       android:name=".OpenGLTileService"
  *       android:exported="true"
- *       android:label="GAMA · OpenGL"
+ *       android:label=applicationContext.tileStr("tile","label","GAMA · OpenGL")
  *       android:icon="@drawable/ic_tile"
  *       android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
  *       <intent-filter>
@@ -31,6 +31,19 @@ import kotlinx.coroutines.launch
  *   </service>
  */
 @RequiresApi(Build.VERSION_CODES.N)
+
+// ── Tile localization helper ──────────────────────────────────────────────────
+private fun android.content.Context.tileStr(section: String, key: String, fallback: String): String {
+    return try {
+        val prefs = getSharedPreferences("gama_prefs", android.content.Context.MODE_PRIVATE)
+        val code = prefs.getString("selected_language", "en") ?: "en"
+        if (code == "en") return fallback
+        val raw = assets.open("translations/$code.json").bufferedReader().readText()
+        org.json.JSONObject(raw).optJSONObject(section)?.optString(key)?.takeIf { it.isNotEmpty() } ?: fallback
+    } catch (_: Exception) { fallback }
+}
+
+
 class OpenGLTileService : TileService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -49,15 +62,15 @@ class OpenGLTileService : TileService() {
         super.onClick()
 
         if (!ShizukuHelper.checkBinder()) {
-            setTile(Tile.STATE_INACTIVE, "Shizuku not running")
+            setTile(Tile.STATE_INACTIVE, applicationContext.tileStr("tile","state_shizuku_not_running","Shizuku not running"))
             return
         }
         if (!ShizukuHelper.checkPermission()) {
-            setTile(Tile.STATE_INACTIVE, "Permission needed")
+            setTile(Tile.STATE_INACTIVE, applicationContext.tileStr("tile","state_permission_needed","Permission needed"))
             return
         }
 
-        setTile(Tile.STATE_ACTIVE, "Switching…")
+        setTile(Tile.STATE_ACTIVE, applicationContext.tileStr("tile","state_switching","Switching…"))
 
         val prefs      = getSharedPreferences("gama_prefs", Context.MODE_PRIVATE)
         val aggressive = prefs.getBoolean("aggressive_mode", false)
@@ -77,19 +90,19 @@ class OpenGLTileService : TileService() {
                 prefs.edit().putString("last_renderer", "OpenGL").apply()
                 setTile(Tile.STATE_ACTIVE, null)
             } catch (e: Exception) {
-                setTile(Tile.STATE_INACTIVE, "Failed — tap to retry")
+                setTile(Tile.STATE_INACTIVE, applicationContext.tileStr("tile","state_failed","Failed — tap to retry"))
             }
         }
     }
 
     private fun setTile(state: Int, subtitle: String?) {
         val tile = qsTile ?: return
-        tile.label = "GAMA · OpenGL"
+        tile.label = applicationContext.tileStr("tile","label","GAMA · OpenGL")
         tile.state = state
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             tile.subtitle = subtitle ?: when (state) {
-                Tile.STATE_ACTIVE   -> "Active"
-                else                -> "Tap to enable"
+                Tile.STATE_ACTIVE   -> applicationContext.tileStr("tile","state_active","Active")
+                else                -> applicationContext.tileStr("tile","state_tap_to_enable","Tap to enable")
             }
         }
         tile.updateTile()

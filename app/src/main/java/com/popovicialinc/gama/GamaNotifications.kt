@@ -106,6 +106,19 @@ import kotlin.math.roundToInt
 // Notifications: boot + OpenGL reminder senders
 // ============================================================
 
+
+// ── Localization helper for non-composable notification functions ─────────────
+private fun Context.notifString(section: String, key: String, fallback: String): String {
+    return try {
+        val prefs = getSharedPreferences("gama_prefs", android.content.Context.MODE_PRIVATE)
+        val code = prefs.getString("selected_language", "en") ?: "en"
+        if (code == "en") return fallback
+        val raw = assets.open("translations/$code.json").bufferedReader().readText()
+        org.json.JSONObject(raw).optJSONObject(section)?.optString(key)?.takeIf { it.isNotEmpty() } ?: fallback
+    } catch (_: Exception) { fallback }
+}
+
+
 fun sendBootNotification(
     context: Context,
     userName: String = "",
@@ -134,7 +147,8 @@ fun sendBootNotification(
         notificationManager.createNotificationChannel(channel)
     }
 
-    val title = if (userName.isNotEmpty()) "Hey there, $userName! 👋" else "Hey there! 👋"
+    val title = if (userName.isNotEmpty()) context.notifString("notification","boot_title_named","Hey, $userName! 👋").replace("%s", userName) else context.notifString("notification","boot_title_unnamed","Hey! 👋")
+    val bootBody = context.notifString("notification","boot_body","Is now a good time to switch to Vulkan?")
 
     val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
     val pendingIntent = PendingIntent.getActivity(
@@ -145,7 +159,7 @@ fun sendBootNotification(
     val builder = android.app.Notification.Builder(context, channelId)
         .setSmallIcon(R.mipmap.ic_launcher)
         .setContentTitle(title)
-        .setContentText("Is now a good time to switch to Vulkan rendering?")
+        .setContentText(bootBody)
         .setContentIntent(pendingIntent)
         .setAutoCancel(true)
 
@@ -173,14 +187,13 @@ fun sendOpenGLReminderNotification(context: Context, userName: String = ""): Boo
         nm.createNotificationChannel(ch)
     }
 
-    val name = if (userName.isNotEmpty()) ", $userName" else ""
-    val title = if (userName.isNotEmpty()) "Hey there, $userName! 👋" else "Hey there! 👋"
+    val title = if (userName.isNotEmpty()) context.notifString("notification","boot_title_named","Hey, $userName! 👋").replace("%s", userName) else context.notifString("notification","boot_title_unnamed","Hey! 👋")
     val messages = listOf(
-        "Is now a good time to switch to Vulkan? ⚡",
-        "Still on OpenGL$name - Vulkan is ready whenever you are!",
-        "Quick heads up$name - you might get a speed boost from Vulkan!",
-        "Psst$name… Vulkan is just one tap away",
-        "Just a friendly nudge$name - Vulkan could make things snappier!"
+        context.notifString("notification","reminder_msg_1","Is now a good time to switch to Vulkan? ⚡"),
+        if (userName.isNotEmpty()) context.notifString("notification","reminder_msg_2_named","Still on OpenGL, $userName - Vulkan is ready whenever you are!").replace("%s",userName) else context.notifString("notification","reminder_msg_2_unnamed","Still on OpenGL - Vulkan is ready whenever you are!"),
+        if (userName.isNotEmpty()) context.notifString("notification","reminder_msg_3_named","A small alert, $userName - you might get a speed boost from Vulkan!").replace("%s",userName) else context.notifString("notification","reminder_msg_3_unnamed","A small alert - you might get a speed boost from Vulkan!"),
+        if (userName.isNotEmpty()) context.notifString("notification","reminder_msg_4_named","Psst, $userName… Vulkan is just one tap away").replace("%s",userName) else context.notifString("notification","reminder_msg_4_unnamed","Psst… Vulkan is just one tap away"),
+        if (userName.isNotEmpty()) context.notifString("notification","reminder_msg_5_named","A friendly nudge, $userName - Vulkan could make things snappier!").replace("%s",userName) else context.notifString("notification","reminder_msg_5_unnamed","A friendly nudge - Vulkan could make things snappier!")
     )
 
     return try {

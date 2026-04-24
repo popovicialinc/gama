@@ -139,6 +139,19 @@ private val S44 = DpSize(292.dp, 292.dp)
 // ─────────────────────────────────────────────────────────────────────────────
 // GamaWidget
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ── Widget localization helper ────────────────────────────────────────────────
+private fun Context.widgetStr(section: String, key: String, fallback: String): String {
+    return try {
+        val prefs = getSharedPreferences("gama_prefs", android.content.Context.MODE_PRIVATE)
+        val code = prefs.getString("selected_language", "en") ?: "en"
+        if (code == "en") return fallback
+        val raw = assets.open("translations/$code.json").bufferedReader().readText()
+        org.json.JSONObject(raw).optJSONObject(section)?.optString(key)?.takeIf { it.isNotEmpty() } ?: fallback
+    } catch (_: Exception) { fallback }
+}
+
+
 class GamaWidget : GlanceAppWidget() {
 
     override val stateDefinition: GlanceStateDefinition<*>
@@ -213,7 +226,8 @@ private fun StatusDot(s: Boolean, binderOk: Boolean, size: Int = 7) {
 
 @androidx.compose.runtime.Composable
 private fun StatusBadge(s: Boolean, binderOk: Boolean, c: WC) {
-    val label = when { s -> "Ready"; !binderOk -> "No Shizuku"; else -> "No permission" }
+    val localCtx = androidx.glance.LocalContext.current
+    val label = when { s -> localCtx.widgetStr("widget","status_ready","Ready"); !binderOk -> localCtx.widgetStr("widget","status_no_shizuku","No Shizuku"); else -> localCtx.widgetStr("widget","status_no_permission","No permission") }
     val color = when { s -> W.dotGreen; !binderOk -> W.dotRed; else -> W.dotAmber }
     GB(
         modifier = GlanceModifier
@@ -315,6 +329,7 @@ private fun WNano(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.
 // ─────────────────────────────────────────────────────────────────────────────
 @androidx.compose.runtime.Composable
 private fun WSmall(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.glance.action.Action) {
+    val localCtx = androidx.glance.LocalContext.current
     val accent = W.accent(r)
     GB(
         modifier = GlanceModifier.fillMaxSize().background(c.bg)
@@ -329,7 +344,7 @@ private fun WSmall(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx
                 StatusDot(s, binderOk, 6)
             }
             GS(GlanceModifier.defaultWeight())
-            GT("RENDERER", style = TextStyle(color = cp(c.muted), fontSize = sp(7.5f), fontWeight = GFW.Bold))
+            GT(localCtx.widgetStr("widget","renderer_label","RENDERER"), style = TextStyle(color = cp(c.muted), fontSize = sp(7.5f), fontWeight = GFW.Bold))
             GS(GlanceModifier.height(2.dp))
             GT(r, style = TextStyle(color = cp(accent), fontSize = sp(27f), fontWeight = GFW.Bold))
             GS(GlanceModifier.height(6.dp))
@@ -343,6 +358,7 @@ private fun WSmall(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx
 // ─────────────────────────────────────────────────────────────────────────────
 @androidx.compose.runtime.Composable
 private fun WMedium(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.glance.action.Action) {
+    val localCtx = androidx.glance.LocalContext.current
     val accent = W.accent(r)
     GB(
         modifier = GlanceModifier.fillMaxSize().background(c.bg)
@@ -358,7 +374,7 @@ private fun WMedium(r: String, s: Boolean, binderOk: Boolean, c: WC, op: android
             }
             GS(GlanceModifier.defaultWeight())
             GT(r, style = TextStyle(color = cp(accent), fontSize = sp(30f), fontWeight = GFW.Bold))
-            GT("Active renderer", style = TextStyle(color = cp(c.muted), fontSize = sp(9f)))
+            GT(localCtx.widgetStr("widget","active_renderer","Active renderer"), style = TextStyle(color = cp(c.muted), fontSize = sp(9f)))
             GS(GlanceModifier.defaultWeight())
             if (s) {
                 GR(modifier = GlanceModifier.fillMaxWidth()) {
@@ -380,6 +396,7 @@ private fun WMedium(r: String, s: Boolean, binderOk: Boolean, c: WC, op: android
 // ─────────────────────────────────────────────────────────────────────────────
 @androidx.compose.runtime.Composable
 private fun WWide(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.glance.action.Action) {
+    val localCtx = androidx.glance.LocalContext.current
     val accent = W.accent(r)
     GB(
         modifier = GlanceModifier.fillMaxSize().background(c.bg)
@@ -399,7 +416,7 @@ private fun WWide(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.
             GR(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = GA.CenterVertically) {
                 GC(modifier = GlanceModifier.defaultWeight()) {
                     GT(r, style = TextStyle(color = cp(accent), fontSize = sp(36f), fontWeight = GFW.Bold))
-                    GT("Active pipeline", style = TextStyle(color = cp(c.muted), fontSize = sp(9f)))
+                    GT(localCtx.widgetStr("widget","active_pipeline","Active pipeline"), style = TextStyle(color = cp(c.muted), fontSize = sp(9f)))
                 }
                 GS(GlanceModifier.width(12.dp))
                 if (s) {
@@ -435,6 +452,7 @@ private fun WWide(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.
 // ─────────────────────────────────────────────────────────────────────────────
 @androidx.compose.runtime.Composable
 private fun WTall(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.glance.action.Action) {
+    val localCtx = androidx.glance.LocalContext.current
     val accent = W.accent(r)
     GB(
         modifier = GlanceModifier.fillMaxSize().background(c.bg)
@@ -459,13 +477,13 @@ private fun WTall(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.
                 contentAlignment = GA.Center
             ) {
                 GC(horizontalAlignment = GA.CenterHorizontally, verticalAlignment = GA.CenterVertically) {
-                    GT("CURRENT RENDERER", style = TextStyle(
+                    GT(localCtx.widgetStr("widget","current_renderer","CURRENT RENDERER"), style = TextStyle(
                         color = cp(c.muted), fontSize = sp(8f), fontWeight = GFW.Bold, textAlign = GTA.Center))
                     GS(GlanceModifier.height(5.dp))
                     GT(r, style = TextStyle(color = cp(accent), fontSize = sp(38f), fontWeight = GFW.Bold, textAlign = GTA.Center))
                     GS(GlanceModifier.height(3.dp))
                     GT(
-                        if (r == "Vulkan") "Skia Vulkan pipeline" else "Skia OpenGL pipeline",
+                        if (r == "Vulkan") localCtx.widgetStr("widget","vulkan_pipeline","Skia Vulkan pipeline") else localCtx.widgetStr("widget","opengl_pipeline","Skia OpenGL pipeline"),
                         style = TextStyle(color = cp(c.muted), fontSize = sp(9f), textAlign = GTA.Center)
                     )
                 }
@@ -499,6 +517,7 @@ private fun WTall(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.
 // ─────────────────────────────────────────────────────────────────────────────
 @androidx.compose.runtime.Composable
 private fun WFull(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.glance.action.Action) {
+    val localCtx = androidx.glance.LocalContext.current
     val accent = W.accent(r)
     GB(
         modifier = GlanceModifier.fillMaxSize().background(c.bg)
@@ -548,13 +567,13 @@ private fun WFull(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.
                 contentAlignment = GA.Center
             ) {
                 GC(horizontalAlignment = GA.CenterHorizontally, verticalAlignment = GA.CenterVertically) {
-                    GT("ACTIVE RENDERER", style = TextStyle(
+                    GT(localCtx.widgetStr("widget","active_renderer_full","ACTIVE RENDERER"), style = TextStyle(
                         color = cp(c.muted), fontSize = sp(8f), fontWeight = GFW.Bold, textAlign = GTA.Center))
                     GS(GlanceModifier.height(6.dp))
                     GT(r, style = TextStyle(color = cp(accent), fontSize = sp(44f), fontWeight = GFW.Bold, textAlign = GTA.Center))
                     GS(GlanceModifier.height(4.dp))
                     GT(
-                        if (r == "Vulkan") "Skia Vulkan  ·  High performance" else "Skia OpenGL  ·  Compatibility mode",
+                        if (r == "Vulkan") localCtx.widgetStr("widget","vulkan_detail","Skia Vulkan  ·  High performance") else localCtx.widgetStr("widget","opengl_detail","Skia OpenGL  ·  Compatibility mode"),
                         style = TextStyle(color = cp(c.muted), fontSize = sp(9f), textAlign = GTA.Center)
                     )
                 }
@@ -683,7 +702,7 @@ private fun WidgetSettingsSheet(widgetId: Int, onDone: () -> Unit) {
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text("Widget Settings", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                        Text("Background is always blurred", color = Color(0x80FFFFFF), fontSize = 12.sp)
+                        Text(ctx.widgetStr("widget","settings_subtitle","Background is always blurred"), color = Color(0x80FFFFFF), fontSize = 12.sp)
                     }
                 }
                 Spacer(Modifier.height(20.dp))
@@ -697,9 +716,9 @@ private fun WidgetSettingsSheet(widgetId: Int, onDone: () -> Unit) {
                 }
                 // Option rows
                 listOf(
-                    Triple(0, "Match App Theme",  "Follows your GAMA dark/light setting"),
-                    Triple(1, "Dark",              "Near-black translucent"),
-                    Triple(2, "Light",             "Near-white translucent")
+                    Triple(0, ctx.widgetStr("widget","bg_match","Match App Theme"), ctx.widgetStr("widget","bg_match_desc","Follows your GAMA dark/light setting")),
+                    Triple(1, ctx.widgetStr("widget","bg_dark","Dark"), ctx.widgetStr("widget","bg_dark_desc","Near-black translucent")),
+                    Triple(2, ctx.widgetStr("widget","bg_light","Light"), ctx.widgetStr("widget","bg_light_desc","Near-white translucent"))
                 ).forEachIndexed { i, (v, label, desc) ->
                     WidgetSettingsRow(label, desc, bgMode == v, accent) { bgMode = v }
                     if (i < 2) {
@@ -726,7 +745,7 @@ private fun WidgetSettingsSheet(widgetId: Int, onDone: () -> Unit) {
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Apply", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(ctx.widgetStr("widget","apply","Apply"), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.height(36.dp))
             }

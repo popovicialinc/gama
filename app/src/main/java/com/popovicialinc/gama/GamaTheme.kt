@@ -264,26 +264,34 @@ object MotionTokens {
 
     object Easing {
         val emphasized = CubicBezierEasing(0.4f, 0.0f, 0.2f, 1.0f)
-        val emphasizedDecelerate = CubicBezierEasing(0.3f, 0.0f, 0.1f, 1.0f)
-        val emphasizedAccelerate = CubicBezierEasing(0.4f, 0.0f, 0.6f, 0.3f)
+        val emphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f) // refined: softer deceleration landing
+        val emphasizedAccelerate = CubicBezierEasing(0.3f, 0.0f, 0.8f, 0.15f) // refined: sharper initial kick
         val silk = CubicBezierEasing(0.45f, 0.05f, 0.55f, 0.95f)
-        val butter = CubicBezierEasing(0.45f, 0.0f, 0.15f, 1.0f)
+        val butter = CubicBezierEasing(0.35f, 0.0f, 0.1f, 1.0f)  // refined: more pronounced ease-out
         val velvet = CubicBezierEasing(0.37f, 0.0f, 0.63f, 1.0f)
+        // Enter curve: fast lift-off, gentle deceleration into final position
+        val enter = CubicBezierEasing(0.22f, 1.0f, 0.36f, 1.0f)
+        // Exit curve: immediate acceleration, swift departure
+        val exit = CubicBezierEasing(0.55f, 0.0f, 1.0f, 0.45f)
+        // Overshoot: like enter but with a subtle anticipation kick
+        val overshoot = CubicBezierEasing(0.34f, 1.2f, 0.64f, 1.0f)
     }
 
     object Springs {
         data class SpringConfig(val dampingRatio: Float, val stiffness: Float)
 
-        val silk       = SpringConfig(0.8f,  300f)
-        val smooth     = SpringConfig(0.75f, 400f)
-        val gentle     = SpringConfig(0.7f,  500f)
-        val balanced   = SpringConfig(0.6f,  600f)
-        val responsive = SpringConfig(0.55f, 700f)
-        val playful    = SpringConfig(0.5f,  250f)
-        val snappy     = SpringConfig(0.85f, 1000f)
-        // Press-down: immediate, no bounce. Release: overshoots past rest, settles with one bounce.
-        val pressDown  = SpringConfig(0.9f,  1400f)   // crisp snap to pressed state
-        val pressUp    = SpringConfig(0.48f,  480f)   // overshoot back past 1.0, one clean bounce
+        val silk       = SpringConfig(0.82f,  280f)   // slightly more damped — settles with no ringing
+        val smooth     = SpringConfig(0.76f, 380f)
+        val gentle     = SpringConfig(0.72f,  480f)
+        val balanced   = SpringConfig(0.62f,  580f)
+        val responsive = SpringConfig(0.56f, 680f)
+        val playful    = SpringConfig(0.44f,  230f)   // softer stiffness — longer, dreamier bounce
+        val snappy     = SpringConfig(0.88f, 950f)    // fractionally less stiff — avoids a hard-mechanical feel
+        // Press-down: immediate, no bounce. Release: overshoots past rest, settles with one clean bounce.
+        val pressDown  = SpringConfig(0.92f, 1500f)   // marginally higher damping — zero micro-oscillation on press
+        val pressUp    = SpringConfig(0.46f,  440f)   // slightly less stiff — bounce travels a hair further before settling
+        // Snap-back: used after swipe-to-dismiss cancel; confident return to rest
+        val snapBack   = SpringConfig(0.72f,  600f)
     }
 
     object Scale {
@@ -326,18 +334,23 @@ data class ThemeColors(
         )
 
         fun light(
-            accent: Color = Color(0xFF2563EB),
-            gradStart: Color = Color(0xFFB8D4FF),
-            gradEnd: Color = Color(0xFFE8F0FF)
+            accent: Color = Color(0xFF1D4ED8),
+            gradStart: Color = Color(0xFF3B6FD4),
+            gradEnd: Color = Color(0xFFF0F4FF)
         ) = ThemeColors(
-            background = Color(0xFFE8F0FF),
-            cardBackground = Color.White,
+            // Warm off-white base — less clinical than pure white, more depth than pale blue
+            background = Color(0xFFF5F6FA),
+            // Cards sit slightly above the background with a warm paper-white tone
+            cardBackground = Color(0xFFFCFCFE),
             primaryAccent = accent,
-            textPrimary = Color(0xFF1A1A1A),
-            textSecondary = Color(0xFF666666),
-            border = accent.copy(alpha = 0.3f),
+            // Near-black with a tiny cool tint — reads sharper than neutral dark grey
+            textPrimary = Color(0xFF0F172A),
+            // Slate-blue secondary — more character than a flat grey, harmonises with accent
+            textSecondary = Color(0xFF64748B),
+            // Slightly stronger border so cards have clear definition on the light surface
+            border = accent.copy(alpha = 0.22f),
             successColor = accent,
-            errorColor = Color(0xFFC62828),
+            errorColor = Color(0xFFB91C1C),
             gradientStart = gradStart,
             gradientEnd = gradEnd
         )
@@ -364,6 +377,10 @@ val LocalThemeColors = compositionLocalOf { ThemeColors.dark() }
 val LocalUIScale = compositionLocalOf { 1 } // 0=75%, 1=100%, 2=125%
 val LocalDismissOnClickOutside = compositionLocalOf { true } // New global setting for back behavior
 val LocalStaggerEnabled = compositionLocalOf { true } // true = cascading stagger, false = simultaneous fade+scale
+val LocalShadowsEnabled = compositionLocalOf { true } // true = card elevation shadows, false = flat (no shadow blur pass)
+val LocalCardSettled   = compositionLocalOf { true }  // false while AnimatedElement is mid-stagger, true once it lands
+val LocalCardProgress  = compositionLocalOf { 1f }    // mirrors AnimatedElement's progress [0,1]; drives directional shadow intensity
+val LocalCardEnabled   = compositionLocalOf { true }  // false when the card is disabled; drives shadow fade-out with ease-in-out animation
 val LocalTypeScale = compositionLocalOf { AdaptiveTypeScale(
     displayLarge = 50.sp, displayMedium = 44.sp, displaySmall = 37.sp,
     headlineLarge = 28.sp, headlineMedium = 24.sp, headlineSmall = 21.sp,

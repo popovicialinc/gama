@@ -118,8 +118,8 @@ fun ShizukuHelpDialog(
 ) {
     val ts = LocalTypeScale.current
     val dialogBorderAlpha = 0.3f
-    val dialogBorderWidth = 0.75.dp
-    val dialogShape = RoundedCornerShape(24.dp)
+    val dialogBorderWidth = 1.dp
+    val dialogShape = RoundedCornerShape(28.dp)
 
     BouncyDialog(visible = visible, onDismiss = onDismiss) {
     Card(
@@ -136,7 +136,7 @@ fun ShizukuHelpDialog(
             },
         colors = CardDefaults.cardColors(containerColor = cardBackground),
         shape = dialogShape,
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier
@@ -176,7 +176,7 @@ fun ShizukuHelpDialog(
 
             // Button border uses the same accent alpha as the card outline for consistency
             DialogButton(
-                text = "Okay",
+                text = LocalStrings.current["dialogs.btn_okay"].ifEmpty { "Okay" },
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth(),
                 colors = colors,
@@ -212,17 +212,18 @@ fun WarningDialog(
             modifier = Modifier
                 .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
                 .widthIn(max = 500.dp)
+                .directionalShadow(cornerRadius = 24.dp)
                 .border(
-                    width = 0.75.dp,
+                    width = 1.dp,
                     color = colors.primaryAccent.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(24.dp)
+                    shape = RoundedCornerShape(28.dp)
                 )
                 .pointerInput(Unit) {
                     detectTapGestures { /* Block taps on card from dismissing dialog */ }
                 },
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(24.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            shape = RoundedCornerShape(28.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -258,7 +259,7 @@ fun WarningDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Just a sec!",
+                        text = LocalStrings.current["dialogs.warning_title"].ifEmpty { "Just a sec!" },
                         fontSize = ts.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         fontFamily = quicksandFontFamily,
@@ -268,9 +269,11 @@ fun WarningDialog(
 
                 Text(
                     text = if (killLauncher)
-                        "This will briefly restart System UI, the launcher, and other processes to apply the change. Your device will be back to normal in just a moment."
+                        LocalStrings.current["dialogs.warning_body_with_launcher"]
+                            .ifEmpty { "This will briefly restart System UI, the launcher, and other processes to apply the change. Your device will be back to normal in just a moment." }
                     else
-                        "This will briefly restart System UI and other processes to apply the change. Your device will be back to normal in just a moment.",
+                        LocalStrings.current["dialogs.warning_body_no_launcher"]
+                            .ifEmpty { "This will briefly restart System UI and other processes to apply the change. Your device will be back to normal in just a moment." },
                     fontSize = ts.bodyLarge,
                     lineHeight = (ts.bodyLarge.value * 1.4f).sp,
                     color = colors.textPrimary.copy(alpha = 0.85f),
@@ -285,14 +288,14 @@ fun WarningDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     DialogButton(
-                        text = "Cancel",
+                        text = LocalStrings.current["dialogs.btn_cancel"].ifEmpty { "Cancel" },
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground
                     )
                     DialogButton(
-                        text = "Continue",
+                        text = LocalStrings.current["dialogs.btn_continue"].ifEmpty { "Continue" },
                         onClick = onContinue,
                         modifier = Modifier.weight(1f),
                         colors = colors,
@@ -323,11 +326,11 @@ fun ClearRecentsDialog(
             modifier = Modifier
                 .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
                 .widthIn(max = 500.dp)
-                .border(0.75.dp, colors.primaryAccent.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                .border(1.dp, colors.primaryAccent.copy(alpha = 0.3f), RoundedCornerShape(28.dp))
                 .pointerInput(Unit) { detectTapGestures { } },
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(24.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            shape = RoundedCornerShape(28.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -371,7 +374,7 @@ fun ClearRecentsDialog(
 
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(
-                        text = "Clear background apps?",
+                        text = LocalStrings.current["dialogs.clear_recents_title"].ifEmpty { "Clear background apps?" },
                         fontSize = ts.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         fontFamily = quicksandFontFamily,
@@ -380,7 +383,7 @@ fun ClearRecentsDialog(
                 }
 
                 Text(
-                    text = "Clearing the Recents menu makes sure all apps restart fresh with the new renderer. Skip this if you want to keep your open apps.",
+                    text = LocalStrings.current["dialogs.clear_recents_body"].ifEmpty { "Clearing the Recents menu makes sure all apps restart fresh with the new renderer. Skip this if you want to keep your open apps." },
                     fontSize = ts.bodyLarge,
                     lineHeight = (ts.bodyLarge.value * 1.4f).sp,
                     color = colors.textPrimary.copy(alpha = 0.85f),
@@ -395,7 +398,7 @@ fun ClearRecentsDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     DialogButton(
-                        text = "Skip",
+                        text = LocalStrings.current["dialogs.btn_skip"].ifEmpty { "Skip" },
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         colors = colors,
@@ -403,7 +406,7 @@ fun ClearRecentsDialog(
                         accent = false
                     )
                     DialogButton(
-                        text = "Clear",
+                        text = LocalStrings.current["dialogs.btn_clear"].ifEmpty { "Clear" },
                         onClick = onConfirm,
                         modifier = Modifier.weight(1f),
                         colors = colors,
@@ -472,16 +475,16 @@ fun SuccessDialog(
                 .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
                 .widthIn(max = 500.dp)
                 .border(
-                    width = 0.75.dp,
+                    width = 1.dp,
                     color = colors.primaryAccent.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(24.dp)
+                    shape = RoundedCornerShape(28.dp)
                 )
                 .pointerInput(Unit) {
                     detectTapGestures { /* Block taps on card from dismissing */ }
                 },
             colors    = CardDefaults.cardColors(containerColor = cardBackground),
-            shape     = RoundedCornerShape(24.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            shape     = RoundedCornerShape(28.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier            = Modifier
@@ -581,7 +584,7 @@ fun SuccessDialog(
                     exit    = fadeOut(tween(150))
                 ) {
                     DialogButton(
-                        text           = if (userName.isNotEmpty()) "Okay, $userName!" else "OK",
+                        text           = if (userName.isNotEmpty()) LocalStrings.current["dialogs.btn_okay_named"].replace("%s", userName).ifEmpty { "Okay, $userName!" } else LocalStrings.current["dialogs.btn_okay"].ifEmpty { "OK" },
                         onClick        = onDismiss,
                         modifier       = Modifier.fillMaxWidth(),
                         colors         = colors,
@@ -616,16 +619,16 @@ fun DeveloperMenuDialog(
                 .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
                 .widthIn(max = 500.dp)
                 .border(
-                    width = 0.75.dp,
+                    width = 1.dp,
                     color = colors.primaryAccent.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(24.dp)
+                    shape = RoundedCornerShape(28.dp)
                 )
                 .pointerInput(Unit) {
                     detectTapGestures { /* Block taps on card from dismissing dialog */ }
                 },
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(24.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            shape = RoundedCornerShape(28.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -635,7 +638,7 @@ fun DeveloperMenuDialog(
                 verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 20.dp else 24.dp)
             ) {
                 Text(
-                    text = "Developer Mode",
+                    text = LocalStrings.current["dialogs.developer_title"].ifEmpty { "Developer Mode" },
                     fontSize = ts.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     fontFamily = quicksandFontFamily,
@@ -643,7 +646,7 @@ fun DeveloperMenuDialog(
                 )
 
                 Text(
-                    text = "Developer tools for testing and debugging.",
+                    text = LocalStrings.current["dialogs.developer_subtitle"].ifEmpty { "Developer tools for testing and debugging." },
                     fontSize = ts.bodyMedium,
                     color = colors.textSecondary,
                     fontFamily = quicksandFontFamily,
@@ -654,7 +657,7 @@ fun DeveloperMenuDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 FlatButton(
-                    text = "Send Test Notification",
+                    text = LocalStrings.current["notifications.send_test"].ifEmpty { "Send Test Notification" },
                     onClick = onTestNotification,
                     modifier = Modifier.fillMaxWidth(),
                     accent = false,
@@ -664,7 +667,7 @@ fun DeveloperMenuDialog(
                 )
 
                 DialogButton(
-                    text = "Close",
+                    text = LocalStrings.current["dialogs.btn_close"].ifEmpty { "Close" },
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth(),
                     colors = colors,
@@ -697,16 +700,16 @@ fun GitHubDialog(
                 .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
                 .widthIn(max = 500.dp)
                 .border(
-                    width = 0.75.dp,
+                    width = 1.dp,
                     color = colors.primaryAccent.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(24.dp)
+                    shape = RoundedCornerShape(28.dp)
                 )
                 .pointerInput(Unit) {
                     detectTapGestures { /* Block taps on card from dismissing dialog */ }
                 },
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(24.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            shape = RoundedCornerShape(28.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -761,7 +764,7 @@ fun GitHubDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "Would you like to visit the GAMA repository on GitHub?",
+                        text = LocalStrings.current["dialogs.github_title"].ifEmpty { "Would you like to visit the GAMA repository on GitHub?" },
                         fontSize = ts.bodyLarge,
                         lineHeight = (ts.bodyLarge.value * 1.4f).sp,
                         color = colors.textPrimary.copy(alpha = 0.9f),
@@ -777,14 +780,14 @@ fun GitHubDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     DialogButton(
-                        text = "Cancel",
+                        text = LocalStrings.current["dialogs.btn_cancel"].ifEmpty { "Cancel" },
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground
                     )
                     DialogButton(
-                        text = "Sure!",
+                        text = LocalStrings.current["dialogs.btn_sure"].ifEmpty { "Sure!" },
                         onClick = onVisitGitHub,
                         modifier = Modifier.weight(1f),
                         colors = colors,
@@ -819,11 +822,11 @@ fun ExternalLinkConfirmDialog(
             modifier = Modifier
                 .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
                 .widthIn(max = 500.dp)
-                .border(0.75.dp, colors.primaryAccent.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                .border(1.dp, colors.primaryAccent.copy(alpha = 0.3f), RoundedCornerShape(28.dp))
                 .pointerInput(Unit) { detectTapGestures { } },
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(24.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            shape = RoundedCornerShape(28.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -863,7 +866,7 @@ fun ExternalLinkConfirmDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "You're leaving GAMA",
+                        text = LocalStrings.current["dialogs.external_link_title"].ifEmpty { "You're leaving GAMA" },
                         fontSize = ts.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         fontFamily = quicksandFontFamily,
@@ -887,14 +890,14 @@ fun ExternalLinkConfirmDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     DialogButton(
-                        text = "Close",
+                        text = LocalStrings.current["dialogs.btn_close"].ifEmpty { "Close" },
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground
                     )
                     DialogButton(
-                        text = "Open",
+                        text = LocalStrings.current["dialogs.btn_open"].ifEmpty { "Open" },
                         onClick = onConfirm,
                         modifier = Modifier.weight(1f),
                         colors = colors,
@@ -1079,7 +1082,7 @@ fun EasterEggDialog(
                         Spacer(Modifier.height(if (isSmallScreen) 16.dp else 22.dp))
 
                         Text(
-                            text = "Built with obsessive attention to detail,\nlate nights, and too much hot cocoa.",
+                            text = LocalStrings.current["dialogs.easter_egg_subtitle"].replace("\\n","\n").ifEmpty { "Built with obsessive attention to detail,\nlate nights, and too much hot cocoa." },
                             fontSize = ts.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = quicksandFontFamily,
@@ -1091,7 +1094,7 @@ fun EasterEggDialog(
                         Spacer(Modifier.height(if (isSmallScreen) 8.dp else 10.dp))
 
                         Text(
-                            text = "Thanks for using it.",
+                            text = LocalStrings.current["dialogs.easter_egg_thanks"].ifEmpty { "Thanks for using it." },
                             fontSize = ts.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = quicksandFontFamily,
@@ -1102,7 +1105,7 @@ fun EasterEggDialog(
                         Spacer(Modifier.height(if (isSmallScreen) 6.dp else 8.dp))
 
                         Text(
-                            text = "— @popovicialinc",
+                            text = "@palincat",
                             fontSize = ts.labelMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = quicksandFontFamily,
@@ -1115,7 +1118,7 @@ fun EasterEggDialog(
 
                         // ── Dismiss button ────────────────────────────────────
                         DialogButton(
-                            text = "❤️  Nice",
+                            text = LocalStrings.current["dialogs.btn_nice"].ifEmpty { "❤️  Nice" },
                             onClick = onDismiss,
                             modifier = Modifier.fillMaxWidth(),
                             colors = colors,
@@ -1155,10 +1158,11 @@ fun AggressiveWarningDialog(
                 modifier = Modifier
                     .fillMaxWidth(0.9f)
                     .widthIn(max = 500.dp)
-                    .border(0.75.dp, colors.primaryAccent.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                    .border(1.dp, colors.primaryAccent.copy(alpha = 0.3f), RoundedCornerShape(28.dp))
                     .pointerInput(Unit) { /* Consume taps */ },
                 colors = CardDefaults.cardColors(containerColor = cardBackground),
-                shape = RoundedCornerShape(24.dp)
+                shape = RoundedCornerShape(28.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(
                     modifier = Modifier
@@ -1167,7 +1171,7 @@ fun AggressiveWarningDialog(
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     Text(
-                        text = "Aggressive Mode Warning️ ⚠️",
+                        text = LocalStrings.current["dialogs.aggressive_title"].ifEmpty { "Aggressive Mode Warning ⚠️" },
                         fontSize = ts.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         fontFamily = quicksandFontFamily,
@@ -1175,7 +1179,7 @@ fun AggressiveWarningDialog(
                     )
 
                     Text(
-                        text = "Using Aggressive mode is powerful, sure, but comes with some side effects that you should know about:",
+                        text = LocalStrings.current["dialogs.aggressive_intro"].ifEmpty { "Using Aggressive mode is powerful, sure, but comes with some side effects that you should know about:" },
                         fontSize = ts.bodyMedium,
                         color = colors.textPrimary,
                         fontFamily = quicksandFontFamily,
@@ -1283,7 +1287,7 @@ fun AggressiveWarningDialog(
                             )
                         )
                         Text(
-                            text = "Don't show this warning again",
+                            text = LocalStrings.current["dialogs.aggressive_dont_show_again"].ifEmpty { "Don't show this warning again" },
                             fontSize = ts.bodyMedium,
                             color = colors.textSecondary,
                             fontFamily = quicksandFontFamily,
@@ -1296,7 +1300,7 @@ fun AggressiveWarningDialog(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         DialogButton(
-                            text = "Cancel",
+                            text = LocalStrings.current["dialogs.btn_cancel"].ifEmpty { "Cancel" },
                             onClick = onDismiss,
                             modifier = Modifier.weight(1f),
                             colors = colors,
@@ -1305,7 +1309,7 @@ fun AggressiveWarningDialog(
                             oledMode = oledMode
                         )
                         DialogButton(
-                            text = "OK",
+                            text = LocalStrings.current["dialogs.btn_ok"].ifEmpty { "OK" },
                             onClick = onConfirm,
                             modifier = Modifier.weight(1f),
                             colors = colors,
@@ -1339,9 +1343,10 @@ fun GPUWatchConfirmDialog(
             modifier = Modifier
                 .fillMaxWidth(0.85f)
                 .widthIn(max = 450.dp)
-                .border(0.75.dp, colors.primaryAccent.copy(alpha = 0.3f), RoundedCornerShape(24.dp)),
+                .border(1.dp, colors.primaryAccent.copy(alpha = 0.3f), RoundedCornerShape(28.dp)),
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(24.dp)
+            shape = RoundedCornerShape(28.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -1395,7 +1400,7 @@ fun GPUWatchConfirmDialog(
                 }
 
                 Text(
-                    text = "Open GPUWatch",
+                    text = LocalStrings.current["dialogs.gpuwatch_title"].ifEmpty { "Open GPUWatch" },
                     fontSize = ts.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     fontFamily = quicksandFontFamily,
@@ -1404,7 +1409,7 @@ fun GPUWatchConfirmDialog(
                 )
 
                 Text(
-                    text = "GAMA can't open GPUWatch directly. You will be taken to Developer Options where you can find and enable 'GPUWatch' yourself.",
+                    text = LocalStrings.current["dialogs.gpuwatch_body"].ifEmpty { "GAMA can't open GPUWatch directly. You will be taken to Developer Options where you can find and enable 'GPUWatch' yourself." },
                     fontSize = ts.labelLarge,
                     color = colors.textSecondary,
                     fontFamily = quicksandFontFamily,
@@ -1417,7 +1422,7 @@ fun GPUWatchConfirmDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     DialogButton(
-                        text = "Cancel",
+                        text = LocalStrings.current["dialogs.btn_cancel"].ifEmpty { "Cancel" },
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         colors = colors,
@@ -1426,7 +1431,7 @@ fun GPUWatchConfirmDialog(
                         oledMode = oledMode
                     )
                     DialogButton(
-                        text = "Open",
+                        text = LocalStrings.current["dialogs.btn_open"].ifEmpty { "Open" },
                         onClick = onConfirm,
                         modifier = Modifier.weight(1f),
                         colors = colors,

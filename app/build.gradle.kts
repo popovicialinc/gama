@@ -14,7 +14,7 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("C:\\Users\\popov\\Documents\\gama_key") 
+            storeFile = file("C:\\Users\\popov\\Documents\\gama_key")
             storePassword = "alinalin11"
             keyAlias = "gama-key"
             keyPassword = "alinalin11"
@@ -25,22 +25,17 @@ android {
         applicationId = "com.popovicialinc.gama"
         minSdk = 29
         targetSdk = 35
-        versionCode = 11
-        versionName = "1.3"
+        versionCode = 12
+        versionName = "1.4"
 
         vectorDrawables.useSupportLibrary = true
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    androidResources {
-        localeFilters += listOf("en")
-        noCompress += listOf()
-    }
-
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release") 
-            
+            signingConfig = signingConfigs.getByName("release")
+
             isMinifyEnabled = true
             isShrinkResources = true
 

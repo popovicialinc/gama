@@ -130,7 +130,10 @@ data class ParticleState(
         parallaxSensitivity: Float = 0.025f,
         starMode: Boolean = false,
         timeModeEnabled: Boolean = false,
-        isDaytime: Boolean = true
+        isDaytime: Boolean = true,
+        // Pre-computed damping factor for this tick — avoids one Math.pow() per particle
+        // Caller computes: Math.pow(0.94, (deltaTime * 60.0)).toFloat() once per tick
+        frameDamping: Float = Math.pow(0.94, (deltaTime * 60.0)).toFloat()
     ) {
         // Calculate rotation delta (change from last frame)
         val rawDeltaX = rotationX - smoothRotationX
@@ -180,7 +183,7 @@ data class ParticleState(
         // 0.94^0.5 at 120Hz, 0.94^2 at 30Hz — all decaying at the same per-second rate.
         // Raised from 0.92 → 0.94 so the stronger naturalForce above translates to
         // visibly snappier movement rather than being absorbed before particles build speed.
-        val frameDamping = Math.pow(0.94, (deltaTime * 60f).toDouble()).toFloat()
+        // frameDamping is pre-computed by the caller once per tick — no Math.pow here
         velocityX *= frameDamping
         velocityY *= frameDamping
 
@@ -406,6 +409,9 @@ private class PhysicsInputs {
     @Volatile var timeMode: Boolean = false
     @Volatile var daytime:  Boolean = true
 }
+
+private const val STAR_ALPHA_BUCKETS = 8
+private const val TRAIL_LUT_SIZE = 64
 
 // Standalone Particles Overlay Component
 @Composable
@@ -701,15 +707,35 @@ fun ParticlesOverlay(
     // Queried once and shared by both the physics loop and the render trigger.
     // Works for any Hz: 50, 60, 90, 120, 144, or anything adaptive — nothing
     // below is hardcoded to a specific display rate.
+    //
+    // IMPORTANT — why we use supportedModes.maxOf { refreshRate } instead of
+    // display.refreshRate:
+    //
+    //   On LTPO / adaptive-sync panels (Galaxy S23 Ultra, Pixel 8 Pro, etc.)
+    //   `Display.getRefreshRate()` returns the *current live* rate, which the
+    //   OS adaptive governor can idle down to 1–60 Hz when content appears still.
+    //   If the physics and render loops are calibrated to that idle rate they will
+    //   target 16.7ms intervals instead of 8.3ms — meaning the overlay renders at
+    //   60fps even when the panel is actually running at 120Hz, producing judder.
+    //
+    //   `Display.getSupportedModes()` always exposes the hardware ceiling, so
+    //   maxOf { refreshRate } gives the true panel maximum regardless of whatever
+    //   rate the governor has currently chosen.  The physics + render intervals
+    //   then stay correctly calibrated to the panel's native cadence.
     val displayHz: Float = remember(context) {
         try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                context.display?.refreshRate ?: 60f
-            } else {
-                @Suppress("DEPRECATION")
-                (context.getSystemService(Context.WINDOW_SERVICE)
-                            as android.view.WindowManager).defaultDisplay.refreshRate
-            }
+            val display =
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    context.display
+                } else {
+                    @Suppress("DEPRECATION")
+                    (context.getSystemService(Context.WINDOW_SERVICE)
+                                as android.view.WindowManager).defaultDisplay
+                }
+            // Prefer the maximum mode rate; fall back to live rate if modes unavailable.
+            display?.supportedModes?.maxOfOrNull { it.refreshRate }
+                ?: display?.refreshRate
+                ?: 60f
         } catch (_: Exception) { 60f }
     }.coerceAtLeast(1f)
 
@@ -768,6 +794,11 @@ fun ParticlesOverlay(
                     val delta = (elapsed / 1_000_000_000f).coerceAtMost(MAX_DELTA)
                     lastPhysicsNs = now
 
+                    // Pre-compute damping ONCE per tick instead of inside every particle.
+                    // Math.pow is a JNI transcendental — at 300 particles × 60Hz this saves
+                    // ~18,000 Math.pow() calls per second with zero visual difference.
+                    val tickDamping = Math.pow(0.94, (delta * 60.0)).toFloat()
+
                     // Read the volatile snapshot once (one memory barrier for the batch)
                     val inp = physicsInputs
                     val rotX     = inp.rotX
@@ -779,7 +810,7 @@ fun ParticlesOverlay(
                     val day      = inp.daytime
 
                     particles.forEach { p ->
-                        p.update(spd, now, rotX, rotY, delta, sens, star, timeMode, day)
+                        p.update(spd, now, rotX, rotY, delta, sens, star, timeMode, day, tickDamping)
                     }
                 }
 
@@ -850,7 +881,49 @@ fun ParticlesOverlay(
     // remember blocks MUST be called unconditionally (Compose rules), so they live
     // outside the particleAlpha > 0.01f guard below.
     // Reusable paths and Paint objects — allocated once, never recreated.
-    val reusableStarPath  = remember { Path() }
+    //
+    // ── Star batching paths ───────────────────────────────────────────────────
+    // Previously: ONE reusableStarPath was reset() + rebuilt with 8 lineTo calls
+    // per particle per frame, then drawPath() was called 150× per frame.
+    // GPU has to tessellate each star polygon separately — 150 draw calls/frame.
+    //
+    // Now: TWO batch paths accumulate ALL star geometry for all alpha buckets,
+    // then drawPath() is called ONCE per alpha bucket (2 calls total).
+    // GPU tessellates one combined path — massively cheaper.
+    //
+    // Alpha bucketing: stars vary in alpha per particle. We can't batch them all
+    // into one drawPath call with a single color. The fix: quantize alpha into
+    // N buckets and draw one batched path per bucket. 8 buckets covers the full
+    // [0,1] range with steps of 0.125 — visually indistinguishable from per-particle
+    // alpha, but reduces draw calls from 150 to ≤ 8.
+    // ── Star line-draw buffers ────────────────────────────────────────────────
+    // Stars are no longer drawn as filled concave polygons via Compose drawPath.
+    // Instead each star is 4 line segments (H + V + 2 diagonals) with ROUND caps,
+    // batched into a FloatArray per alpha bucket and dispatched as a single
+    // nativeCanvas.drawLines() call — a direct GPU primitive with zero tessellation.
+    //
+    // Why this matters:
+    //   OLD: Compose drawPath(concave polygon) → CPU ear-clip tessellation per frame
+    //        = 3000+ path ops + 16 draw calls + full tessellation overhead
+    //   NEW: nativeCanvas.drawLines(FloatArray) → GPU line primitive, no tessellation
+    //        = ≤8 native draw calls regardless of particle count
+    //
+    // Each star needs 4 lines × 4 floats (x1,y1,x2,y2) = 16 floats.
+    // Pre-allocate worst-case: actualParticleCount × 16 floats per bucket.
+    val starLineBuffers = remember(actualParticleCount) {
+        Array(STAR_ALPHA_BUCKETS) { FloatArray(actualParticleCount * 16) }
+    }
+    val starLineCounts  = remember { IntArray(STAR_ALPHA_BUCKETS) }
+    val nativeStarPaint = remember {
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            style      = android.graphics.Paint.Style.STROKE
+            strokeCap  = android.graphics.Paint.Cap.ROUND
+            strokeJoin = android.graphics.Paint.Join.ROUND
+            strokeWidth = 2.5f   // fixed arm thickness; star SIZE is encoded in arm length (r)
+        }
+    }
+    // circleBatchPaths still used for circle (non-star) particle mode
+    val circleBatchPaths = remember { Array(STAR_ALPHA_BUCKETS) { Path() } }
     val reusableRayPath   = remember { Path() }
     val reusableFullDisc  = remember { android.graphics.Path() }
     val reusableBitePath  = remember { android.graphics.Path() }
@@ -872,6 +945,10 @@ fun ParticlesOverlay(
     // 30fps was the single biggest GC source on older JIT-based devices.
     var cachedBlurRadius  = remember { -1f }
     var cachedBlurFilter  = remember<android.graphics.BlurMaskFilter?> { null }
+    // Cached alpha for the moon's RadialGradient — only rebuild shader when alpha changes.
+    // effectiveAlpha is stable most of the time (only changes during fade-in/out transitions),
+    // so this skips the shader allocation entirely during steady-state rendering.
+    var cachedMoonGradAlphaInt = remember { -1 }
 
     // Crater data: constant fractions of moonR — list allocated once, not per frame.
     val craterData = remember {
@@ -901,39 +978,84 @@ fun ParticlesOverlay(
             // so it redraws every time the physics loop increments it.
             @Suppress("UNUSED_VARIABLE") val frame = frameCount
             val useStars = starMode || (timeModeEnabled && !frameIsDaytime)
-            particles.forEach { particle ->
-                if (useStars) {
-                    val cx = size.width * particle.x
-                    val cy = size.height * particle.y
-                    val r  = particle.size * 1.2f
-                    val a  = particle.alpha * particleAlpha * 0.6f
+            if (useStars) {
+                // ── Native drawLines star rendering ──────────────────────────
+                // Each star = 4 line segments (H, V, diagonal \, diagonal /)
+                // with ROUND stroke caps. The intersecting lines with rounded
+                // endpoints naturally form a ✦ sparkle shape.
+                //
+                // All lines for a given alpha bucket are packed into a single
+                // pre-allocated FloatArray, then dispatched as ONE native
+                // drawLines() call per bucket — a direct GPU line primitive
+                // with ZERO path tessellation, ZERO Compose DrawScope overhead.
+                //
+                // floats layout per star: [x1,y1,x2,y2] × 4 lines = 16 floats
 
-                    // Reuse path object — reset() clears without allocating
-                    reusableStarPath.reset()
-                    reusableStarPath.moveTo(cx,            cy - r)
-                    reusableStarPath.lineTo(cx + r * 0.25f, cy - r * 0.25f)
-                    reusableStarPath.lineTo(cx + r,         cy)
-                    reusableStarPath.lineTo(cx + r * 0.25f, cy + r * 0.25f)
-                    reusableStarPath.lineTo(cx,             cy + r)
-                    reusableStarPath.lineTo(cx - r * 0.25f, cy + r * 0.25f)
-                    reusableStarPath.lineTo(cx - r,         cy)
-                    reusableStarPath.lineTo(cx - r * 0.25f, cy - r * 0.25f)
-                    reusableStarPath.close()
+                // Zero counts (no allocation — just int writes)
+                for (i in 0 until STAR_ALPHA_BUCKETS) starLineCounts[i] = 0
 
-                    // Use int-based Color constructor to avoid color.copy() allocation
-                    val aInt  = ((a.coerceIn(0f,1f) * 255f).toInt() shl 24) or colorArgb
-                    val a8Int = ((a * 0.8f).coerceIn(0f,1f) * 255f).toInt() shl 24 or colorArgb
-                    drawPath(path = reusableStarPath, color = Color(aInt))
-                    drawCircle(color = Color(a8Int), radius = r * 0.3f,
-                        center = Offset(cx, cy))
-                } else {
+                // Pass 1: write line coords into per-bucket FloatArrays
+                particles.forEach { particle ->
+                    val cx  = size.width  * particle.x
+                    val cy  = size.height * particle.y
+                    val r   = particle.size * 1.2f
+                    val rd  = r * 0.68f   // diagonal arms slightly shorter for clean ✦ look
+                    val a   = particle.alpha * particleAlpha * 0.6f
+
+                    val bucket = ((a.coerceIn(0f, 1f)) * (STAR_ALPHA_BUCKETS - 1) + 0.5f).toInt()
+                        .coerceIn(0, STAR_ALPHA_BUCKETS - 1)
+
+                    val buf = starLineBuffers[bucket]
+                    var idx = starLineCounts[bucket]
+
+                    // Horizontal arm ─
+                    buf[idx] = cx - r;  buf[idx+1] = cy;       buf[idx+2] = cx + r;  buf[idx+3] = cy
+                    // Vertical arm │
+                    buf[idx+4] = cx;    buf[idx+5] = cy - r;   buf[idx+6] = cx;      buf[idx+7] = cy + r
+                    // Diagonal arm ╲
+                    buf[idx+8] = cx - rd; buf[idx+9] = cy - rd; buf[idx+10] = cx + rd; buf[idx+11] = cy + rd
+                    // Diagonal arm ╱
+                    buf[idx+12] = cx - rd; buf[idx+13] = cy + rd; buf[idx+14] = cx + rd; buf[idx+15] = cy - rd
+
+                    starLineCounts[bucket] = idx + 16
+                }
+
+                // Pass 2: one nativeCanvas.drawLines() per non-empty bucket
+                // ≤ STAR_ALPHA_BUCKETS total GPU draw calls, regardless of particle count.
+                drawIntoCanvas { composeCanvas ->
+                    val nc = composeCanvas.nativeCanvas
+                    nativeStarPaint.color = colorArgb  // RGB set once; alpha overridden per bucket
+                    for (bucket in 0 until STAR_ALPHA_BUCKETS) {
+                        val count = starLineCounts[bucket]
+                        if (count == 0) continue
+                        val bucketAlpha = bucket.toFloat() / (STAR_ALPHA_BUCKETS - 1)
+                        nativeStarPaint.alpha = (bucketAlpha * 255f + 0.5f).toInt().coerceIn(0, 255)
+                        nc.drawLines(starLineBuffers[bucket], 0, count, nativeStarPaint)
+                    }
+                }
+            } else {
+                // Circle mode — batch into alpha buckets exactly like star mode.
+                // Reduces N draw calls (one per particle) to ≤ STAR_ALPHA_BUCKETS GPU draw calls.
+                // Reuse circleBatchPaths — the star arrays are unused in this branch.
+                for (i in 0 until STAR_ALPHA_BUCKETS) circleBatchPaths[i].reset()
+
+                particles.forEach { particle ->
                     val a = particle.alpha * particleAlpha * 0.5f
-                    val aInt = ((a.coerceIn(0f,1f) * 255f).toInt() shl 24) or colorArgb
-                    drawCircle(
-                        color = Color(aInt),
-                        radius = particle.size,
-                        center = Offset(size.width * particle.x, size.height * particle.y)
+                    val bucket = ((a.coerceIn(0f, 1f)) * (STAR_ALPHA_BUCKETS - 1) + 0.5f).toInt()
+                        .coerceIn(0, STAR_ALPHA_BUCKETS - 1)
+                    val cx = size.width  * particle.x
+                    val cy = size.height * particle.y
+                    val r  = particle.size
+                    circleBatchPaths[bucket].addOval(
+                        androidx.compose.ui.geometry.Rect(cx - r, cy - r, cx + r, cy + r)
                     )
+                }
+
+                for (bucket in 0 until STAR_ALPHA_BUCKETS) {
+                    if (circleBatchPaths[bucket].isEmpty) continue
+                    val bucketAlpha = bucket.toFloat() / (STAR_ALPHA_BUCKETS - 1)
+                    val aInt = ((bucketAlpha * 255f + 0.5f).toInt().coerceIn(0, 255) shl 24) or colorArgb
+                    drawPath(path = circleBatchPaths[bucket], color = Color(aInt))
                 }
             }
 
@@ -969,49 +1091,54 @@ fun ParticlesOverlay(
                         // Draw beautiful sun with rays
                         val sunCenter = Offset(adjustedX, cel.y)
 
-                        // Draw sun rays (8 rays in a circle)
+                        // Draw sun rays — all 8 accumulated into reusableRayPath, then ONE drawPath call.
+                        // Previously: 8 separate drawPath calls (reset + draw per ray).
                         val numRays = 8
                         val rayLength = cel.size * 1.8f
                         val rayWidth = cel.size * 0.18f
 
+                        reusableRayPath.reset()  // single reset before all 8 rays
                         for (i in 0 until numRays) {
                             val angle = (i * 2 * PI / numRays).toFloat()
+                            val cosA = cos(angle)
+                            val sinA = sin(angle)
                             val rayStart = Offset(
-                                sunCenter.x + cos(angle) * cel.size * 1.1f,
-                                sunCenter.y + sin(angle) * cel.size * 1.1f
+                                sunCenter.x + cosA * cel.size * 1.1f,
+                                sunCenter.y + sinA * cel.size * 1.1f
                             )
                             val rayEnd = Offset(
-                                sunCenter.x + cos(angle) * rayLength,
-                                sunCenter.y + sin(angle) * rayLength
+                                sunCenter.x + cosA * rayLength,
+                                sunCenter.y + sinA * rayLength
                             )
 
                             val perpAngle = angle + (PI / 2).toFloat()
+                            val cosPa = cos(perpAngle)
+                            val sinPa = sin(perpAngle)
                             val baseWidth = rayWidth
                             val tipWidth = rayWidth * 0.3f
-                            reusableRayPath.reset()
                             reusableRayPath.moveTo(
-                                rayStart.x + cos(perpAngle) * baseWidth,
-                                rayStart.y + sin(perpAngle) * baseWidth
+                                rayStart.x + cosPa * baseWidth,
+                                rayStart.y + sinPa * baseWidth
                             )
                             reusableRayPath.lineTo(
-                                rayEnd.x + cos(perpAngle) * tipWidth,
-                                rayEnd.y + sin(perpAngle) * tipWidth
+                                rayEnd.x + cosPa * tipWidth,
+                                rayEnd.y + sinPa * tipWidth
                             )
                             reusableRayPath.lineTo(
-                                rayEnd.x - cos(perpAngle) * tipWidth,
-                                rayEnd.y - sin(perpAngle) * tipWidth
+                                rayEnd.x - cosPa * tipWidth,
+                                rayEnd.y - sinPa * tipWidth
                             )
                             reusableRayPath.lineTo(
-                                rayStart.x - cos(perpAngle) * baseWidth,
-                                rayStart.y - sin(perpAngle) * baseWidth
+                                rayStart.x - cosPa * baseWidth,
+                                rayStart.y - sinPa * baseWidth
                             )
                             reusableRayPath.close()
-
-                            drawPath(
-                                path = reusableRayPath,
-                                color = colorWithAlpha(effectiveAlpha * 0.5f)
-                            )
                         }
+                        // Single draw call for all 8 rays
+                        drawPath(
+                            path = reusableRayPath,
+                            color = colorWithAlpha(effectiveAlpha * 0.5f)
+                        )
 
                         // Draw outer glow (largest)
                         drawCircle(
@@ -1047,14 +1174,21 @@ fun ParticlesOverlay(
                         val biteR = moonR * 0.82f
                         val biteCenter = Offset(moonCenter.x + moonR * 0.48f, moonCenter.y - moonR * 0.12f)
 
-                        // 1. Soft glow halo behind the crescent
-                        for (i in 5 downTo 1) {
-                            drawCircle(
-                                color = colorWithAlpha(effectiveAlpha * 0.05f / i),
-                                radius = moonR * (1f + i * 0.28f),
-                                center = moonCenter
-                            )
-                        }
+                        // 1. Soft glow halo — single radial gradient drawCircle instead of 5 layered calls.
+                        // The gradient replicates the falloff of the original 5 concentric circles
+                        // but costs exactly 1 GPU draw call instead of 5.
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                0f   to colorWithAlpha(effectiveAlpha * 0.05f),
+                                0.35f to colorWithAlpha(effectiveAlpha * 0.03f),
+                                0.65f to colorWithAlpha(effectiveAlpha * 0.02f),
+                                1f   to colorWithAlpha(0f),
+                                center = moonCenter,
+                                radius = moonR * (1f + 5 * 0.28f)
+                            ),
+                            radius = moonR * (1f + 5 * 0.28f),
+                            center = moonCenter
+                        )
 
                         // 2. Draw crescent using drawIntoCanvas with native path clipping
                         drawIntoCanvas { canvas ->
@@ -1072,20 +1206,24 @@ fun ParticlesOverlay(
 
                             nCanvas.clipPath(reusableCrescent)
 
-                            // Fill the crescent — reuse cached Paint, rebuild shader with current values.
-                            // The RadialGradient must be rebuilt each frame because effectiveAlpha changes.
-                            // Use int-math to avoid color.copy() allocations inside toArgb().
-                            reusableGradPaint.shader = android.graphics.RadialGradient(
-                                moonCenter.x - moonR * 0.2f,
-                                moonCenter.y - moonR * 0.2f,
-                                moonR * 1.1f,
-                                intArrayOf(
-                                    colorWithAlpha(effectiveAlpha).toArgb(),
-                                    colorWithAlpha(effectiveAlpha * 0.85f).toArgb()
-                                ),
-                                floatArrayOf(0f, 1f),
-                                android.graphics.Shader.TileMode.CLAMP
-                            )
+                            // Fill the crescent — rebuild RadialGradient only when effectiveAlpha
+                            // changes meaningfully. At steady state alpha is stable → zero rebuilds.
+                            // Previously allocated a new native shader object every frame.
+                            val alphaInt255 = (effectiveAlpha * 255f + 0.5f).toInt().coerceIn(0, 255)
+                            if (alphaInt255 != cachedMoonGradAlphaInt) {
+                                cachedMoonGradAlphaInt = alphaInt255
+                                reusableGradPaint.shader = android.graphics.RadialGradient(
+                                    moonCenter.x - moonR * 0.2f,
+                                    moonCenter.y - moonR * 0.2f,
+                                    moonR * 1.1f,
+                                    intArrayOf(
+                                        colorWithAlpha(effectiveAlpha).toArgb(),
+                                        colorWithAlpha(effectiveAlpha * 0.85f).toArgb()
+                                    ),
+                                    floatArrayOf(0f, 1f),
+                                    android.graphics.Shader.TileMode.CLAMP
+                                )
+                            }
                             nCanvas.drawPath(reusableCrescent, reusableGradPaint)
 
                             // Rim glow — reuse cached Paint, update stroke/color for this frame.
@@ -1157,6 +1295,486 @@ fun ParticlesOverlay(
                     .pointerInput(Unit) {}
             ) { drawCelestial() }
         } // end if timeModeEnabled
+    }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MatrixRainOverlay — HIGH-PERFORMANCE MATRIX DIGITAL RAIN
+//
+// HOW TO INTEGRATE:
+//   Open GamaParticles.kt and paste this entire block just BEFORE the
+//   final "// CompositionLocals" comment at the very bottom of the file.
+//   No other changes are needed in GamaParticles.kt.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Internal data model — per-column mutable state.
+// Written by the physics background thread; read by the Canvas main thread.
+// No synchronisation needed: each column is only ever written by the physics
+// loop and read by the Canvas in the same tick window; the worst that can
+// happen is a one-frame-old read, which is invisible at 30-120 Hz.
+// ─────────────────────────────────────────────────────────────────────────────
+private class MatrixColumn(
+    val x: Float,            // horizontal centre of this column, px
+    @Volatile var headRow: Int,  // head position in discrete row units (row * fontSizePx = Y)
+    val ticksPerStep: Int,   // how many physics ticks between each 1-row downward step
+    val chars: CharArray,    // ring of characters shown in the trail
+    val trailSlots: Int,     // how many character rows the trail spans
+    @Volatile var charAge: Int = 0,
+    val shuffleEvery: Int,   // physics ticks between random character swaps
+    @Volatile var tickAccum: Int = 0,  // counts ticks until next row step
+    // ── 3-D depth ────────────────────────────────────────────────────────────
+    // 0.0 = far away (small, slow, dim)  |  1.0 = close (large, fast, bright)
+    val depth: Float = 1.0f
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Character palette — classic Matrix mix: katakana + digits + latin + symbols
+// ─────────────────────────────────────────────────────────────────────────────
+private val MATRIX_CHARS: CharArray = (
+    "\u30A1\u30A2\u30A3\u30A4\u30A5\u30A6\u30A7\u30A8\u30A9\u30AA" + // ア-コ
+    "\u30AB\u30AC\u30AD\u30AE\u30AF\u30B0\u30B1\u30B2\u30B3\u30B4" + // カ-ゴ
+    "\u30B5\u30B6\u30B7\u30B8\u30B9\u30BA\u30BB\u30BC\u30BD\u30BE" + // サ-ゾ
+    "\u30BF\u30C0\u30C1\u30C2\u30C3\u30C4\u30C5\u30C6\u30C7\u30C8" + // タ-ド
+    "\u30C9\u30CA\u30CB\u30CC\u30CD\u30CE\u30CF\u30D0\u30D1\u30D2" + // ト-ヒ
+    "\u30D3\u30D4\u30D5\u30D6\u30D7\u30D8\u30D9\u30DA\u30DB\u30DC" + // ビ-ボ
+    "0123456789" +
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+    "abcdefghijklmnopqrstuvwxyz" +
+    "@#\$%^&*-+=<>?!~|:;"
+).toCharArray()
+
+private fun randomMatrixChar(): Char =
+    MATRIX_CHARS[kotlin.random.Random.nextInt(MATRIX_CHARS.size)]
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MatrixRainOverlay — public composable
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+fun MatrixRainOverlay(
+    enabled: Boolean,
+
+    // ── Visual ────────────────────────────────────────────────────────────────
+    /** Colour of the leading (head) character — default bright white */
+    headColor: Color = Color(0xFFFFFFFF),
+    /** Colour of the characters just below the head — the "hot" part of the trail */
+    rainColor: Color = Color(0xFF00FF41),
+    /** Colour blended into the deep tail — the "cool" / dim end */
+    trailColor: Color = Color(0xFF003B00),
+    /** Solid background painted under every column.
+     *  Use Color.Black + backgroundAlpha=1 for the pure cinema look,
+     *  or Color.Transparent + backgroundAlpha=0 (default) to overlay on top of
+     *  the existing app background. */
+    backgroundColor: Color = Color.Black,
+    /** 0 = fully transparent (composites over app), 1 = fully opaque black canvas */
+    backgroundAlpha: Float = 0.0f,
+
+    // ── Motion ────────────────────────────────────────────────────────────────
+    /** 0 = slow, 1 = medium (default), 2 = fast */
+    speedLevel: Int = 1,
+
+    // ── Appearance ────────────────────────────────────────────────────────────
+    /** 0 = sparse columns, 1 = medium (default), 2 = dense */
+    densityLevel: Int = 1,
+    /** 0 = small glyphs, 1 = medium (default), 2 = large */
+    fontSizeLevel: Int = 1,
+    /** 0 = short trail, 1 = medium (default), 2 = full-screen-length trail */
+    fadeLength: Int = 1,
+
+    // ── Performance ───────────────────────────────────────────────────────────
+    // No refresh-rate knob needed: the rain steps one row at a time, so the
+    // tick rate is derived entirely from speedLevel. The render loop fires
+    // only when a step actually occurs — no wasted vsync budget.
+) {
+    val context     = LocalContext.current
+    val density     = LocalDensity.current
+    val configuration = LocalConfiguration.current
+
+    // Screen size in physical pixels — recomputed only on rotation/resize
+    val screenWidthPx = remember(configuration) {
+        with(density) { configuration.screenWidthDp.dp.toPx() }
+    }
+    val screenHeightPx = remember(configuration) {
+        with(density) { configuration.screenHeightDp.dp.toPx() }
+    }
+
+    // ── Derive numeric parameters from the 0/1/2 levels ──────────────────────
+    val fontSizePx: Float = remember(fontSizeLevel, density) {
+        with(density) {
+            when (fontSizeLevel) {
+                0    -> 11.sp.toPx()
+                2    -> 20.sp.toPx()
+                else -> 15.sp.toPx()
+            }
+        }
+    }
+
+    // Column width keeps cells roughly square; density just packs them tighter
+    val columnWidth: Float = remember(fontSizePx, densityLevel) {
+        when (densityLevel) {
+            0    -> fontSizePx * 2.0f   // sparse  — wide gaps
+            2    -> fontSizePx * 1.1f   // dense   — nearly touching
+            else -> fontSizePx * 1.5f   // medium
+        }
+    }
+
+    // Number of visible character slots per column (trail + head)
+    val trailLength: Int = remember(fadeLength, screenHeightPx, fontSizePx) {
+        val fullScreen = (screenHeightPx / fontSizePx).toInt() + 4
+        when (fadeLength) {
+            0    -> (fullScreen * 0.22f).toInt().coerceAtLeast(6)
+            2    -> fullScreen + 3
+            else -> (fullScreen * 0.55f).toInt().coerceAtLeast(10)
+        }
+    }
+
+    // ── Discrete step timing ──────────────────────────────────────────────────
+    // The physics loop runs at ~60 Hz. Each column steps exactly one character
+    // row downward every N ticks — an instant jump with no sub-pixel movement.
+    // This is the authentic Matrix look: no smooth scrolling, just discrete steps.
+    //   0 (slow)   → step every 8 ticks  → ~7.5 rows/sec at 60 Hz
+    //   1 (medium) → step every 4 ticks  → ~15 rows/sec at 60 Hz
+    //   2 (fast)   → step every 2 ticks  → ~30 rows/sec at 60 Hz
+    val baseTicksPerStep: Int = remember(speedLevel) {
+        when (speedLevel) {
+            0    -> 8
+            2    -> 2
+            else -> 4
+        }
+    }
+
+    // ── Build column array ────────────────────────────────────────────────────
+    // headRow is in discrete row units; Y = headRow * fontSizePx.
+    // Columns independently vary their ticks-per-step by ±1 so they step at
+    // slightly different rates, preserving the independent-column feel.
+    val columns: Array<MatrixColumn> = remember(
+        screenWidthPx, screenHeightPx, columnWidth, trailLength, baseTicksPerStep, fontSizePx
+    ) {
+        val rng = kotlin.random.Random
+        val count = ((screenWidthPx / columnWidth).toInt() + 1).coerceAtLeast(1)
+        val rowsOnScreen = (screenHeightPx / fontSizePx).toInt() + 2
+        Array(count) { i ->
+            val xPos  = i * columnWidth + columnWidth * 0.5f
+            // Stagger initial heads above screen so rain fills in gradually
+            val startRow = -(rng.nextFloat() * rowsOnScreen * 1.5f).toInt()
+            val slots  = trailLength + rng.nextInt((trailLength / 4).coerceAtLeast(1))
+            // ── 3-D depth ─────────────────────────────────────────────────────
+            // Distribute columns across three depth layers with weighted probability:
+            //   far (0.15–0.40)  ~30% of columns — small, slow, dim
+            //   mid (0.45–0.70)  ~40% of columns — medium
+            //   near (0.75–1.00) ~30% of columns — large, fast, bright
+            val depth: Float = when (rng.nextInt(10)) {
+                in 0..2  -> 0.15f + rng.nextFloat() * 0.25f  // far
+                in 3..6  -> 0.45f + rng.nextFloat() * 0.25f  // mid
+                else     -> 0.75f + rng.nextFloat() * 0.25f  // near
+            }
+            // Far columns step less often (slower); near columns step more often (faster).
+            // Extra ticks added = up to +6 for the farthest columns.
+            val depthTickBonus = ((1f - depth) * 6f).toInt()
+            val colTicks = (baseTicksPerStep + depthTickBonus + rng.nextInt(2)).coerceAtLeast(1)
+            MatrixColumn(
+                x            = xPos,
+                headRow      = startRow,
+                ticksPerStep = colTicks,
+                chars        = CharArray(slots) { randomMatrixChar() },
+                trailSlots   = slots,
+                shuffleEvery = 2 + rng.nextInt(6),
+                tickAccum    = rng.nextInt(colTicks),  // stagger so not all step on tick 0
+                depth        = depth
+            )
+        }
+    }
+
+    // ── Enable/disable fade ───────────────────────────────────────────────────
+    val overlayAlpha by animateFloatAsState(
+        targetValue    = if (enabled) 1f else 0f,
+        animationSpec  = tween(durationMillis = 700, easing = FastOutSlowInEasing),
+        label          = "matrix_alpha"
+    )
+
+    // ── Frame counter — establishes Compose snapshot dependency on Canvas ─────
+    // IMPORTANT: declared before the early-return so the render loop can start
+    // on the very first composition and drive the alpha animation forward.
+    var frameCount by remember { mutableLongStateOf(0L) }
+
+    // ── Physics tick rate ─────────────────────────────────────────────────────
+    // The physics loop runs at a fixed ~60 Hz regardless of display refresh rate.
+    // Columns step by whole rows on their own tick counters, so display Hz is
+    // irrelevant — render only fires when at least one column has stepped.
+    val physicsHz: Long = 60L
+    val physicsTargetNs: Long = 1_000_000_000L / physicsHz
+
+    // ── Physics loop — Dispatchers.Default (background thread) ───────────────
+    //
+    // Each tick: increment each column's tickAccum. When it reaches ticksPerStep,
+    // reset it to 0 and advance headRow by 1. This is a discrete row-step — the
+    // character grid jumps exactly one row, no sub-pixel movement ever.
+    // Zero allocations inside the loop — only integer arithmetic.
+    // IMPORTANT: this LaunchedEffect must live before the early-return so that
+    // the physics loop is already running when the alpha animation completes.
+    LaunchedEffect(columns, enabled, physicsHz) {
+        if (!enabled) return@LaunchedEffect
+        withContext(Dispatchers.Default) {
+            val targetNs = physicsTargetNs
+            var lastTick = System.nanoTime()
+            while (isActive) {
+                val now     = System.nanoTime()
+                val elapsed = now - lastTick
+                if (elapsed >= targetNs) {
+                    lastTick = now
+                    for (col in columns) {
+                        col.tickAccum++
+                        if (col.tickAccum >= col.ticksPerStep) {
+                            col.tickAccum = 0
+                            col.headRow++
+                            // Recycle: once entire trail has scrolled off-screen,
+                            // reset head to a random position above the top
+                            if (col.headRow - col.trailSlots > (screenHeightPx / fontSizePx).toInt() + 1) {
+                                col.headRow = -(kotlin.random.Random.nextFloat() *
+                                    (screenHeightPx / fontSizePx) * 0.7f).toInt()
+                                // Fresh character set for the recycled column
+                                for (k in col.chars.indices) col.chars[k] = randomMatrixChar()
+                            }
+                        }
+                        // Periodic character shuffle — gives the rain its "live data" feel
+                        col.charAge++
+                        if (col.charAge >= col.shuffleEvery) {
+                            col.charAge = 0
+                            val sz = col.chars.size
+                            col.chars[kotlin.random.Random.nextInt(sz)] = randomMatrixChar()
+                            if (sz > 4) {
+                                col.chars[kotlin.random.Random.nextInt(sz)] = randomMatrixChar()
+                            }
+                        }
+                    }
+                } else {
+                    delay(((targetNs - elapsed) / 1_000_000L).coerceAtLeast(1L))
+                }
+            }
+        }
+    }
+
+    // ── Render trigger — main thread, physics-rate aligned ───────────────────
+    // Columns only change state once per physics tick, so we render at that
+    // rate too — no point firing the Canvas faster than the data changes.
+    // withFrameNanos gates us to vsync boundaries; the elapsed check skips
+    // frames where nothing has changed (i.e. most frames at high refresh rates).
+    // IMPORTANT: also before the early-return for the same reason as the physics loop.
+    LaunchedEffect(enabled, physicsTargetNs) {
+        if (!enabled) return@LaunchedEffect
+        var lastRender = 0L
+        while (isActive) {
+            withFrameNanos { ns ->
+                if (ns - lastRender >= physicsTargetNs) {
+                    lastRender = ns
+                    frameCount++
+                }
+            }
+        }
+    }
+
+    // Skip drawing when fully invisible (alpha animation not yet started or faded out).
+    // The LaunchedEffects above must remain before this guard so they start immediately.
+    if (overlayAlpha < 0.005f) return
+
+    // ── Pre-allocated native Paints — reused every frame, ZERO allocation ────
+    val nativePaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias  = true
+            typeface     = android.graphics.Typeface.MONOSPACE
+            textAlign    = android.graphics.Paint.Align.CENTER
+        }
+    }
+    // Bloom paint: same text drawn underneath with a large BlurMaskFilter.
+    // BlurMaskFilter is expensive to construct — cached and only rebuilt when
+    // the bloom radius changes (which only happens when fontSizePx changes,
+    // i.e. never at runtime once the overlay is composed).
+    val bloomPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias  = true
+            typeface     = android.graphics.Typeface.MONOSPACE
+            textAlign    = android.graphics.Paint.Align.CENTER
+        }
+    }
+    // Track last bloom radius so we only rebuild BlurMaskFilter when needed
+    var lastBloomRadius = remember { -1f }
+
+    // Pre-compute ARGB ints so Color.toArgb() is never called inside the draw loop
+    val headArgb  = remember(headColor)  { headColor.toArgb() }
+    val rainArgb  = remember(rainColor)  { rainColor.toArgb() }
+    val trailArgb = remember(trailColor) { trailColor.toArgb() }
+    val bgArgb    = remember(backgroundColor, backgroundAlpha) {
+        android.graphics.Color.argb(
+            (backgroundAlpha * 255f).toInt().coerceIn(0, 255),
+            android.graphics.Color.red(backgroundColor.toArgb()),
+            android.graphics.Color.green(backgroundColor.toArgb()),
+            android.graphics.Color.blue(backgroundColor.toArgb())
+        )
+    }
+
+    // ── Trail colour LUT ─────────────────────────────────────────────────────
+    // The hot-zone → tail colour lerp (rRain→rTrail, gRain→gTrail, bRain→bTrail)
+    // was previously computed per-character per-frame inside the draw loop —
+    // three float multiplications + three toInt() calls × up to ~500 characters
+    // per frame = tens of thousands of operations/sec at high density.
+    //
+    // Precompute 64 evenly-spaced RGB steps covering t ∈ [0,1].  At draw time
+    // map t → index with one multiply+cast, then read packed RGB from the LUT.
+    // The LUT is rebuilt only when rain/trail colours change (never at runtime
+    // once the overlay is composed with default colours).
+    //
+    // 64 steps → max colour error < 2/255 per channel — visually perfect.
+    val trailRgbLut: IntArray = remember(rainArgb, trailArgb) {
+        val rR = android.graphics.Color.red(rainArgb)
+        val gR = android.graphics.Color.green(rainArgb)
+        val bR = android.graphics.Color.blue(rainArgb)
+        val rT = android.graphics.Color.red(trailArgb)
+        val gT = android.graphics.Color.green(trailArgb)
+        val bT = android.graphics.Color.blue(trailArgb)
+        IntArray(TRAIL_LUT_SIZE) { i ->
+            val fade = i.toFloat() / (TRAIL_LUT_SIZE - 1)
+            val fi   = 1f - fade
+            val r = (rR * fi + rT * fade).toInt().coerceIn(0, 255)
+            val g = (gR * fi + gT * fade).toInt().coerceIn(0, 255)
+            val b = (bR * fi + bT * fade).toInt().coerceIn(0, 255)
+            (r shl 16) or (g shl 8) or b  // packed 0x00RRGGBB
+        }
+    }
+
+    // ── Canvas ────────────────────────────────────────────────────────────────
+    val currentFrame = frameCount
+
+    Canvas(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer(alpha = overlayAlpha)
+            .pointerInput(Unit) {}  // opaque to touch
+    ) {
+        @Suppress("UNUSED_EXPRESSION") currentFrame
+        drawIntoCanvas { composeCanvas ->
+            val nc = composeCanvas.nativeCanvas
+
+            // Optional solid background
+            if (backgroundAlpha > 0.001f) {
+                nc.drawColor(bgArgb)
+            }
+
+            // rHead/gHead/bHead and rRain/gRain/bRain/rTrail/gTrail/bTrail previously
+            // decomposed here for per-character lerp. Now headArgb/rainArgb are set
+            // directly as paint.color, and the trail lerp is replaced by trailRgbLut.
+            // These per-frame Color.red/green/blue decompositions are no longer needed.
+            val baseA  = overlayAlpha
+
+            // ── Bloom pass then sharp pass ────────────────────────────────────
+            // We render all columns twice:
+            //   Pass 1 (bloom): head + hot-zone only, large blur, low alpha → glow halo
+            //   Pass 2 (sharp): all characters at full crispness on top
+            // Drawing bloom first means the sharp characters always render over the glow.
+            //
+            // Bloom radius scales with fontSizePx so it looks right at all glyph sizes.
+            // Only the head and the first few hot-zone slots get bloom — the tail does not,
+            // keeping performance budget low (< 10% of columns visible at any time are
+            // head/hot-zone) and preserving visual hierarchy.
+
+            val bloomRadius = fontSizePx * 1.6f
+            if (bloomRadius != lastBloomRadius) {
+                lastBloomRadius = bloomRadius
+                bloomPaint.maskFilter = android.graphics.BlurMaskFilter(
+                    bloomRadius, android.graphics.BlurMaskFilter.Blur.NORMAL
+                )
+            }
+            bloomPaint.textSize = fontSizePx  // will be overridden per-column below
+
+            // ── PASS 1: Bloom glow ────────────────────────────────────────────
+            for (col in columns) {
+                val depth   = col.depth
+                // Far columns (low depth) get smaller glyphs and lower brightness
+                val scaledSize = fontSizePx * (0.45f + depth * 0.55f)  // 0.45×–1.0× font size
+                val depthAlpha = 0.25f + depth * 0.75f                  // 0.25–1.0
+
+                bloomPaint.textSize = scaledSize
+
+                val headY  = col.headRow * scaledSize
+                val slots  = col.chars.size
+
+                for (slot in 0..minOf(3, slots - 1)) {
+                    val charY = headY - slot * scaledSize
+                    if (charY < -scaledSize || charY > size.height + scaledSize) continue
+
+                    // Bloom alpha: strong at head, fades quickly through hot zone
+                    // Also modulated by depth so far columns have subtler glow
+                    val bloomAlpha = when (slot) {
+                        0    -> baseA * depthAlpha * 0.55f
+                        1    -> baseA * depthAlpha * 0.35f
+                        2    -> baseA * depthAlpha * 0.20f
+                        else -> baseA * depthAlpha * 0.10f
+                    }
+                    val bAlphaInt = (bloomAlpha.coerceIn(0f, 1f) * 255f).toInt()
+                    if (bAlphaInt < 4) continue
+
+                    // Bloom uses head/rain color depending on slot
+                    val bArgb = if (slot == 0) headArgb else rainArgb
+                    bloomPaint.color = bArgb
+                    bloomPaint.alpha = bAlphaInt
+                    // drawText(CharArray, offset, count, x, y, paint) avoids allocating
+                    // a new String object for every character drawn — the single biggest
+                    // GC source in the matrix rain at high density / long trails.
+                    nc.drawText(col.chars, slot % slots, 1, col.x, charY, bloomPaint)
+                }
+            }
+
+            // ── PASS 2: Sharp characters ──────────────────────────────────────
+            nativePaint.maskFilter = null  // ensure sharp (no blur)
+            for (col in columns) {
+                val depth   = col.depth
+                val scaledSize = fontSizePx * (0.45f + depth * 0.55f)
+                val depthAlpha = 0.25f + depth * 0.75f
+
+                nativePaint.textSize = scaledSize
+
+                val headY  = col.headRow * scaledSize
+                val slots  = col.chars.size
+                val slotsM = (slots - 1).coerceAtLeast(1)
+
+                for (slot in 0 until slots) {
+                    val charY = headY - slot * scaledSize
+                    if (charY < -scaledSize || charY > size.height + scaledSize) continue
+
+                    val t = slot.toFloat() / slotsM   // 0 = head, 1 = tail
+
+                    val alpha: Int
+                    val argb: Int
+
+                    when {
+                        slot == 0 -> {
+                            alpha = (baseA * depthAlpha * 255f).toInt().coerceIn(0, 255)
+                            argb  = headArgb
+                        }
+                        slot <= 3 -> {
+                            alpha = (baseA * depthAlpha * 240f).toInt().coerceIn(0, 255)
+                            argb  = rainArgb
+                        }
+                        else -> {
+                            val fade = ((t - 0.12f) / 0.88f).coerceIn(0f, 1f)
+                            // LUT lookup: one int cast instead of 3 float multiplies + 3 toInt() calls.
+                            // Map fade [0,1] → LUT index [0, TRAIL_LUT_SIZE-1], read packed 0x00RRGGBB.
+                            val lutIdx = (fade * (TRAIL_LUT_SIZE - 1) + 0.5f).toInt()
+                                .coerceIn(0, TRAIL_LUT_SIZE - 1)
+                            alpha    = (baseA * depthAlpha * (1f - fade * fade) * 210f).toInt().coerceIn(0, 255)
+                            argb     = trailRgbLut[lutIdx] or 0xFF000000.toInt()  // OR in opaque sentinel; alpha set via paint.alpha below
+                        }
+                    }
+
+                    if (alpha < 3) continue
+
+                    nativePaint.color = argb
+                    nativePaint.alpha = alpha
+                    // CharArray overload: zero String allocation per character
+                    nc.drawText(col.chars, slot % slots, 1, col.x, charY, nativePaint)
+                }
+            }
+        }
     }
 }
 
