@@ -8,7 +8,7 @@
 
 # **Overview**
 <p align="left">
-  <a href="https://www.android.com/"><img src="https://img.shields.io/badge/Android-FFB3BA?style=for-the-badge&logo=android&logoColor=333" /></a>&nbsp;<a href="https://news.samsung.com/global/galaxy-s23-series"><img src="https://img.shields.io/badge/Galaxy_S23-FFDFBA?style=for-the-badge&logo=samsung&logoColor=333" /></a>&nbsp;<a href="https://www.samsung.com/us/support/answer/ANS10004612/"><img src="https://img.shields.io/badge/One_UI_7-FFFFBA?style=for-the-badge&logoColor=333" /></a>&nbsp;<a href="https://github.com/palincat/gama"><img src="https://img.shields.io/badge/Safe-BAFFC9?style=for-the-badge&logoColor=333" /></a>&nbsp;<a href="https://discord.gg/n6BeKWhTAM"><img src="https://img.shields.io/badge/Discord-BAE1FF?style=for-the-badge&logo=discord&logoColor=333" /></a>&nbsp;<a href="https://github.com/popovicialinc/gama/releases"><img src="https://img.shields.io/github/downloads/popovicialinc/gama/total?style=for-the-badge&label=Downloads&color=E8BAFF&labelColor=C98FE8&logoColor=000" /></a>
+  <a href="https://www.android.com/"><img src="https://img.shields.io/badge/Android-FFB3BA?style=for-the-badge&logo=android&logoColor=333" /></a>&nbsp;<a href="https://news.samsung.com/global/galaxy-s23-series"><img src="https://img.shields.io/badge/Galaxy_S23-FFDFBA?style=for-the-badge&logo=samsung&logoColor=333" /></a>&nbsp;<a href="https://www.samsung.com/us/support/answer/ANS10004612/"><img src="https://img.shields.io/badge/One_UI_7-FFFFBA?style=for-the-badge&logoColor=333" /></a>&nbsp;<a href="https://github.com/palincat/gama"><img src="https://img.shields.io/badge/Safe-BAFFC9?style=for-the-badge&logoColor=333" /></a>&nbsp;<a href="https://discord.gg/YYXSedBAS9"><img src="https://img.shields.io/badge/Discord-BAE1FF?style=for-the-badge&logo=discord&logoColor=333" /></a>&nbsp;<a href="https://github.com/popovicialinc/gama/releases"><img src="https://img.shields.io/github/downloads/popovicialinc/gama/total?style=for-the-badge&label=Downloads&color=E8BAFF&labelColor=C98FE8&logoColor=000" /></a>
 </p>
 
 **Graphics API Manager for Android (GAMA) is an application that lets you switch the GPU rendering API on your Android device without requiring root access**
@@ -20,22 +20,26 @@ While optimized for the Samsung Galaxy S23 lineup, this project is compatible wi
 * 🔓 **Zero risk** - Root is not needed; 100% Knox-safe!
 * 🛠️ **User-friendliness** - Simple yet beautiful UI to switch APIs without complex terminal commands
 
-**Extra resources**
+**Resources**
 * 📱 [**Does Vulkan work on my device?**](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
     * Vulkan support can vary between Android devices and One UI versions, so performance may differ, especially on versions below One UI 7 (Android 15). You’re always welcome to give it a try though! If something doesn’t work as expected, a quick reboot will bring everything back to normal.
     * If your device is not listed, please kindly follow [this link](https://forms.gle/qYUHHhaQNLiY9i1MA) where you will be able to fill out a form - The relevant, collected data will be added to the [spreadsheet](https://docs.google.com/spreadsheets/d/1X_UuSJBWc9O2Q9nW0x-V_WC0uY-yKDfNRkxgko8i6AA/edit?usp=sharing)
+    * All data is user-reported.
 * ☕ If you want to support the development of GAMA, [**consider donating**](https://buymeacoffee.com/popovicialinc)!
 
-<br>
+**Stargazers over time**
+[![Stargazers over time](https://starchart.cc/palincat/gama.svg?variant=adaptive)](https://starchart.cc/palincat/gama)
 
 <br>
 
-# **Get started on your platform**
+<br>
 
-* 🤖 [**Android**](https://github.com/popovicialinc/gama?tab=readme-ov-file#gama-on-android)
-* 🖥️ [**Windows**](https://github.com/popovicialinc/gama_windows?tab=readme-ov-file#gama-on-windows-batch)
-* 🍎 [**MacOS**](https://github.com/bialobrzeskid/gama-macos) (adapted by bialobrzeskid)
-* 🐧 [**Linux**](https://github.com/Ameen-Sha-Cheerangan/s23-vulkan-support) (adapted by Ameen Sha Cheerangan)
+# Get started on your platform
+
+- 🤖 [**Android**](https://github.com/popovicialinc/gama?tab=readme-ov-file#gama-on-android), native app
+- 🖥️ [**Windows**](https://github.com/popovicialinc/gama_windows?tab=readme-ov-file#gama-on-windows-batch), Batch version
+- 🍎 [**macOS**](https://github.com/bialobrzeskid/gama-macos), ported by [bialobrzeskid](https://github.com/bialobrzeskid)
+- 🐧 [**Linux**](https://github.com/Ameen-Sha-Cheerangan/s23-vulkan-support), ported by [Ameen Sha Cheerangan](https://github.com/Ameen-Sha-Cheerangan)
 
 <br>
 
@@ -122,18 +126,15 @@ If OneUI has already disabled your Good Lock modules, simply re-enable them in t
 <details>
 <summary><b>🔸 The Aggressive Profile</b></summary>
 <br>
-Using the **Aggressive** profile for stopping background apps is, dare I say, nuclear, and you probably shouldn't use it... but if you **do** plan on using it, please be aware of the side effects:
+Using the Aggressive profile for stopping background apps is, dare I say, kind of nuclear, and you shouldn't really use it... but if you do plan on using it, please be aware of the side effects:
 
-- **Resets Defaults** - Your default browser and keyboard will be reset.  
-  - There's nothing we can do to fix it. You will need to manually set everything back up. Sorry!
+- Resets Defaults - Your default browser and keyboard will be reset.  
+  - It's intended behaviour. You will need to manually set everything back up. Sorry for the inconvenience!
 
-- **Connectivity Loss** - Possible loss of WiFi-Calling / VoLTE capability.  
+- Connectivity Loss - Loss of WiFi-Calling / VoLTE capability.  
   - Go to *Settings > Connections > SIM manager*, then toggle SIM 1/2 off and on again.  
   - *Thanks to Fun-Flight4427 and ActualMountain7899 for the fix.*
 
-- ...and probably some other stuff we haven't documented yet.
-
-**After you switch APIs with this profile enabled:**  
-Go to *Settings > Connections > SIM manager*, then toggle SIM 1/2 off and back on.
+... and probably some other stuff we haven't documented yet.
 <br>
 </details>
