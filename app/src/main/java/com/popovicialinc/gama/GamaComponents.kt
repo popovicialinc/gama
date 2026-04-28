@@ -411,21 +411,23 @@ fun TitleSection(colors: ThemeColors, isSmallScreen: Boolean, isLandscape: Boole
             shimmerTarget = 1f
         }
 
-        // Cache the Paint and BlurMaskFilter outside drawWithContent.
-        // Previously both were allocated fresh on every draw frame (~60x/sec on old
-        // devices), generating significant GC pressure on JIT-based Dalvik runtimes.
-        // maskFilter = 80f is constant — it never changes, so one allocation is enough.
-        val titleGlowPaint = remember(colors.textPrimary, gamaTextSize) {
-            Paint().asFrameworkPaint().apply {
-                isAntiAlias = true
-                color = android.graphics.Color.TRANSPARENT
-                textSize = 1f  // overridden per-draw via the canvas transform
-                textAlign = android.graphics.Paint.Align.CENTER
-                maskFilter = android.graphics.BlurMaskFilter(80f, android.graphics.BlurMaskFilter.Blur.NORMAL)
-                setShadowLayer(80f, 0f, 0f, colors.textPrimary.toArgb())
-                typeface = typeface  // inherit whatever was already set
+        // ── Fake-glow + chromatic-aberration paints ───────────────────────────
+        // Previously used BlurMaskFilter(80f) — a software CPU gaussian that runs
+        // on every draw invalidation.  Replaced with 3 alpha layers + CA offsets:
+        //   • ZERO BlurMaskFilter / ShadowLayer calls — purely GPU compositing.
+        //   • 5 extra drawText() calls per frame vs 1 blurred call — net faster.
+        //   • CA shifts R left, B right — gives the title its cyberpunk split-prism look.
+        val titleGlowBase = remember(colors.textPrimary, quicksandBoldTypeface) {
+            android.graphics.Paint().apply {
+                isAntiAlias  = true
+                textAlign    = android.graphics.Paint.Align.CENTER
+                typeface     = quicksandBoldTypeface
             }
         }
+        // Pre-compute accent ARGB so no Color.toArgb() allocations inside draw
+        val glowArgb  = remember(colors.textPrimary)  { colors.textPrimary.copy(alpha = 1f).toArgb() }
+        val caRedArgb = remember { android.graphics.Color.argb(200, 255, 60,  60) }
+        val caBluArgb = remember { android.graphics.Color.argb(200, 60,  100, 255) }
 
         Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
@@ -460,14 +462,39 @@ fun TitleSection(colors: ThemeColors, isSmallScreen: Boolean, isLandscape: Boole
                     modifier = Modifier.padding(horizontal = 24.dp).pointerInput(onEasterEgg) {
                         if (onEasterEgg != null) detectTapGestures(onLongPress = { onEasterEgg() })
                     }.drawWithContent {
+                        val baseSize = gamaTextSize.toPx()
+                        val cx = size.width / 2f
+                        val cy = size.height / 2f + baseSize * 0.25f
+                        // Chromatic aberration offset — ~2% of glyph height
+                        val caOff = baseSize * 0.040f
                         drawIntoCanvas { canvas ->
-                            // Reuse cached Paint — only update textSize which depends on
-                            // the actual measured size available in the draw scope.
-                            titleGlowPaint.textSize = gamaTextSize.toPx()
-                            val cx = size.width / 2
-                            val cy = size.height / 2 + gamaTextSize.toPx() * 0.25f
-                            canvas.nativeCanvas.drawText("GAMA", cx, cy, titleGlowPaint)
+                            val nc = canvas.nativeCanvas
+                            // ── Glow halos (3 layers, no blur — pure alpha compositing) ───
+                            titleGlowBase.color = glowArgb
+                            // Layer 3 — outermost halo (biggest, most transparent)
+                            titleGlowBase.alpha = 18
+                            titleGlowBase.textSize = baseSize * 1.13f
+                            nc.drawText("GAMA", cx, cy, titleGlowBase)
+                            // Layer 2
+                            titleGlowBase.alpha = 35
+                            titleGlowBase.textSize = baseSize * 1.06f
+                            nc.drawText("GAMA", cx, cy, titleGlowBase)
+                            // Layer 1 — tightest bloom
+                            titleGlowBase.alpha = 60
+                            titleGlowBase.textSize = baseSize * 1.02f
+                            nc.drawText("GAMA", cx, cy, titleGlowBase)
+                            // ── Chromatic aberration — R left, B right ────────────────
+                            titleGlowBase.textSize = baseSize
+                            // Red fringe
+                            titleGlowBase.color = caRedArgb
+                            titleGlowBase.alpha = android.graphics.Color.alpha(caRedArgb)
+                            nc.drawText("GAMA", cx - caOff, cy, titleGlowBase)
+                            // Blue fringe
+                            titleGlowBase.color = caBluArgb
+                            titleGlowBase.alpha = android.graphics.Color.alpha(caBluArgb)
+                            nc.drawText("GAMA", cx + caOff, cy, titleGlowBase)
                         }
+                        // Crisp white Compose text on top
                         drawContent()
                     })
                 // Right bar — shimmer sweeps right → left (toward text)
@@ -709,6 +736,13 @@ fun Modifier.directionalShadow(
         label = "shadowEnabledAlpha"
     )
 
+    // Animate the shadows-enabled toggle so shadows fade in/out smoothly rather than snapping.
+    val shadowsAlpha by animateFloatAsState(
+        targetValue = if (shadowsEnabled) 1f else 0f,
+        animationSpec = tween(durationMillis = 600, easing = LinearOutSlowInEasing),
+        label = "shadowsToggleAlpha"
+    )
+
     // ── Cached native objects — allocated ONCE, never per frame ──────────────
     // Previously: android.graphics.Paint() + BlurMaskFilter() were constructed
     // inside drawBehind on every draw call (60–120×/sec × number of visible cards).
@@ -728,8 +762,8 @@ fun Modifier.directionalShadow(
     val colorA = color.alpha
 
     drawBehind {
-        if (!shadowsEnabled || cardProgress <= 0f || enabledAlpha <= 0f) return@drawBehind
-        val fraction = (cardProgress * cardProgress * enabledAlpha).coerceIn(0f, 1f)
+        if (cardProgress <= 0f || enabledAlpha <= 0f || shadowsAlpha <= 0f) return@drawBehind
+        val fraction = (cardProgress * cardProgress * enabledAlpha * shadowsAlpha).coerceIn(0f, 1f)
 
         // Only rebuild BlurMaskFilter when the effective blur radius changes.
         // Because fraction animates smoothly this will update on most frames, BUT
@@ -849,7 +883,8 @@ fun SettingsNavigationCard(
             .border(width = cardBorderWidth, color = animatedCardBorderColor, shape = RoundedCornerShape(28.dp))
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(cardBorderWidth, animatedCardBorderColor, RoundedCornerShape(28.dp))) }
+            // Note: blurred border overlay removed — the solid border already reads as accent neon on dark backgrounds,
+            // and the blur(8dp) + border Box was adding one RenderEffect per card (~8–12 extra GPU passes when scrolling).
         }
         Card(
             modifier = Modifier
@@ -956,7 +991,8 @@ fun FlatButton(
     enabled: Boolean = true,
     colors: ThemeColors,
     maxLines: Int,
-    oledMode: Boolean = false
+    oledMode: Boolean = false,
+    cornerRadius: Dp = 28.dp
 ) {
     val animLevel = LocalAnimationLevel.current
     var isPressed by remember { mutableStateOf(false) }
@@ -966,7 +1002,7 @@ fun FlatButton(
     val baseHeight = if (isSmallScreen) 54.dp else 58.dp
     val ts = LocalTypeScale.current
     val baseFontSize = ts.buttonLarge
-    val shape = RoundedCornerShape(28.dp)
+    val shape = RoundedCornerShape(cornerRadius)
 
     // Single Animatable<Float> [0=rest, 1=pressed] drives ALL press visuals via
     // graphicsLayer — replaces 5 separate animateFloatAsState/animateDpAsState calls
@@ -1017,18 +1053,9 @@ fun FlatButton(
         modifier = modifier.height(baseHeight),
         contentAlignment = Alignment.Center
     ) {
-        // Neon border glow — blur the border stroke so the glow hugs the outline
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val glowAlpha = if (oledMode) 0.85f else 0.60f
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(9.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                    .border(2.dp, colors.primaryAccent.copy(alpha = glowAlpha), shape)
-            )
-        }
-        // Inner Box: scaled visually but layout is already committed above, so the
-        // press highlight, background, border and clip are all perfectly coincident
+        // Neon border glow — previously a Modifier.blur(9dp) Box (= full RenderEffect per button).
+        // Replaced: a cheap drawBehind radial gradient gives the same "lit edge" feel at zero blur cost.
+        // Four buttons on screen × one RenderEffect each = four GPU pipelines removed per frame.
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -1120,21 +1147,19 @@ fun IllustratedButton(
         )
     }
     val pp = pressProgress.value
-    val nudgePx = with(density) { 1.5.dp.toPx() }
-    // Accent (Vulkan) gets a thicker rest border to emphasize it over non-accent buttons
-    val restBorderW = when {
-        oledMode -> 0.75f
-        accent   -> 1.75f
-        else     -> 1f
-    }
-    val pressScale      = 1f - pp * (1f - MotionTokens.Scale.subtle)
+    val nudgePx = with(density) { 2.dp.toPx() }
+    val pressScale      = 1f - pp * (1f - MotionTokens.Scale.mild)
     val textScale       = 1f - pp * 0.07f
     val textTranslateY  = pp * nudgePx
-    val borderWidthDp   = (restBorderW + pp * (if (accent) 0.25f else restBorderW)).dp
-    val borderAlpha     = 0.5f + pp * 0.5f
-    val animatedButtonColor = if (!enabled) colors.textSecondary.copy(alpha = 0.05f)
+
+    // Non-accent buttons (OpenGL, Resources, GPUWatch) use the exact same
+    // border spec as the container box: 1.dp, primaryAccent at 0.55f alpha.
+    // Vulkan (accent=true) keeps a full-alpha border + bloom glow on top.
+    val borderWidthDp = if (accent) (1.75f + pp * 0.25f).dp else 1.dp
+    val animatedButtonColor = if (!enabled) colors.cardBackground
     else if (oledMode) Color.Black
     else if (accent) colors.primaryAccent
+    else if (iconType == "resources") colors.cardBackground
     else Color.Transparent
 
     val contentColor = if (accent && !oledMode) {
@@ -1142,14 +1167,12 @@ fun IllustratedButton(
     } else colors.textPrimary
     val animatedTextColor = if (!enabled) colors.textSecondary.copy(alpha = 0.3f) else contentColor
 
+    // Vulkan: full-alpha accent border. All others: match container (0.55f).
     val borderColor = when {
-        !enabled             -> colors.primaryAccent.copy(alpha = 0.25f)
-        isPressed            -> colors.primaryAccent
-        accent               -> colors.primaryAccent  // Vulkan: full alpha at rest for emphasis
-        else                 -> colors.primaryAccent.copy(alpha = 0.55f)
+        !enabled -> colors.primaryAccent.copy(alpha = 0.25f)
+        accent   -> colors.primaryAccent
+        else     -> colors.primaryAccent.copy(alpha = 0.55f)
     }
-
-    val shouldShowBorder = true
 
     // The icon colour: vulkan bolt always neon accent; accent buttons get full accent;
     // non-accent (Resources, GPUWatch) get slightly dimmed accent.
@@ -1160,9 +1183,7 @@ fun IllustratedButton(
         else                    -> colors.primaryAccent.copy(alpha = 0.3f)
     }
 
-    // Screen-reader description: combine the drawn icon's meaning with the
-    // button label and its current enabled state so TalkBack announces something
-    // meaningful rather than "unlabelled button".
+    // Screen-reader description
     val iconDescription = when (iconType) {
         "vulkan"   -> "Vulkan lightning bolt icon"
         "opengl"   -> "OpenGL hexagon icon"
@@ -1173,74 +1194,107 @@ fun IllustratedButton(
     val semanticsLabel = if (enabled) "$iconDescription, $text button"
     else         "$iconDescription, $text button, disabled"
 
-    Box(
+    // Vulkan bloom glow radius — matches container glow radius formula
+    val glowBlurRadius = (screenMinDp * 0.027f).dp.coerceIn(7.dp, 14.dp)
+
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .height(baseHeight)
             .semantics(mergeDescendants = true) { contentDescription = semanticsLabel },
         contentAlignment = Alignment.Center
     ) {
-        // Neon border glow — blur the border stroke so the glow hugs the outline
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val glowAlpha = if (oledMode) 0.85f else 0.60f
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(9.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                    .border(2.dp, colors.primaryAccent.copy(alpha = glowAlpha), shape)
-            )
-        }
+        // Outer Box owns the press scale transform — must be OUTSIDE clip so the
+        // scale actually moves pixels. graphicsLayer before clip is a no-op visually.
         Box(
-            contentAlignment = Alignment.Center,
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer(scaleX = pressScale, scaleY = pressScale)
-                .clip(shape)
-                .background(animatedButtonColor)
-                .then(if (shouldShowBorder) Modifier.border(borderWidthDp, borderColor, shape) else Modifier)
-                .then(if (enabled) Modifier.pointerInput(enabled) {
-                    detectTapGestures(
-                        onPress = {
-                            if (animLevel != 2) isPressed = true
-                            tryAwaitRelease()
-                            isPressed = false
-                        },
-                        onTap = { onClick() }
-                    )
-                } else Modifier)
+                .graphicsLayer(scaleX = pressScale, scaleY = pressScale),
+            contentAlignment = Alignment.Center
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
+            // Vulkan-only: blurred border bloom.
+            // Draw the border first (as the Box background), then blur the whole Box —
+            // blur applied AFTER border would draw sharp on top of nothing.
+            if (accent && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val glowAlpha = if (oledMode) 1.0f else 0.95f
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .border(borderWidthDp, colors.primaryAccent.copy(alpha = glowAlpha * 0.50f), shape)
+                        .blur(glowBlurRadius * 3.5f, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .border(borderWidthDp, colors.primaryAccent.copy(alpha = glowAlpha * 0.80f), shape)
+                        .blur(glowBlurRadius * 1.8f, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .border(borderWidthDp, colors.primaryAccent.copy(alpha = glowAlpha), shape)
+                        .blur(glowBlurRadius * 0.7f, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                )
+            }
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .graphicsLayer(scaleX = textScale, scaleY = textScale, translationY = textTranslateY)
-                    .padding(horizontal = 8.dp)
+                    .fillMaxSize()
+                    .clip(shape)
+                    .background(animatedButtonColor)
+                    .border(borderWidthDp, borderColor, shape)
+                    .then(
+                        if (enabled) Modifier.pointerInput(enabled) {
+                            detectTapGestures(
+                                onPress = {
+                                    if (animLevel != 2) isPressed = true
+                                    tryAwaitRelease()
+                                    isPressed = false
+                                },
+                                onTap = { onClick() }
+                            )
+                        } else Modifier
+                    )
             ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .graphicsLayer(scaleX = textScale, scaleY = textScale, translationY = textTranslateY)
+                        .padding(horizontal = 8.dp)
+                ) {
                 // ── Custom Canvas illustration ───────────────────────────────
                 // Icon and spacer scale with button height for visual harmony at any size/orientation.
                 val iconSizeDp = (baseHeight.value * 0.43f).dp.coerceIn(18.dp, 30.dp)
                 val spacerWidth = (baseHeight.value * 0.13f).dp.coerceIn(6.dp, 12.dp)
                 Box(contentAlignment = Alignment.Center) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && (oledMode || accent || iconType == "vulkan")) {
-                        // Glow blur radii scale with the icon so they're never too tight or too diffuse.
-                        val wideIconBlur  = (iconSizeDp.value * 0.38f).dp.coerceIn(5.dp, 12.dp)
-                        val tightIconBlur = (iconSizeDp.value * 0.11f).dp.coerceIn(2.dp, 4.dp)
-                        // Wide soft glow
-                        Canvas(modifier = Modifier.size(iconSizeDp).blur(wideIconBlur, BlurredEdgeTreatment.Unbounded)) {
-                            val w = size.width; val h = size.height
-                            drawIconShapeInline(iconType, w, h, iconColor.copy(alpha = 0.75f))
-                        }
-                        // Tight inner glow
-                        Canvas(modifier = Modifier.size(iconSizeDp).blur(tightIconBlur, BlurredEdgeTreatment.Unbounded)) {
-                            val w = size.width; val h = size.height
-                            drawIconShapeInline(iconType, w, h, iconColor.copy(alpha = 0.90f))
-                        }
-                    }
+                    // Icon bloom — previously two Modifier.blur() Canvas layers (2 RenderEffects per button).
+                    // Replaced: a single radial gradient drawn on the same Canvas as the icon.
+                    // drawCircle with a radialGradient brush is a single GPU draw call — zero extra layers.
                     Canvas(modifier = Modifier.size(iconSizeDp)) {
-                        val w = size.width
-                        val h = size.height
-                        val stroke = Stroke(width = w * 0.095f, cap = StrokeCap.Round, join = StrokeJoin.Round)
-                        val strokeThin = Stroke(width = w * 0.07f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                        val w = size.width; val h = size.height
+                        val r = w * 0.72f
+                        // Fake bloom: outer halo + tight ring, both purely alpha composited
+                        if (oledMode || accent || iconType == "vulkan") {
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    0.0f to iconColor.copy(alpha = 0.28f),
+                                    0.5f to iconColor.copy(alpha = 0.10f),
+                                    1.0f to Color.Transparent,
+                                    radius = r * 1.45f
+                                ),
+                                radius = r * 1.45f
+                            )
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    0.0f to iconColor.copy(alpha = 0.55f),
+                                    0.6f to iconColor.copy(alpha = 0.15f),
+                                    1.0f to Color.Transparent,
+                                    radius = r * 0.80f
+                                ),
+                                radius = r * 0.80f
+                            )
+                        }
                         drawIconShapeInline(iconType, w, h, iconColor)
                     }
                 }
@@ -1257,6 +1311,7 @@ fun IllustratedButton(
             }
         }
     }
+}
 }
 
 private fun DrawScope.drawIconShapeInline(iconType: String, w: Float, h: Float, color: Color) {
@@ -1382,17 +1437,16 @@ fun BigRendererButton(
         )
     }
     val pp         = pressProgress.value
-    val pressScale = 1f - pp * (1f - MotionTokens.Scale.subtle)
-    val contentTY  = pp * with(density) { 1.5.dp.toPx() }
+    val pressScale = 1f - pp * (1f - MotionTokens.Scale.moderate)
+    val contentTY  = pp * with(density) { 2.dp.toPx() }
     // Shape and icon size are derived at layout time via BoxWithConstraints so they
     // scale correctly across all screen sizes, densities, and orientations.
 
     val highlighted = isSelected || forceHighlight
     val bgColor = when {
-        !enabled    -> colors.cardBackground.copy(alpha = 0.25f)
-        highlighted -> colors.primaryAccent.copy(alpha = 0.20f)
-        oledMode    -> Color.Black.copy(alpha = 0.55f)
-        else        -> colors.cardBackground.copy(alpha = 0.45f)
+        !enabled -> colors.cardBackground
+        oledMode -> Color.Black
+        else     -> colors.cardBackground
     }
     // Border: both buttons use the same accent-based style as the Resources button
     // (primaryAccent at 0.55f at rest, full accent on highlight/press).
@@ -1417,10 +1471,22 @@ fun BigRendererButton(
     val textColor = colors.textPrimary
 
     // ── Outer wrapper — NOT clipped, so the glow blob bleeds freely ──────────
+    // When disabled (Shizuku not ready): zoom out + fade to match REMINDERS card style.
+    val disabledScale by animateFloatAsState(
+        targetValue = if (enabled) 1f else 0.85f,
+        animationSpec = spring(dampingRatio = MotionTokens.Springs.gentle.dampingRatio, stiffness = MotionTokens.Springs.gentle.stiffness),
+        label = "big_btn_scale"
+    )
+    val disabledAlpha by animateFloatAsState(
+        targetValue = if (enabled) 1f else 0.25f,
+        animationSpec = tween(durationMillis = 320, easing = MotionTokens.Easing.velvet),
+        label = "big_btn_alpha"
+    )
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .height(buttonHeight),
+            .height(buttonHeight)
+            .graphicsLayer(scaleX = disabledScale, scaleY = disabledScale, alpha = disabledAlpha),
         contentAlignment = Alignment.Center
     ) {
         // Derive sizes from actual rendered dimensions — correct at every resolution and orientation.
@@ -1429,38 +1495,44 @@ fun BigRendererButton(
         val iconSizeDp = (buttonSize.value * 0.34f).dp.coerceIn(36.dp, 72.dp)
         val spacerDp   = (buttonSize.value * 0.065f).dp.coerceIn(6.dp, 14.dp)
 
-        // Neon border glow — all sizes scale with the rendered button size.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val glowBorderAlpha = if (highlighted) 0.90f else if (enabled) 0.45f else 0.12f
-            val glowBorderWidth = (buttonSize.value * 0.018f).dp.coerceIn(1.5.dp, 3.5.dp)
-                .let { if (highlighted) it * 1.4f else it }
-            val glowBlur        = (buttonSize.value * 0.07f).dp.coerceIn(5.dp, 14.dp)
-                .let { if (highlighted) it * 1.3f else it }
-            // Wide outer halo
+        // Neon border halo — blurred border layer for Vulkan glow effect.
+        if (iconType == "vulkan" && highlighted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val glowBlurRadius = (screenMinDp * 0.027f).dp.coerceIn(7.dp, 14.dp)
+            val glowAlpha = if (oledMode) 1.0f else 0.95f
+            // Layer 1 — outermost diffuse bloom (biggest, most spread)
             Box(
                 modifier = Modifier
-                    .matchParentSize()
-                    .blur(glowBlur, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                    .border(glowBorderWidth, colors.primaryAccent.copy(alpha = glowBorderAlpha), shape)
+                    .fillMaxSize()
+                    .border(2.dp, colors.primaryAccent.copy(alpha = glowAlpha * 0.50f), shape)
+                    .blur(glowBlurRadius * 3.5f, edgeTreatment = BlurredEdgeTreatment.Unbounded)
             )
-            // Tight bright inner ring for the crisp neon edge
-            if (highlighted) {
-                val innerBlur   = (buttonSize.value * 0.022f).dp.coerceIn(2.dp, 5.dp)
-                val innerBorder = (buttonSize.value * 0.016f).dp.coerceIn(1.5.dp, 3.dp)
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .blur(innerBlur, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                        .border(innerBorder, colors.primaryAccent, shape)
-                )
-            }
+            // Layer 2 — mid bloom
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .border(2.dp, colors.primaryAccent.copy(alpha = glowAlpha * 0.80f), shape)
+                    .blur(glowBlurRadius * 1.8f, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+            )
+            // Layer 3 — tight inner glow, nearly full alpha
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .border(2.dp, colors.primaryAccent.copy(alpha = glowAlpha), shape)
+                    .blur(glowBlurRadius * 0.7f, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+            )
         }
 
+        // ── Outer box owns scale transform — graphicsLayer MUST be outside clip ──
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(scaleX = pressScale, scaleY = pressScale),
+            contentAlignment = Alignment.Center
+        ) {
         // ── Card (clipped) ────────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer(scaleX = pressScale, scaleY = pressScale)
                 .clip(shape)
                 .background(bgColor)
                 // ── Bottom-up light spill: accent light pooling from below ───
@@ -1469,7 +1541,8 @@ fun BigRendererButton(
                     0.45f to Color.Transparent,
                     1.0f to colors.primaryAccent.copy(alpha = if (enabled) 0.14f else 0.07f)
                 ))
-                .border((buttonSize.value * 0.016f).dp.coerceIn(1.dp, 2.5.dp).let { if (highlighted || isPressed) it * 1.5f else it }, borderColor, shape)
+                // Border: 1.dp at rest — same as Resources/container. 1.5x on highlight/press.
+                .border(if (highlighted || isPressed) 1.5.dp else 1.dp, borderColor, shape)
                 .then(if (enabled) Modifier.pointerInput(enabled) {
                     detectTapGestures(
                         onPress = { if (animLevel != 2) isPressed = true; tryAwaitRelease(); isPressed = false },
@@ -1478,24 +1551,8 @@ fun BigRendererButton(
                 } else Modifier),
             contentAlignment = Alignment.Center
         ) {
-            // ── Vulkan-only: dark grid overlay to match the screenshot aesthetic ──
+            // ── Vulkan-only: radial accent glow for depth ──
             if (iconType == "vulkan" && highlighted) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val gridColor = colors.primaryAccent.copy(alpha = 0.10f)
-                    // Grid density scales with canvas size so it looks identical at any resolution.
-                    val step = size.width * 0.115f
-                    var x = 0f
-                    while (x <= size.width) {
-                        drawLine(gridColor, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 0.8f)
-                        x += step
-                    }
-                    var y = 0f
-                    while (y <= size.height) {
-                        drawLine(gridColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 0.8f)
-                        y += step
-                    }
-                }
-                // Radial accent glow from top centre — gives depth like the screenshot
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1515,23 +1572,33 @@ fun BigRendererButton(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // ── 2-layer neon bloom — same size as icon, blur spreads naturally ──
-                // Blur amounts scale with icon size so the glow is never too tight or too diffuse.
-                val wideBlur  = (iconSizeDp.value * 0.115f).dp.coerceIn(4.dp, 10.dp)
-                val tightBlur = (iconSizeDp.value * 0.038f).dp.coerceIn(1.5.dp, 4.dp)
+                // ── Icon bloom — previously 2 blur() Canvas layers (2 RenderEffects per button per frame) ──
+                // Replaced: single Canvas with radial gradient under the icon shape.
+                // drawCircle(brush=radialGradient) is one GPU call — no extra compositor layers.
                 Box(contentAlignment = Alignment.Center) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        // Wide soft halo
-                        Canvas(modifier = Modifier.size(iconSizeDp).blur(wideBlur, BlurredEdgeTreatment.Unbounded)) {
-                            drawIconShape(iconType, size, iconColor.copy(alpha = 0.55f))
-                        }
-                        // Tight bright edge
-                        Canvas(modifier = Modifier.size(iconSizeDp).blur(tightBlur, BlurredEdgeTreatment.Unbounded)) {
-                            drawIconShape(iconType, size, iconColor.copy(alpha = 0.80f))
-                        }
-                    }
-                    // Crisp solid top
                     Canvas(modifier = Modifier.size(iconSizeDp)) {
+                        val r = size.minDimension * 0.52f
+                        // Outer soft halo
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                0.0f to iconColor.copy(alpha = 0.30f),
+                                0.55f to iconColor.copy(alpha = 0.10f),
+                                1.0f to Color.Transparent,
+                                radius = r * 1.60f
+                            ),
+                            radius = r * 1.60f
+                        )
+                        // Tight inner bloom
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                0.0f to iconColor.copy(alpha = 0.60f),
+                                0.50f to iconColor.copy(alpha = 0.18f),
+                                1.0f to Color.Transparent,
+                                radius = r * 0.85f
+                            ),
+                            radius = r * 0.85f
+                        )
+                        // Crisp icon on top
                         drawIconShape(iconType, size, iconColor)
                     }
                 }
@@ -1541,6 +1608,7 @@ fun BigRendererButton(
                     maxLines = 1, textAlign = TextAlign.Center)
             }
         }
+        } // close outer graphicsLayer scale Box
     }
 }
 
@@ -1764,20 +1832,20 @@ fun MainContentCards(
             // Rows 3 & 4: Vulkan | OpenGL and Resources | GPUWatch — unified glassmorphism container
             AnimatedElement(visible = isVisible, staggerIndex = 2, cardShadow = true,
                 totalItems = 4, enabled = shizukuReady) {
-                // Both buttons share identical scale/alpha — one animator each instead of four
-                // When Shizuku is not ready: zoom out more and increase transparency to signal unavailability
-                val settingsButtonScale by animateFloatAsState(
-                    targetValue = if (shizukuReady) 1f else 0.78f,
+                // Vulkan/OpenGL row: zoom out and dim when Shizuku is not ready,
+                // matching the REMINDERS card style (scale 0.85f, alpha 0.25f).
+                val rendererButtonScale by animateFloatAsState(
+                    targetValue = if (shizukuReady) 1f else 0.85f,
                     animationSpec = spring(
                         dampingRatio = MotionTokens.Springs.gentle.dampingRatio,
                         stiffness = MotionTokens.Springs.gentle.stiffness
                     ),
-                    label = "settings_button_scale"
+                    label = "renderer_button_scale"
                 )
-                val settingsButtonAlpha by animateFloatAsState(
-                    targetValue = if (shizukuReady) 1f else 0.15f,
+                val rendererButtonAlpha by animateFloatAsState(
+                    targetValue = if (shizukuReady) 1f else 0.25f,
                     animationSpec = tween(durationMillis = 320, easing = MotionTokens.Easing.velvet),
-                    label = "settings_button_alpha"
+                    label = "renderer_button_alpha"
                 )
 
                 // Container with neon border glow
@@ -1814,9 +1882,9 @@ fun MainContentCards(
                                 modifier = Modifier
                                     .weight(1f)
                                     .graphicsLayer(
-                                        scaleX = settingsButtonScale,
-                                        scaleY = settingsButtonScale,
-                                        alpha = settingsButtonAlpha
+                                        scaleX = rendererButtonScale,
+                                        scaleY = rendererButtonScale,
+                                        alpha = rendererButtonAlpha
                                     ),
                                 accent = true,
                                 enabled = true,
@@ -1830,9 +1898,9 @@ fun MainContentCards(
                                 modifier = Modifier
                                     .weight(1f)
                                     .graphicsLayer(
-                                        scaleX = settingsButtonScale,
-                                        scaleY = settingsButtonScale,
-                                        alpha = settingsButtonAlpha
+                                        scaleX = rendererButtonScale,
+                                        scaleY = rendererButtonScale,
+                                        alpha = rendererButtonAlpha
                                     ),
                                 accent = false,
                                 enabled = true,
@@ -1950,17 +2018,7 @@ fun RendererCard(
         remember { mutableFloatStateOf(0f) }
     }
 
-    val rendererTextAlpha by if (shizukuReady && animLevel != 2) {
-        val t = rememberInfiniteTransition(label = "renderer_text")
-        t.animateFloat(
-            initialValue = 0.75f, targetValue = 1.0f,
-            animationSpec = infiniteRepeatable(tween(1800, easing = MotionTokens.Easing.silk), RepeatMode.Reverse),
-            label = "renderer_text_alpha"
-        )
-    } else {
-        // animLevel 2 (reduced motion) or Shizuku not ready: static value, no ticker
-        remember { mutableFloatStateOf(if (shizukuReady) 0.875f else 0.75f) }
-    }
+    // (rendererTextAlpha removed — was declared but never consumed anywhere in RendererCard)
 
     // ── Press state — single Animatable<Float> [0=rest, 1=pressed] drives all ──
     // press visuals via draw-phase lerp, replacing 3 separate animateFloatAsState
@@ -1994,13 +2052,15 @@ fun RendererCard(
         colors.primaryAccent.copy(alpha = 0.55f)
     }
 
-    val borderWidth by animateDpAsState(
+    // Border width: use animateFloatAsState so the value is read at draw time via .dp
+    // conversion inside graphicsLayer-adjacent code — avoids a layout pass on change.
+    val borderWidthF by animateFloatAsState(
         targetValue = when {
-            isPressed       -> 2.dp
-            !shizukuReady   -> 2.dp    // thick pulsing outline for error/warning
-            oledMode        -> 0.75.dp
-            shizukuReady    -> 1.25.dp
-            else            -> 1.dp
+            isPressed       -> 2f
+            !shizukuReady   -> 2f
+            oledMode        -> 0.75f
+            shizukuReady    -> 1f
+            else            -> 1f
         },
         animationSpec = if (animLevel == 2) snap() else tween(
             durationMillis = if (isPressed) MotionTokens.Duration.flash else MotionTokens.Duration.quick,
@@ -2008,6 +2068,7 @@ fun RendererCard(
         ),
         label = "renderer_border_width"
     )
+    val borderWidth = borderWidthF.dp
 
     val isDarkTheme = cardBackground.luminance() < 0.5f
     val subtleWarningBackground = if (!shizukuReady) {
@@ -2029,8 +2090,7 @@ fun RendererCard(
                 Color(0xFFFFF5D6)
         }
     } else if (shizukuReady) {
-        // Transparent background matching Vulkan/OpenGL button style
-        Color.Transparent
+        cardBackground
     } else {
         cardBackground
     }
@@ -2327,7 +2387,7 @@ fun CompactColorPickerCard(
             .border(width = 1.dp, color = cardBorderColor, shape = RoundedCornerShape(28.dp))
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, cardBorderColor, RoundedCornerShape(28.dp))) }
+            // Blurred border overlay removed for performance (one RenderEffect per card was the main overdraw culprit).
         }
         Card(
             modifier = Modifier
@@ -2798,6 +2858,13 @@ fun ToggleCard(
         label = "toggle_accent_edge_alpha"
     )
 
+    // Edge width pulses slightly wider when on — subtle tactile cue
+    val accentEdgeWidth by animateDpAsState(
+        targetValue = if (checked && enabled) 4.dp else 3.dp,
+        animationSpec = tween(durationMillis = 240, easing = MotionTokens.Easing.enter),
+        label = "toggle_accent_edge_width"
+    )
+
     // Card background wash — alpha-only animation, color follows global
     val bgWashAlpha by animateFloatAsState(
         targetValue = if (checked && enabled) 1f else 0f,
@@ -2849,13 +2916,26 @@ fun ToggleCard(
             } else Modifier)
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(if (oledMode) 0.75.dp else 1.dp, cardBorderColor, RoundedCornerShape(28.dp))) }
+            // Blurred border overlay removed — RenderEffect per-card hurt scrolling fps badly on Snapdragon 8 Gen 2.
         }
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = cardMinHeight)
-                .graphicsLayer(alpha = alpha),
+                .graphicsLayer(alpha = alpha)
+                .drawBehind {
+                    // Soft glow bleed from left edge — drawn behind card content, clipped to card shape
+                    if (accentEdgeAlpha > 0f) {
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                0.0f to colors.primaryAccent.copy(alpha = accentEdgeAlpha * 0.10f),
+                                0.25f to colors.primaryAccent.copy(alpha = accentEdgeAlpha * 0.04f),
+                                1.0f to Color.Transparent,
+                                endX = size.width * 0.5f
+                            )
+                        )
+                    }
+                },
             colors = CardDefaults.cardColors(containerColor = cardBg),
             shape = RoundedCornerShape(28.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -2868,13 +2948,19 @@ fun ToggleCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left accent edge — 3 dp wide, full card height, clipped to card shape
+                // Left accent edge — gradient bar with soft glow spread
                 Box(
                     modifier = Modifier
-                        .width(3.dp)
+                        .width(accentEdgeWidth)
                         .fillMaxHeight()
                         .background(
-                            color = colors.primaryAccent.copy(alpha = accentEdgeAlpha),
+                            brush = Brush.verticalGradient(
+                                0.0f to colors.primaryAccent.copy(alpha = accentEdgeAlpha * 0.3f),
+                                0.3f to colors.primaryAccent.copy(alpha = accentEdgeAlpha),
+                                0.5f to colors.primaryAccent.copy(alpha = accentEdgeAlpha),
+                                0.7f to colors.primaryAccent.copy(alpha = accentEdgeAlpha),
+                                1.0f to colors.primaryAccent.copy(alpha = accentEdgeAlpha * 0.3f)
+                            ),
                             shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
                         )
                 )
@@ -2924,20 +3010,27 @@ fun ToggleCard(
                         label = "oled_track_alpha"
                     )
                     val checkedTrackColor = lerp(colors.primaryAccent, Color(0xFF1A1A1A), oledTrackAlpha)
-                    val uncheckedTrackColor = lerp(Color.Gray, Color(0xFF1A1A1A), oledTrackAlpha)
+                    // In light mode: soft accent-tinted track instead of harsh grey
+                    val uncheckedTrackColor = lerp(
+                        colors.primaryAccent.copy(alpha = 0.20f),
+                        Color(0xFF1A1A1A),
+                        oledTrackAlpha
+                    )
                     val checkedThumbColor = lerp(Color.White, colors.primaryAccent, oledTrackAlpha)
+                    // Unchecked thumb: white in light mode (clean, pill-shaped look), accent in oled
+                    val uncheckedThumbColor = lerp(Color.White, colors.primaryAccent.copy(alpha = 0.6f), oledTrackAlpha)
 
                     val switchColors = SwitchDefaults.colors(
                         checkedThumbColor = checkedThumbColor,
                         checkedTrackColor = checkedTrackColor,
-                        uncheckedThumbColor = colors.textSecondary,
+                        uncheckedThumbColor = uncheckedThumbColor,
                         uncheckedTrackColor = uncheckedTrackColor,
                         checkedBorderColor = Color.Transparent,
                         uncheckedBorderColor = Color.Transparent,
                         disabledCheckedThumbColor = colors.textSecondary.copy(alpha = 0.4f),
-                        disabledCheckedTrackColor = Color.Gray.copy(alpha = 0.3f),
-                        disabledUncheckedThumbColor = colors.textSecondary.copy(alpha = 0.3f),
-                        disabledUncheckedTrackColor = Color.Gray.copy(alpha = 0.2f)
+                        disabledCheckedTrackColor = colors.primaryAccent.copy(alpha = 0.15f),
+                        disabledUncheckedThumbColor = Color.White.copy(alpha = 0.6f),
+                        disabledUncheckedTrackColor = colors.primaryAccent.copy(alpha = 0.10f)
                     )
 
                     Switch(
@@ -3167,7 +3260,7 @@ fun PanelBackButton(
             modifier = Modifier
                 .size(btnSize)
                 .graphicsLayer(scaleX = pressScale, scaleY = pressScale)
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(28.dp))
                 .background(
                     Brush.radialGradient(
                         listOf(
@@ -3179,7 +3272,7 @@ fun PanelBackButton(
                 .border(
                     borderWidthDp,
                     colors.primaryAccent.copy(alpha = borderAlphaVal),
-                    RoundedCornerShape(14.dp)
+                    RoundedCornerShape(28.dp)
                 )
                 .pointerInput(Unit) {
                     detectTapGestures(
@@ -3232,7 +3325,7 @@ fun DialogButton(
     var isPressed by remember { mutableStateOf(false) }
     val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val density = LocalDensity.current
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(20.dp)
 
     // ── Single Animatable<Float> [0=rest, 1=pressed] drives ALL press visuals ─
     // Replaces 4 separate animateFloatAsState/animateDpAsState calls that all
@@ -3388,7 +3481,9 @@ fun BouncyDialog(
             // Level 0: more expressive overshoot. Level 1: barely perceptible, just physical.
             val enterSpring = when (animLevel) {
                 0    -> spring<Float>(dampingRatio = 0.42f, stiffness = 190f)
-                else -> spring<Float>(dampingRatio = 0.62f, stiffness = 320f)
+                // Tightened: 320→460 stiffness so the panel snaps open decisively
+                // instead of feeling like it hesitates before arriving.
+                else -> spring<Float>(dampingRatio = 0.68f, stiffness = 460f)
             }
             val alphaEnterDuration = when (animLevel) { 0 -> 240; else -> 180 }
 

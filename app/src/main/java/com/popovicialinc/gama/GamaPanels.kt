@@ -57,32 +57,37 @@ private fun PanelScaffold(
     val dismissOnClickOutside = LocalDismissOnClickOutside.current
     val scrollState = rememberScrollState()
 
-    val backPadding by animateDpAsState(
-        targetValue = if (visible) (if (isSmallScreen) 72.dp else 84.dp) else 0.dp,
+    // Back button slide-in — graphicsLayer translationY keeps this in the draw phase,
+    // zero layout recompositions.
+    val backButtonTranslationY by animateFloatAsState(
+        targetValue = if (visible) 0f else 300f,  // 300f = off-screen below
         animationSpec = tween(420, easing = MotionTokens.Easing.emphasizedDecelerate),
-        label = "panel_back_padding"
+        label = "panel_back_ty"
     )
-    // When a sub-dialog opens (isBlurred = true) the panel fades down to a dim
-    // blurred state so the dialog feels like it's on a higher layer.
-    // When the sub-dialog closes the panel fades back to full opacity/sharpness.
-    //
-    // Two animated values:
-    //   blurAlpha   — 0→1 drives the blurred copy fading IN
-    //   panelAlpha  — 1→0.35 dims the whole panel as the sub-dialog arrives
-    //
-    // The net effect: panel softly recedes, sub-dialog pops on top, then panel
-    // snaps back to life when the dialog is dismissed.
-    val animLevel = LocalAnimationLevel.current
-    val blurAlpha by animateFloatAsState(
-        targetValue = if (isBlurred) 1f else 0f,
-        animationSpec = if (animLevel == 2) snap() else tween(
-            durationMillis = if (isBlurred) 280 else 210,
-            easing = if (isBlurred) MotionTokens.Easing.emphasizedDecelerate else MotionTokens.Easing.exit
+
+    // Animated bottom padding — springs open with a gentle bounce so the scroll
+    // column "makes space" for the back button rather than letting it float over
+    // the last card.  Spring spec: low damping for the bounce, high enough stiffness
+    // to feel snappy but not jarring.  This drives a layout pass, but it only runs
+    // once on panel entry (visible becomes true) and once on exit — not per-frame.
+    val bottomPaddingTarget = if (visible) {
+        if (isSmallScreen) 96f else 112f   // dp: button height + gap + comfortable clearance
+    } else {
+        0f
+    }
+    val bottomPaddingDp by animateFloatAsState(
+        targetValue = bottomPaddingTarget,
+        animationSpec = spring(
+            dampingRatio = 0.52f,   // underdamped — produces the single pleasant overshoot
+            stiffness    = 280f     // responsive but not harsh; keeps the bounce visible
         ),
-        label = "panel_blur_alpha"
+        label = "panel_bottom_pad"
     )
-    // Overall panel dim: fades to 38% when sub-dialog is shown (slightly lighter than 35%
-    // so content is still readable), snaps back cleanly when dialog closes.
+    // When a sub-dialog opens (isBlurred = true) the panel dims so the dialog feels
+    // on a higher layer. The blur itself snaps on/off (no animated radius — see below).
+    //
+    // panelAlpha  — 1→0.35 dims the whole panel as the sub-dialog arrives
+    val animLevel = LocalAnimationLevel.current
     val panelAlpha by animateFloatAsState(
         targetValue = if (isBlurred) 0.38f else 1f,
         animationSpec = if (animLevel == 2) snap() else tween(
@@ -108,14 +113,19 @@ private fun PanelScaffold(
         // at a dialog, not scrutinising the blurred panel behind it.
         val useBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
+        // Snap blur radius — never animate it per-frame.
+        // Previously `(blurAlpha * 20f).dp` caused a new RenderEffect (Gaussian kernel
+        // rebuild) every vsync during the ~300 ms transition: ~18 kernel rebuilds back-to-back.
+        // Fixed radius set once when isBlurred becomes true → zero per-frame GPU rebuild cost.
+        // The panelAlpha fade still provides smooth visual feedback of the transition.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = panelAlpha }
                 .then(
-                    if (useBlur && (isBlurred || blurAlpha > 0f))
+                    if (useBlur && isBlurred)
                         Modifier.blur(
-                            radius = (blurAlpha * 20f).dp,
+                            radius = 20.dp,
                             edgeTreatment = BlurredEdgeTreatment.Unbounded
                         )
                     else Modifier
@@ -135,7 +145,7 @@ private fun PanelScaffold(
                         .widthIn(max = if (isLandscape) 800.dp else 500.dp)
                         .verticalScroll(scrollState)
                         .padding(horizontal = if (isLandscape) 32.dp else 24.dp)
-                        .padding(bottom = backPadding)
+                        .padding(bottom = bottomPaddingDp.dp)
                         .pointerInput(Unit) { detectTapGestures { } },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 16.dp else 20.dp)
@@ -154,6 +164,7 @@ private fun PanelScaffold(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(end = 20.dp, bottom = 28.dp)
+                        .graphicsLayer { translationY = backButtonTranslationY }
                 )
             }
         }
@@ -309,7 +320,6 @@ fun VisualEffectsPanel(
                         shape = RoundedCornerShape(28.dp))
             ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
                 }
                 Card(
                     modifier = Modifier
@@ -358,7 +368,6 @@ fun VisualEffectsPanel(
                         shape = RoundedCornerShape(28.dp))
             ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
                 }
                 Card(
                     modifier = Modifier
@@ -399,7 +408,6 @@ fun VisualEffectsPanel(
                         shape = RoundedCornerShape(28.dp))
             ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
                 }
                 Card(
                     modifier = Modifier
@@ -461,7 +469,6 @@ fun VisualEffectsPanel(
                         shape = RoundedCornerShape(28.dp))
             ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
                 }
                 Card(
                     modifier = Modifier
@@ -571,7 +578,8 @@ fun OLEDPanel(
 fun EffectsPanel(
     visible: Boolean,
     onDismiss: () -> Unit,
-    onBlurSettingsClick: () -> Unit,
+    blurEnabled: Boolean,
+    onBlurChange: (Boolean) -> Unit,
     onParticlesClick: () -> Unit,
     userName: String,
     isSmallScreen: Boolean,
@@ -591,52 +599,6 @@ fun EffectsPanel(
         CleanTitle(text = LocalStrings.current["effects.title"].ifEmpty { "EFFECTS" }, fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
 
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 2) {
-            SettingsNavigationCard(
-                title = LocalStrings.current["blur.blur_toggle"].ifEmpty { "BLUR" },
-                description = LocalStrings.current["blur.blur_toggle_desc"].ifEmpty { "Frosted glass effect behind panels — toggle and choose transition style" },
-                onClick = { performHaptic(); onBlurSettingsClick() },
-                isSmallScreen = isSmallScreen, colors = colors, cardBackground = cardBackground, oledMode = oledMode
-            )
-        }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 2) {
-            SettingsNavigationCard(
-                title = LocalStrings.current["particles.toggle"].ifEmpty { "PARTICLES" }, description = if (oledMode) LocalStrings.current["effects.particles_oled_desc"].ifEmpty { "Visible in OLED mode — some effects are limited by black backgrounds" } else LocalStrings.current["effects.particles_desc"].ifEmpty { "Floating dots, twinkling stars, or Matrix rain — choose your style" },
-                onClick = { performHaptic(); onParticlesClick() },
-                isSmallScreen = isSmallScreen, colors = colors, cardBackground = cardBackground, oledMode = oledMode
-            )
-        }
-    }
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BlurPanel
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-fun BlurPanel(
-    visible: Boolean,
-    onDismiss: () -> Unit,
-    blurEnabled: Boolean,
-    onBlurChange: (Boolean) -> Unit,
-    blurOptimised: Boolean,
-    onBlurOptimisedChange: (Boolean) -> Unit,
-    isSmallScreen: Boolean,
-    isLandscape: Boolean,
-    colors: ThemeColors,
-    cardBackground: Color,
-    performHaptic: () -> Unit,
-    oledMode: Boolean
-) {
-    val ts = LocalTypeScale.current
-    PanelScaffold(
-        visible = visible, onDismiss = onDismiss,
-        isLandscape = isLandscape, isSmallScreen = isSmallScreen,
-        oledMode = oledMode, colors = colors
-    ) { _ ->
-        CleanTitle(text = LocalStrings.current["blur.title"].ifEmpty { "BLUR" }, fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
-
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 2) {
             ToggleCard(
                 title = LocalStrings.current["blur.blur_toggle"].ifEmpty { "BLUR" },
                 description = LocalStrings.current["blur.blur_toggle_desc"].ifEmpty { "Frosted glass behind panels and dialogs — subtle depth that makes the UI feel premium" },
@@ -646,90 +608,12 @@ fun BlurPanel(
                 isSmallScreen = isSmallScreen, oledMode = oledMode
             )
         }
-
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 2, enabled = blurEnabled) {
-            val cardScale by animateFloatAsState(
-                targetValue = if (blurEnabled) 1f else 0.93f,
-                animationSpec = spring(
-                    dampingRatio = MotionTokens.Springs.gentle.dampingRatio,
-                    stiffness = MotionTokens.Springs.gentle.stiffness
-                ),
-                label = "blur_transition_card_scale"
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 2) {
+            SettingsNavigationCard(
+                title = LocalStrings.current["particles.toggle"].ifEmpty { "PARTICLES" }, description = if (oledMode) LocalStrings.current["effects.particles_oled_desc"].ifEmpty { "Visible in OLED mode — some effects are limited by black backgrounds" } else LocalStrings.current["effects.particles_desc"].ifEmpty { "Floating dots, twinkling stars, or Matrix rain — choose your style" },
+                onClick = { performHaptic(); onParticlesClick() },
+                isSmallScreen = isSmallScreen, colors = colors, cardBackground = cardBackground, oledMode = oledMode
             )
-            val cardAlpha by animateFloatAsState(
-                targetValue = if (blurEnabled) 1f else 0.45f,
-                animationSpec = tween(durationMillis = 260, easing = MotionTokens.Easing.velvet),
-                label = "blur_transition_card_alpha"
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer(scaleX = cardScale, scaleY = cardScale, alpha = cardAlpha)
-                    .border(
-                        width = 1.dp,
-                        color = colors.primaryAccent.copy(alpha = 0.55f),
-                        shape = RoundedCornerShape(28.dp))
-            ) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
-                }
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .graphicsLayer {
-                            shape = RoundedCornerShape(28.dp)
-                            clip = false
-                        },
-                    colors = CardDefaults.cardColors(containerColor = cardBackground),
-                    shape = RoundedCornerShape(28.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = LocalStrings.current["blur.blur_transition"].ifEmpty { "BLUR TRANSITION" },
-                            fontSize = ts.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 2.sp,
-                            fontFamily = quicksandFontFamily,
-                            color = colors.primaryAccent.copy(alpha = if (blurEnabled) 0.7f else 0.3f)
-                        )
-                        val descText = if (blurOptimised)
-                            LocalStrings.current["blur.blur_transition_optimised_desc"].ifEmpty { "Efficient: blur is baked once at full strength and fades in/out via opacity. Smooth on all devices." }
-                        else
-                            LocalStrings.current["blur.blur_transition_real_desc"].ifEmpty { "Precise: blur radius animates live every frame as the panel opens. Looks sharper but is heavier on the GPU." }
-                        Crossfade(
-                            targetState = descText,
-                            animationSpec = tween(durationMillis = 200, easing = MotionTokens.Easing.velvet),
-                            label = "blur_desc_crossfade"
-                        ) { text ->
-                            Text(
-                                text = text,
-                                fontSize = ts.bodyMedium,
-                                fontFamily = quicksandFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                color = colors.textSecondary
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        GlideOptionSelector(
-                            options = listOf("Optimised", "Real"),
-                            selectedIndex = if (blurOptimised) 0 else 1,
-                            onOptionSelected = { idx ->
-                                performHaptic()
-                                onBlurOptimisedChange(idx == 0)
-                            },
-                            colors = colors,
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = blurEnabled
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -811,7 +695,6 @@ fun ParticlesPanel(
                     )
             ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
                 }
                 Card(
                     modifier = Modifier
@@ -1093,7 +976,6 @@ fun ParticlesMotionPanel(
                     )
             ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
                 }
                 Card(
                     modifier = Modifier
@@ -1165,7 +1047,6 @@ fun ParticlesMotionPanel(
                     )
             ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
                 }
                 Card(
                     modifier = Modifier
@@ -1258,7 +1139,6 @@ fun ParticlesPerformancePanel(
                     )
             ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
                 }
                 Card(
                     modifier = Modifier
@@ -1895,9 +1775,9 @@ fun NotificationsPanel(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, colors.errorColor.copy(alpha = 0.4f), RoundedCornerShape(28.dp)),
+                        .border(1.dp, colors.errorColor.copy(alpha = 0.4f), RoundedCornerShape(36.dp)),
                     colors = CardDefaults.cardColors(containerColor = colors.errorColor.copy(alpha = 0.08f)),
-                    shape = RoundedCornerShape(28.dp),
+                    shape = RoundedCornerShape(36.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1912,7 +1792,8 @@ fun NotificationsPanel(
                         )
                         FlatButton(
                             text = LocalStrings.current["notifications.grant_permission"].ifEmpty { "Grant Permission" }, onClick = onRequestPermission,
-                            modifier = Modifier.fillMaxWidth(), accent = true, colors = colors, maxLines = 1
+                            modifier = Modifier.fillMaxWidth(), accent = true, colors = colors, maxLines = 1,
+                            cornerRadius = 16.dp
                         )
                     }
                 }
@@ -1953,7 +1834,6 @@ fun NotificationsPanel(
                         shape = RoundedCornerShape(28.dp))
             ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
                 }
                 Card(
                     modifier = Modifier
@@ -2262,19 +2142,22 @@ fun CrashLogPanel(
 
         if (gamaCount == 0) {
             AnimatedElement(visible = listItemsVisible, staggerIndex = 1, totalItems = totalListItems) {
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                        .border(1.dp, colors.border, RoundedCornerShape(28.dp)),
-                    colors = CardDefaults.cardColors(containerColor = cardBackground),
-                    shape = RoundedCornerShape(28.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                Box(modifier = Modifier.fillMaxWidth()
+                    .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))
                 ) {
-                    Text(
-                        text = LocalStrings.current["crash_log.no_gama_crashes"].ifEmpty { "No GAMA crashes recorded." },
-                        modifier = Modifier.fillMaxWidth().padding(20.dp),
-                        fontSize = ts.labelSmall, fontFamily = quicksandFontFamily,
-                        color = colors.textSecondary, fontWeight = FontWeight.Bold
-                    )
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = cardBackground),
+                        shape = RoundedCornerShape(28.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Text(
+                            text = LocalStrings.current["crash_log.no_gama_crashes"].ifEmpty { "No GAMA crashes recorded." },
+                            modifier = Modifier.fillMaxWidth().padding(20.dp),
+                            fontSize = ts.labelSmall, fontFamily = quicksandFontFamily,
+                            color = colors.textSecondary, fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         } else {
@@ -2329,37 +2212,43 @@ fun CrashLogPanel(
             }
             !ShizukuHelper.checkBinder() || !ShizukuHelper.checkPermission() -> {
                 AnimatedElement(visible = listItemsVisible, staggerIndex = systemHeaderIdx + 1, totalItems = totalListItems) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth()
-                            .border(1.dp, colors.border, RoundedCornerShape(28.dp)),
-                        colors = CardDefaults.cardColors(containerColor = cardBackground),
-                        shape = RoundedCornerShape(28.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    Box(modifier = Modifier.fillMaxWidth()
+                        .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))
                     ) {
-                        Text(
-                            text = LocalStrings.current["crash_log.shizuku_required"].ifEmpty { "Shizuku required to read system crash logs." },
-                            modifier = Modifier.fillMaxWidth().padding(20.dp),
-                            fontSize = ts.labelSmall, fontFamily = quicksandFontFamily,
-                            color = colors.textSecondary, fontWeight = FontWeight.Bold
-                        )
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = cardBackground),
+                            shape = RoundedCornerShape(28.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                        ) {
+                            Text(
+                                text = LocalStrings.current["crash_log.shizuku_required"].ifEmpty { "Shizuku required to read system crash logs." },
+                                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                fontSize = ts.labelSmall, fontFamily = quicksandFontFamily,
+                                color = colors.textSecondary, fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
             systemCrashes.isEmpty() -> {
                 AnimatedElement(visible = listItemsVisible, staggerIndex = systemHeaderIdx + 1, totalItems = totalListItems) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth()
-                            .border(1.dp, colors.border, RoundedCornerShape(28.dp)),
-                        colors = CardDefaults.cardColors(containerColor = cardBackground),
-                        shape = RoundedCornerShape(28.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    Box(modifier = Modifier.fillMaxWidth()
+                        .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))
                     ) {
-                        Text(
-                            text = LocalStrings.current["crash_log.no_system_crashes"].ifEmpty { "No relevant system crashes found." },
-                            modifier = Modifier.fillMaxWidth().padding(20.dp),
-                            fontSize = ts.labelSmall, fontFamily = quicksandFontFamily,
-                            color = colors.textSecondary, fontWeight = FontWeight.Bold
-                        )
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = cardBackground),
+                            shape = RoundedCornerShape(28.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                        ) {
+                            Text(
+                                text = LocalStrings.current["crash_log.no_system_crashes"].ifEmpty { "No relevant system crashes found." },
+                                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                fontSize = ts.labelSmall, fontFamily = quicksandFontFamily,
+                                color = colors.textSecondary, fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
@@ -2914,7 +2803,6 @@ fun LanguagePanel(
                             shape = RoundedCornerShape(28.dp))
                 ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
                 }
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -3208,7 +3096,6 @@ fun MatrixAppearancePanel(
                         shape = RoundedCornerShape(28.dp)) else Modifier)
             ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
                 }
                 Card(
                     modifier = Modifier.fillMaxWidth().graphicsLayer { shape = RoundedCornerShape(28.dp); clip = false },
@@ -3287,7 +3174,6 @@ fun MatrixMotionPanel(
                         shape = RoundedCornerShape(28.dp)) else Modifier)
             ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
                 }
                 Card(
                     modifier = Modifier.fillMaxWidth().graphicsLayer { shape = RoundedCornerShape(28.dp); clip = false },
@@ -3327,7 +3213,6 @@ fun MatrixMotionPanel(
                         shape = RoundedCornerShape(28.dp)) else Modifier)
             ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
                 }
                 Card(
                     modifier = Modifier.fillMaxWidth().graphicsLayer { shape = RoundedCornerShape(28.dp); clip = false },
@@ -3367,7 +3252,6 @@ fun MatrixMotionPanel(
                         shape = RoundedCornerShape(28.dp)) else Modifier)
             ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (Build.VERSION.SDK_INT >= 33) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { Box(modifier = Modifier.matchParentSize().blur(8.dp, BlurredEdgeTreatment.Unbounded).border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))) } }
                 }
                 Card(
                     modifier = Modifier.fillMaxWidth().graphicsLayer { shape = RoundedCornerShape(28.dp); clip = false },

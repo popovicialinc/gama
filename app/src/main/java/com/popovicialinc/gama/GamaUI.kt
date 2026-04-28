@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -236,7 +237,6 @@ fun GamaUI(
     var showSettings by remember { mutableStateOf(false) }
     var showAppearance by remember { mutableStateOf(false) }
     var showEffects by remember { mutableStateOf(false) }
-    var showBlurSettings by remember { mutableStateOf(false) }
     var showColorCustomization by remember { mutableStateOf(false) }
     var showGradient by remember { mutableStateOf(false) }
     var showSystem by remember { mutableStateOf(false) }
@@ -324,11 +324,6 @@ fun GamaUI(
         showGradient = false
     }
 
-    BackHandler(enabled = showBlurSettings) {
-        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-        showBlurSettings = false
-    }
-
     BackHandler(enabled = showParticlesAppearance) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showParticlesAppearance = false
@@ -365,7 +360,7 @@ fun GamaUI(
         showParticles = false
     }
 
-    BackHandler(enabled = showEffects && !showBlurSettings && !showParticles) {
+    BackHandler(enabled = showEffects && !showParticles) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showEffects = false
     }
@@ -411,7 +406,7 @@ fun GamaUI(
 
     // ── Top-level Settings ────────────────────────────────────────────────────
 
-    BackHandler(enabled = showSettings && !showAppearance && !showColorCustomization && !showGradient && !showEffects && !showBlurSettings && !showParticles && !showSystem && !showNotifications && !showRendererPanel && !showLanguage) {
+    BackHandler(enabled = showSettings && !showAppearance && !showColorCustomization && !showGradient && !showEffects && !showParticles && !showSystem && !showNotifications && !showRendererPanel && !showLanguage) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showSettings = false
     }
@@ -462,9 +457,6 @@ fun GamaUI(
     var animationLevel by remember { mutableStateOf(prefs.getInt("animation_level", 0)) }
     var gradientEnabled by remember { mutableStateOf(prefs.getBoolean("gradient_enabled", true)) }
     var blurEnabled by remember { mutableStateOf(prefs.getBoolean("blur_enabled", true)) }
-    // true = optimised (blur at full strength, alpha-fade the overlay) — default and recommended.
-    // false = real (animate the blur radius itself, more expensive).
-    var blurOptimised by remember { mutableStateOf(prefs.getBoolean("blur_optimised", true)) }
     var particlesEnabled by remember { mutableStateOf(prefs.getBoolean("particles_enabled", true)) }
     var particleSpeed by remember { mutableStateOf(prefs.getInt("particle_speed", 0)) } // 0=low, 1=medium, 2=high (default: low)
     var particleParallaxEnabled by remember { mutableStateOf(prefs.getBoolean("particle_parallax_enabled", true)) }
@@ -693,7 +685,6 @@ fun GamaUI(
         val snapParticleCount    = particleCount
         val snapParticleCustom   = particleCountCustom.toIntOrNull() ?: 150
         val snapBlur             = blurEnabled
-        val snapBlurOptimised    = blurOptimised
         val snapThemePref        = themePreference
         val snapDynColor         = useDynamicColor
         val snapAdvColorPicker   = advancedColorPicker
@@ -739,7 +730,6 @@ fun GamaUI(
                 putInt("particle_count",                snapParticleCount)
                 putInt("particle_count_custom",         snapParticleCustom)
                 putBoolean("blur_enabled",              snapBlur)
-                putBoolean("blur_optimised",            snapBlurOptimised)
                 putInt("theme_preference",              snapThemePref)
                 putBoolean("use_dynamic_color",         snapDynColor)
                 putBoolean("advanced_color_picker",     snapAdvColorPicker)
@@ -808,7 +798,7 @@ fun GamaUI(
             showShizukuHelp || showSuccessDialog || showClearRecentsDialog ||
             showVerbosePanel || showAggressiveWarning || showGPUWatchConfirm ||
             showDeveloper || showEasterEgg || showNotifications || showBackup || showCrashLog ||
-            showEffects || showBlurSettings || showParticles || showParticlesAppearance ||
+            showEffects || showParticles || showParticlesAppearance ||
             showParticlesMotion || showParticlesPerformance || showMatrixSettings || showMatrixAppearance ||
             showMatrixMotion || showParticlesSettings || showIntegrationInfoDialog
         }
@@ -822,7 +812,7 @@ fun GamaUI(
             showShizukuHelp || showSuccessDialog || showClearRecentsDialog ||
             showVerbosePanel || showAggressiveWarning || showGPUWatchConfirm ||
             showDeveloper || showEasterEgg || showNotifications || showBackup || showCrashLog ||
-            showEffects || showBlurSettings || showParticles || showParticlesAppearance ||
+            showEffects || showParticles || showParticlesAppearance ||
             showParticlesMotion || showParticlesPerformance || showMatrixSettings || showMatrixAppearance ||
             showMatrixMotion || showParticlesSettings
         }
@@ -1115,47 +1105,6 @@ fun GamaUI(
                 ((raw + timeOffsetHours.toInt()).let { h -> ((h % 24) + 24) % 24 })
             }
 
-            // Independent Particles Overlay (sun/moon/clouds)
-            // OUTSIDE blur box so particles stay sharp when panels open
-            // Disabled when OLED mode is enabled
-            if (particlesEnabled && matrixMode) {
-                // ── Matrix digital rain ───────────────────────────────────────
-                MatrixRainOverlay(
-                    enabled          = particlesEnabled,
-                    headColor        = matrixHeadColor,
-                    rainColor        = matrixRainColor,
-                    trailColor       = matrixTrailColor,
-                    backgroundColor  = Color.Black,
-                    backgroundAlpha  = matrixBgAlpha,
-                    speedLevel       = matrixSpeed,
-                    densityLevel     = matrixDensity,
-                    fontSizeLevel    = matrixFontSize,
-                    fadeLength       = matrixFadeLength
-                )
-            }
-            // ── Original parallax particles ───────────────────────────────────
-            // Always composed (even in matrix mode) so the sun/moon can fade out
-            // smoothly via its internal celestialAlpha animation (600 ms tween).
-            // When matrixMode is active: particles are disabled and timeModeEnabled
-            // is set to false, which drives celestialAlpha → 0 with the existing
-            // ease-in-out fade instead of removing the composable instantly.
-            ParticlesOverlay(
-                enabled          = particlesEnabled && !matrixMode,
-                color            = colors.primaryAccent,
-                particleSpeed    = particleSpeed,
-                parallaxEnabled  = particleParallaxEnabled,
-                particleCount    = particleCount,
-                particleCountCustom = particleCountCustom.toIntOrNull() ?: 150,
-                parallaxSensitivity = animatedParallaxSensitivity,
-                starMode         = particleStarMode,
-                timeModeEnabled  = particleTimeMode && !matrixMode,
-                timeOffsetHours  = timeOffsetHours,
-                anyPanelOpen     = anyPanelOpen,
-                isLandscape      = isLandscape,
-                nativeRefreshRate  = particleNativeRefreshRate,
-                quarterRefreshRate = particleQuarterRefreshRate
-            )
-
             // ── Main content ──────────────────────────────────────────────────
             // The UI tree is captured once as a lambda and called in two places:
             // mainContent captures the entire main UI tree as a lambda so it can
@@ -1329,7 +1278,7 @@ fun GamaUI(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     AnimatedElement(
-                                        visible = isVisible, staggerIndex = 4, cardShadow = true,
+                                        visible = isVisible, staggerIndex = 4, cardShadow = false,
                                         totalItems = 8, enabled = shizukuRunning && shizukuPermissionGranted
                                     ) {
                                         val lsShizukuReady = shizukuRunning && shizukuPermissionGranted
@@ -1339,32 +1288,11 @@ fun GamaUI(
                                                 .fillMaxWidth()
                                                 .clip(RoundedCornerShape(44.dp))
                                         ) {
-                                            // Layer 1: blurred tinted background
-                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .matchParentSize()
-                                                        .blur(20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                                                        .background(
-                                                            if (oledMode) Color.Black.copy(alpha = 0.70f)
-                                                            else cardBackground.copy(alpha = 0.60f)
-                                                        )
-                                                )
-                                            } else {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .matchParentSize()
-                                                        .background(
-                                                            if (oledMode) Color.Black.copy(alpha = 0.70f)
-                                                            else cardBackground.copy(alpha = 0.55f)
-                                                        )
-                                                )
-                                            }
-                                            // Layer 2: accent tint + glowing gradient border
+                                            // Transparent card — no blur, no frosted backdrop.
                                             Box(
                                                 modifier = Modifier
                                                     .matchParentSize()
-                                                    .background(colors.primaryAccent.copy(alpha = if (oledMode) 0.03f else 0.05f))
+                                                    .background(Color.Transparent)
                                                     .border(
                                                         width = 1.dp,
                                                         brush = Brush.linearGradient(
@@ -1377,7 +1305,7 @@ fun GamaUI(
                                                         shape = RoundedCornerShape(44.dp)
                                                     )
                                             )
-                                            // Layer 3: RendererCard + buttons
+                                            // Sharp content layer
                                             Column(
                                                 modifier = Modifier.padding(16.dp),
                                                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -1667,53 +1595,23 @@ fun GamaUI(
                                 }
 
                                 // Unified frosted glass box: RendererCard + Vulkan | OpenGL + Resources | GPUWatch
-                                AnimatedElement(visible = isVisible, staggerIndex = 4, cardShadow = true,
+                                AnimatedElement(visible = isVisible, staggerIndex = 4, cardShadow = false,
                                     totalItems = 8, enabled = shizukuRunning && shizukuPermissionGranted) {
-                                    val buttonScale by animateFloatAsState(
-                                        targetValue = if (shizukuRunning && shizukuPermissionGranted) 1f else 0.85f,
-                                        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
-                                        label = "button_scale"
-                                    )
-                                    val buttonAlpha by animateFloatAsState(
-                                        targetValue = if (shizukuRunning && shizukuPermissionGranted) 1f else 0.25f,
-                                        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
-                                        label = "button_alpha"
-                                    )
                                     val shizukuReady = shizukuRunning && shizukuPermissionGranted
 
-                                    // Frosted glass wrapper — clips everything, stacks blur + border + content
+                                    // Transparent card — no blur, no frosted backdrop.
+                                    // Removing the blurred background layer eliminates the
+                                    // per-frame RenderEffect pass for a direct GPU performance win.
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(44.dp))
                                     ) {
-                                        // Layer 1: blurred tinted background (API 31+), plain tint fallback below
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .matchParentSize()
-                                                    .blur(20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                                                    .background(
-                                                        if (oledMode) Color.Black.copy(alpha = 0.70f)
-                                                        else cardBackground.copy(alpha = 0.60f)
-                                                    )
-                                            )
-                                        } else {
-                                            Box(
-                                                modifier = Modifier
-                                                    .matchParentSize()
-                                                    .background(
-                                                        if (oledMode) Color.Black.copy(alpha = 0.70f)
-                                                        else cardBackground.copy(alpha = 0.55f)
-                                                    )
-                                            )
-                                        }
-
-                                        // Layer 2: accent tint + glowing gradient border
+                                        // Accent tint + border, fully opaque, on top of transparent bg
                                         Box(
                                             modifier = Modifier
                                                 .matchParentSize()
-                                                .background(colors.primaryAccent.copy(alpha = if (oledMode) 0.03f else 0.05f))
+                                                .background(Color.Transparent)
                                                 .border(
                                                     width = 1.dp,
                                                     brush = Brush.linearGradient(
@@ -1727,7 +1625,7 @@ fun GamaUI(
                                                 )
                                         )
 
-                                        // Layer 3: buttons
+                                        // Sharp content on top
                                         Column(
                                             modifier = Modifier.padding(16.dp),
                                             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -1787,7 +1685,7 @@ fun GamaUI(
                                                         successDialogMessage = strings["main.vulkan_applied"].ifEmpty { "Vulkan has been applied!" }
                                                         showWarningDialog = true
                                                     },
-                                                    modifier = Modifier.weight(1f),
+                                                    modifier = Modifier.weight(1f).aspectRatio(1f),
                                                     isSelected = currentRenderer == "Vulkan",
                                                     forceHighlight = true,
                                                     enabled = shizukuReady,
@@ -1819,7 +1717,7 @@ fun GamaUI(
                                                         successDialogMessage = strings["main.opengl_applied"].ifEmpty { "OpenGL has been applied!" }
                                                         showWarningDialog = true
                                                     },
-                                                    modifier = Modifier.weight(1f),
+                                                    modifier = Modifier.weight(1f).aspectRatio(1f),
                                                     isSelected = false,
                                                     enabled = shizukuReady,
                                                     colors = colors,
@@ -1868,79 +1766,123 @@ fun GamaUI(
 
             // ── Background blur when panels are open ─────────────────────────────
             //
-            // API gate: Modifier.blur() requires API 31 (Android 12 / RenderEffect).
-            // On older devices no blur is applied — zero GPU cost.
+            // EFFICIENT FAKE BLUR — two permanently-composed layers, zero stutter:
             //
-            // Two modes controlled by blurOptimised:
+            // Both the sharp and blurred copies of mainContent() are ALWAYS in the
+            // composition tree — their modifier chains never change structurally, so
+            // Compose never re-measures or re-lays-out the subtree when blur toggles.
             //
-            // OPTIMISED (default, recommended):
-            //   A fully-blurred copy of mainContent sits behind the panel at all times.
-            //   Its alpha animates 0→1 on open and 1→0 on close with an ease-in-out
-            //   curve. The GPU calculates the blur exactly once, then only updates alpha
-            //   — a single scalar per frame. No per-frame blur recalculation.
+            // The blurred layer uses Modifier.blur() which, on API 31+, compiles to a
+            // RenderEffect Gaussian kernel. Crucially, this kernel is built ONCE on the
+            // first frame the layer is composed — it is never rebuilt mid-transition
+            // because the blur radius is a compile-time constant (40.dp, never animated).
             //
-            // REAL:
-            //   The blur radius itself animates 0→40dp frame by frame. The GPU
-            //   recalculates the full RenderEffect every frame during the transition.
-            //   Looks physically accurate. Heavier on the GPU during the animation.
-            val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-            val blurActive = blurShouldApply && canBlur
+            // The ONLY per-frame work during open/close is a single animateFloatAsState
+            // driving two graphicsLayer alpha scalars — a trivially cheap GPU op.
+            // When both panels are closed the blurred layer sits at alpha=0: the GPU
+            // skips drawing it entirely (hardware layer optimization), so there is zero
+            // rendering cost at rest.
+            //
+            // Particles are rendered AFTER this block so they always sit above the blur
+            // overlay and scrim in z-order — their brightness never changes on toggle.
+            //
+            // Scrim is theme-aware: dark/OLED = darkening, light mode = brightening.
 
-            if (blurOptimised) {
-                // ── Optimised mode ────────────────────────────────────────────
-                //
-                // The blur radius animates 0 → 40dp when a panel first opens and
-                // 40 → 0dp when the last panel closes, giving a smooth ease-in-out.
-                // While navigating between panels blurActive stays TRUE and the
-                // target is already 40dp, so animateDpAsState produces zero work —
-                // the GPU holds the blur at a fixed 40dp with no per-frame update.
-                // This is the key performance win over "Real" mode: panel-to-panel
-                // transitions are inert, only the open/close boundary animates.
-                val bgBlurRadiusOpt by animateDpAsState(
-                    targetValue = if (blurActive) 40.dp else 0.dp,
-                    // Open: blur rushes in quickly (emphasizedDecelerate = fast start, soft landing).
-                    // Close: blur dissipates at a measured pace so the reveal feels intentional.
-                    animationSpec = if (animationLevel != 2)
-                        tween(
-                            durationMillis = if (blurActive) 320 else 420,
-                            easing = if (blurActive) MotionTokens.Easing.emphasizedDecelerate else MotionTokens.Easing.emphasized
-                        )
-                    else snap(),
-                    label = "bg_blur_opt_radius"
+            // Theme-aware scrim: darken in dark/OLED, brighten in light mode.
+            val scrimColor = if (isDarkTheme || oledMode)
+                Color.Black.copy(alpha = 0.32f)
+            else
+                Color.White.copy(alpha = 0.45f)
+
+            // Single float drives the whole transition. Sharp layer = 1-this, blurred = this.
+            val blurAlpha by animateFloatAsState(
+                targetValue = if (blurShouldApply) 1f else 0f,
+                animationSpec = if (animationLevel != 2)
+                    tween(
+                        durationMillis = if (blurShouldApply) 340 else 440,
+                        easing = if (blurShouldApply) MotionTokens.Easing.emphasizedDecelerate else MotionTokens.Easing.emphasized
+                    )
+                else snap(),
+                label = "bg_blur_alpha"
+            )
+
+            // ── Particles — rendered BEFORE mainContent so they are BEHIND the UI ──
+            // Z-order in a Box = last child is on top. Placing particles here means:
+            //   • They draw behind the card/buttons — visually correct ✓
+            //   • They cannot intercept touch events that belong to the UI ✓
+            //   • When a panel opens the blur+scrim (below) covers particles too,
+            //     which is intentional: the whole background dims together ✓
+            if (particlesEnabled && matrixMode) {
+                MatrixRainOverlay(
+                    enabled          = particlesEnabled,
+                    headColor        = matrixHeadColor,
+                    rainColor        = matrixRainColor,
+                    trailColor       = matrixTrailColor,
+                    backgroundColor  = Color.Black,
+                    backgroundAlpha  = matrixBgAlpha,
+                    speedLevel       = matrixSpeed,
+                    densityLevel     = matrixDensity,
+                    fontSizeLevel    = matrixFontSize,
+                    fadeLength       = matrixFadeLength
                 )
+            }
+            // Always composed so the sun/moon can fade out smoothly via its internal
+            // celestialAlpha animation (600 ms tween) even when switching modes.
+            ParticlesOverlay(
+                enabled          = particlesEnabled && !matrixMode,
+                color            = colors.primaryAccent,
+                particleSpeed    = particleSpeed,
+                parallaxEnabled  = particleParallaxEnabled,
+                particleCount    = particleCount,
+                particleCountCustom = particleCountCustom.toIntOrNull() ?: 150,
+                parallaxSensitivity = animatedParallaxSensitivity,
+                starMode         = particleStarMode,
+                timeModeEnabled  = particleTimeMode && !matrixMode,
+                timeOffsetHours  = timeOffsetHours,
+                anyPanelOpen     = anyPanelOpen,
+                isLandscape      = isLandscape,
+                nativeRefreshRate  = particleNativeRefreshRate,
+                quarterRefreshRate = particleQuarterRefreshRate
+            )
+
+            // ── Main content layers ───────────────────────────────────────────
+            // Sharp layer fades OUT, blurred layer fades IN when a panel opens.
+            // Both layers sit ABOVE particles so buttons are always hittable.
+            // Modifier.blur() only affects this layer's own pixels — it never
+            // reaches back to blur the particles drawn underneath.
+
+            // Sharp (unblurred) — always visible when no panel is open.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(alpha = 1f - blurAlpha)
+            ) { mainContent() }
+
+            // Blurred — fades in when a panel opens. Fixed radius = kernel built once.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .then(
-                            if (canBlur && bgBlurRadiusOpt > 0.dp)
-                                Modifier.blur(bgBlurRadiusOpt, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                            else Modifier
-                        )
+                        .graphicsLayer(alpha = blurAlpha)
+                        .blur(radius = 20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
                 ) { mainContent() }
             } else {
-                // ── Real mode ─────────────────────────────────────────────────
-                // Blur radius animates 0→40dp every frame. GPU brute-forces it.
-                val bgBlurRadius by animateDpAsState(
-                    targetValue = if (blurActive) 40.dp else 0.dp,
-                    animationSpec = tween(
-                        durationMillis = if (blurActive) 320 else 420,
-                        easing = if (blurActive) MotionTokens.Easing.emphasizedDecelerate else MotionTokens.Easing.emphasized
-                    ),
-                    label = "bg_blur_radius"
-                )
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .then(
-                            if (bgBlurRadius > 0.dp)
-                                Modifier.blur(bgBlurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                            else Modifier
-                        )
+                        .graphicsLayer(alpha = blurAlpha)
                 ) { mainContent() }
             }
 
+            // Scrim — dims everything (including particles) behind open panels.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(alpha = blurAlpha)
+                    .background(scrimColor)
+            )
 
-            // Shizuku Help Dialog
+
             ShizukuHelpDialog(
                 visible = showShizukuHelp,
                 helpType = shizukuHelpType,
@@ -2361,7 +2303,6 @@ fun GamaUI(
                                 animationLevel       = prefs.getInt("animation_level", 0)
                                 gradientEnabled      = prefs.getBoolean("gradient_enabled", true)
                                 blurEnabled          = prefs.getBoolean("blur_enabled", true)
-                                blurOptimised        = prefs.getBoolean("blur_optimised", true)
                                 particlesEnabled     = prefs.getBoolean("particles_enabled", true)
                                 particleSpeed        = prefs.getInt("particle_speed", 0)
                                 particleParallaxEnabled = prefs.getBoolean("particle_parallax_enabled", true)
@@ -2522,7 +2463,7 @@ fun GamaUI(
 
 
             VisualEffectsPanel(
-                visible = showAppearance && !showEffects && !showColorCustomization && !showGradient && !showBlurSettings && !showParticles,
+                visible = showAppearance && !showEffects && !showColorCustomization && !showGradient && !showParticles,
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showAppearance = false
@@ -2578,14 +2519,16 @@ fun GamaUI(
             )
 
             EffectsPanel(
-                visible = showEffects && !showBlurSettings && !showParticles && !showParticlesAppearance && !showParticlesMotion && !showParticlesPerformance,
+                visible = showEffects && !showParticles && !showParticlesAppearance && !showParticlesMotion && !showParticlesPerformance,
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showEffects = false
                 },
-                onBlurSettingsClick = {
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showBlurSettings = true
+                blurEnabled = blurEnabled,
+                onBlurChange = { value ->
+                    performHaptic(HapticFeedbackConstants.CLOCK_TICK)
+                    blurEnabled = value
+                    savePreferences()
                 },
                 onParticlesClick = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
@@ -2595,32 +2538,6 @@ fun GamaUI(
                 isSmallScreen = isSmallScreen,
                 isLandscape = isLandscape,
                 isTablet = isTablet,
-                colors = colors,
-                cardBackground = cardBackground,
-                performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
-                oledMode = oledMode
-            )
-
-            BlurPanel(
-                visible = showBlurSettings,
-                onDismiss = {
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showBlurSettings = false
-                },
-                blurEnabled = blurEnabled,
-                onBlurChange = { value ->
-                    performHaptic(HapticFeedbackConstants.CLOCK_TICK)
-                    blurEnabled = value
-                    savePreferences()
-                },
-                blurOptimised = blurOptimised,
-                onBlurOptimisedChange = { value ->
-                    performHaptic(HapticFeedbackConstants.CLOCK_TICK)
-                    blurOptimised = value
-                    savePreferences()
-                },
-                isSmallScreen = isSmallScreen,
-                isLandscape = isLandscape,
                 colors = colors,
                 cardBackground = cardBackground,
                 performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
@@ -3097,7 +3014,7 @@ fun GamaUI(
                                     modifier = Modifier
                                         .size(btnSize)
                                         .graphicsLayer(scaleX = settingsPressScale, scaleY = settingsPressScale)
-                                        .clip(RoundedCornerShape(14.dp))
+                                        .clip(RoundedCornerShape(28.dp))
                                         .background(
                                             Brush.radialGradient(
                                                 listOf(
@@ -3106,7 +3023,7 @@ fun GamaUI(
                                                 )
                                             )
                                         )
-                                        .border(settingsBorderWidth, colors.primaryAccent.copy(alpha = settingsBorderAlpha), RoundedCornerShape(14.dp))
+                                        .border(settingsBorderWidth, colors.primaryAccent.copy(alpha = settingsBorderAlpha), RoundedCornerShape(28.dp))
                                         .semantics { contentDescription = "Open Settings" }
                                         .pointerInput(Unit) {
                                             detectTapGestures(

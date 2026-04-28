@@ -111,8 +111,7 @@ data class ParticleState(
     var y: Float,
     val size: Float,
     val speed: Float,
-    val alpha: Float,
-    val phase: Float = kotlin.random.Random.nextFloat() * 2f * kotlin.math.PI.toFloat()
+    val alpha: Float
 ) {
     var velocityX = 0f
     var velocityY = 0f
@@ -121,103 +120,77 @@ data class ParticleState(
     var smoothRotationX = 0f
     var smoothRotationY = 0f
 
+    // Per-particle LCG seed for wrap randomisation — avoids locking the global
+    // kotlin.random.Random instance (which has a synchronized internal state on JVM).
+    // At 300 particles wrapping frequently, global Random lock contention is measurable.
+    // This LCG (Lehmer-style) is fast, allocation-free, and good enough for visual scatter.
+    private var lcgSeed: Int = (System.nanoTime() xor hashCode().toLong()).toInt().let {
+        if (it == 0) 1 else it  // seed must be non-zero
+    }
+
+    // Returns a pseudo-random float in [0, 1) using a fast 32-bit LCG.
+    // No allocation, no lock, no JNI — pure integer arithmetic on the calling thread.
+    private fun nextRandFloat(): Float {
+        lcgSeed = lcgSeed * 1664525 + 1013904223  // Numerical Recipes LCG constants
+        return (lcgSeed ushr 8) / 16777216f        // 24-bit mantissa → [0, 1)
+    }
+    // Pre-baked star geometry — computed once at construction, used every draw frame.
+    // starR  = size * 1.2  (arm half-length)
+    // starRd = size * 1.2 * 0.68 = size * 0.816  (diagonal arm half-length)
+    val starR:  Float = size * 1.2f
+    val starRd: Float = size * 0.816f   // 1.2 * 0.68 collapsed to one constant
+
+    // Pre-baked base alpha for star bucketing: alpha * 0.6 — alpha is a val so this
+    // never changes. Eliminates one float multiplication per particle per draw frame.
+    val baseStarAlpha: Float = alpha * 0.6f
+
     fun update(
         speedMultiplier: Float = 1f,
-        time: Long = 0L,
         rotationX: Float = 0f,
         rotationY: Float = 0f,
         deltaTime: Float = 0.016f,
         parallaxSensitivity: Float = 0.025f,
-        starMode: Boolean = false,
-        timeModeEnabled: Boolean = false,
-        isDaytime: Boolean = true,
         // Pre-computed damping factor for this tick — avoids one Math.pow() per particle
         // Caller computes: Math.pow(0.94, (deltaTime * 60.0)).toFloat() once per tick
-        frameDamping: Float = Math.pow(0.94, (deltaTime * 60.0)).toFloat()
+        frameDamping: Float = Math.pow(0.94, (deltaTime * 60.0)).toFloat(),
+        // Pre-computed per-tick constants — caller derives these once outside the particle loop
+        maxVelocity: Float = 15f * speedMultiplier,
+        dt60: Float = deltaTime * 60f
     ) {
-        // Calculate rotation delta (change from last frame)
         val rawDeltaX = rotationX - smoothRotationX
         val rawDeltaY = rotationY - smoothRotationY
 
-        // Clamp deltas to prevent excessive speed regardless of phone orientation
-        // This ensures consistent speed whether phone is horizontal, vertical, or anywhere in between
-        val maxDelta = 0.1f // Maximum allowed change per frame (significantly reduced for subtlety)
-        val deltaRotationX = rawDeltaX.coerceIn(-maxDelta, maxDelta)
-        val deltaRotationY = rawDeltaY.coerceIn(-maxDelta, maxDelta)
+        // Clamp rotation deltas — prevents excessive speed at any phone orientation
+        val deltaRotationX = rawDeltaX.coerceIn(-MAX_ROT_DELTA, MAX_ROT_DELTA)
+        val deltaRotationY = rawDeltaY.coerceIn(-MAX_ROT_DELTA, MAX_ROT_DELTA)
 
-        // Update smoothed rotation for next frame
         smoothRotationX = rotationX
         smoothRotationY = rotationY
 
-        // Natural forces - ALWAYS USE NORMAL RISING BEHAVIOR
-        // Particles always rise from bottom to top with no horizontal drift
-        val naturalForceX = 0f // No horizontal drift - all particles move straight up
-        val naturalForceY = -0.007f * speed * speedMultiplier // Negative = upward drift — reduced for much slower movement
+        // naturalForceX was always 0f — removed.  Particles rise straight up; only
+        // parallax adds horizontal drift.  Forces applied in one fused expression to
+        // reduce intermediate val allocations and give the JIT a single compound expression.
+        val speedFactor = speed * speedMultiplier
+        velocityX = ((velocityX + deltaRotationY * parallaxSensitivity * speedFactor * 350f * dt60) * frameDamping)
+            .coerceIn(-maxVelocity, maxVelocity)
+        velocityY = ((velocityY + (-0.007f * speedFactor + (-deltaRotationX * parallaxSensitivity * speedFactor * 50f)) * dt60) * frameDamping)
+            .coerceIn(-maxVelocity, maxVelocity)
 
-        // Parallax influence based on ROTATION CHANGE (not absolute rotation)
-        // Only moves particles when device is actively rotating
-        // When device stops rotating, particles just rise naturally
-        // MODIFIED: Added speedMultiplier to parallax forces to make responsiveness consistent with velocity setting
-        // MODIFIED: X axis sensitivity is now 7x (350f) compared to Y axis (50f)
-        val parallaxInfluenceX = deltaRotationY * parallaxSensitivity * speed * speedMultiplier * 350f
-        val parallaxInfluenceY = -deltaRotationX * parallaxSensitivity * speed * speedMultiplier * 50f
-
-        // Combine all forces
-        val totalForceX = naturalForceX + parallaxInfluenceX
-        val totalForceY = naturalForceY + parallaxInfluenceY
-
-        // Apply forces to velocity.
-        // Forces are per-tick impulse magnitudes calibrated to a 60Hz reference.
-        // "* deltaTime * 60f" normalises them to any tick rate:
-        //   at 60Hz: deltaTime=1/60, so factor = 1.0x (identical to original)
-        //   at 120Hz: deltaTime=1/120, applied 2x more often → same per-second effect
-        //   at 30Hz: deltaTime=1/30, applied half as often → same per-second effect
-        velocityX += totalForceX * deltaTime * 60f
-        velocityY += totalForceY * deltaTime * 60f
-
-        // Frame-rate-independent damping, normalised to the 60Hz reference.
-        // Fixed damping (e.g. *= 0.94 every tick) is wrong at non-60Hz rates:
-        //   at 120Hz: 0.94^120/s = 0.00076 → particles stop almost instantly
-        //   at 30Hz:  0.94^30/s  = 0.161   → particles barely damp at all
-        // pow(0.94, deltaTime * 60) gives 0.94^1 at 60Hz (identical to original),
-        // 0.94^0.5 at 120Hz, 0.94^2 at 30Hz — all decaying at the same per-second rate.
-        // Raised from 0.92 → 0.94 so the stronger naturalForce above translates to
-        // visibly snappier movement rather than being absorbed before particles build speed.
-        // frameDamping is pre-computed by the caller once per tick — no Math.pow here
-        velocityX *= frameDamping
-        velocityY *= frameDamping
-
-        // Clamp velocity to prevent excessive speeds
-        val maxVelocity = 15f * speedMultiplier
-        velocityX = velocityX.coerceIn(-maxVelocity, maxVelocity)
-        velocityY = velocityY.coerceIn(-maxVelocity, maxVelocity)
-
-        // Update position
         x += velocityX * deltaTime
         y += velocityY * deltaTime
 
-        // Wrap around screen edges - ALWAYS VERTICAL (bottom to top)
-        // Normal mode behavior: wrap vertically (bottom to top)
         when {
-            y < -0.1f -> {
-                y = 1.1f
-                x = kotlin.random.Random.nextFloat()
-                velocityX *= 0.5f // Keep some momentum
-                velocityY *= 0.5f
-            }
-            y > 1.1f -> {
-                y = -0.1f
-                x = kotlin.random.Random.nextFloat()
-                velocityX *= 0.5f
-                velocityY *= 0.5f
-            }
+            y < -0.1f -> { y = 1.1f;  x = nextRandFloat(); velocityX *= 0.5f; velocityY *= 0.5f }
+            y >  1.1f -> { y = -0.1f; x = nextRandFloat(); velocityX *= 0.5f; velocityY *= 0.5f }
         }
-
-        // Also wrap horizontally to keep particles on screen
         when {
             x < -0.1f -> x = 1.1f
-            x > 1.1f -> x = -0.1f
+            x >  1.1f -> x = -0.1f
         }
+    }
+
+    companion object {
+        private const val MAX_ROT_DELTA = 0.1f
     }
 }
 
@@ -401,16 +374,17 @@ fun isDaytime(timeOffsetHours: Float = 0f): Boolean {
 //     for one 16ms frame — completely invisible to the human eye.
 // ─────────────────────────────────────────────────────────────────────────────
 private class PhysicsInputs {
-    @Volatile var rotX:     Float   = 0f
-    @Volatile var rotY:     Float   = 0f
-    @Volatile var sens:     Float   = 0f
-    @Volatile var speed:    Float   = 3f
-    @Volatile var star:     Boolean = false
-    @Volatile var timeMode: Boolean = false
-    @Volatile var daytime:  Boolean = true
+    @Volatile var rotX:  Float = 0f
+    @Volatile var rotY:  Float = 0f
+    @Volatile var sens:  Float = 0f
+    @Volatile var speed: Float = 3f
+    // star/timeMode/daytime removed — update() no longer uses them
 }
 
-private const val STAR_ALPHA_BUCKETS = 8
+// 4 buckets instead of 8: halves GPU draw calls in star mode (was ≤8, now ≤4).
+// Alpha step of 0.25 is imperceptible for 2–14px sparkle particles.
+// Circle mode still uses 4 buckets via circleBatchPaths (same constant).
+private const val STAR_ALPHA_BUCKETS = 4
 private const val TRAIL_LUT_SIZE = 64
 
 // Standalone Particles Overlay Component
@@ -487,26 +461,21 @@ fun ParticlesOverlay(
         else -> 150
     }).coerceAtMost(deviceParticleCap)
 
-    val particles = remember(actualParticleCount, particleSpeed, parallaxSensitivity) {
-        // Particles are created with positions spread across the screen and
-        // modest initial velocities — no giant pre-heat spike that would cause
-        // the physics engine to thrash on the first few frames.
-        // The background physics loop warms them naturally over ~0.5 s before
-        // particleAlpha reaches 1f (the fade-in takes 2.1 s), so there is
-        // nothing visible to stutter over.
-        List(actualParticleCount) {
-            val spd = kotlin.random.Random.nextFloat() * 1.2f + 0.3f   // 0.3–1.5
+    val particles: Array<ParticleState> = remember(actualParticleCount, particleSpeed, parallaxSensitivity) {
+        // Array instead of List: forEach on a List allocates an Iterator object every call.
+        // At 60Hz physics + 60Hz render that's 120 iterator allocations/sec feeding the GC.
+        // Array iteration (for loop or forEach on Array) is zero-allocation.
+        val rng = kotlin.random.Random(System.nanoTime())  // isolated instance — no global lock
+        Array(actualParticleCount) {
+            val spd = rng.nextFloat() * 1.2f + 0.3f   // 0.3–1.5
             ParticleState(
-                x     = kotlin.random.Random.nextFloat(),
-                y     = kotlin.random.Random.nextFloat(),
-                size  = kotlin.random.Random.nextFloat() * 6f + 1f,
+                x     = rng.nextFloat(),
+                y     = rng.nextFloat(),
+                size  = rng.nextFloat() * 6f + 1f,
                 speed = spd,
-                alpha = kotlin.random.Random.nextFloat() * 0.7f + 0.3f
+                alpha = rng.nextFloat() * 0.7f + 0.3f
             ).also { p ->
-                // Give each particle a gentle initial upward nudge so they start
-                // moving immediately, but keep velocities well within normal
-                // operating range — no clamping, no physics thrash.
-                p.velocityX = (kotlin.random.Random.nextFloat() - 0.5f) * spd * 0.4f
+                p.velocityX = (rng.nextFloat() - 0.5f) * spd * 0.4f
                 p.velocityY = -spd * 0.8f
             }
         }
@@ -517,11 +486,14 @@ fun ParticlesOverlay(
     var rotationY by remember { mutableStateOf(0f) }
 
     // Animated rotation values that smoothly transition when parallax is disabled
+    // Stiffness raised 80→200: the old value kept this spring running for 3+ seconds
+    // after every tilt, firing the physicsInputs LaunchedEffect on each frame.
+    // 200 settles in ~0.8s — still smooth, but stops animating much sooner.
     val animatedRotationX by animateFloatAsState(
         targetValue = if (parallaxEnabled) rotationX else 0f,
         animationSpec = spring(
             dampingRatio = 0.7f,
-            stiffness = 80f
+            stiffness = 200f
         ),
         label = "rotation_x"
     )
@@ -529,20 +501,23 @@ fun ParticlesOverlay(
         targetValue = if (parallaxEnabled) rotationY else 0f,
         animationSpec = spring(
             dampingRatio = 0.7f,
-            stiffness = 80f
+            stiffness = 200f
         ),
         label = "rotation_y"
     )
 
-    // Calibration state
-    var calibrationComplete by remember { mutableStateOf(false) }
-    var initialRotationX by remember { mutableStateOf(0f) }
-    var initialRotationY by remember { mutableStateOf(0f) }
-    var calibrationSamples by remember { mutableStateOf(0) }
+    // Calibration state — plain vars, not mutableStateOf.
+    // These are written from the sensor callback thread and read only within that same callback.
+    // Making them mutableStateOf was triggering Compose recompositions from a non-main thread,
+    // which is both incorrect and causes unnecessary recomposition overhead.
+    var calibrationComplete = false
+    var initialRotationX = 0f
+    var initialRotationY = 0f
+    var calibrationSamples = 0
 
-    DisposableEffect(parallaxEnabled) {
-        if (!parallaxEnabled) {
-            // Reset rotation values when parallax is disabled
+    DisposableEffect(parallaxEnabled, enabled) {
+        if (!parallaxEnabled || !enabled) {
+            // Reset rotation values when parallax is disabled or overlay is disabled
             rotationX = 0f
             rotationY = 0f
             // Must return an onDispose result here
@@ -567,40 +542,35 @@ fun ParticlesOverlay(
 
         val listener = object : android.hardware.SensorEventListener {
             // Low-pass filter for smoothing
-            private val alpha = 0.8f
+            private val lpAlpha = 0.8f
             private var filteredX = 0f
             private var filteredY = 0f
+
+            // Pre-allocated arrays — reused every sensor event.
+            // Previously allocated fresh on every onSensorChanged call (up to 15 Hz):
+            //   3 FloatArrays × 15 Hz = 45 short-lived allocations/sec → GC pressure.
+            private val rotationMatrix = FloatArray(9)
+            private val remappedMatrix = FloatArray(9)
+            private val orientation    = FloatArray(3)
 
             override fun onSensorChanged(event: android.hardware.SensorEvent?) {
                 event?.let {
                     try {
-                        // Get rotation matrix from rotation vector
-                        val rotationMatrix = FloatArray(9)
                         android.hardware.SensorManager.getRotationMatrixFromVector(rotationMatrix, it.values)
-
-                        // Remap coordinates to account for device orientation
-                        val remappedMatrix = FloatArray(9)
                         android.hardware.SensorManager.remapCoordinateSystem(
                             rotationMatrix,
                             android.hardware.SensorManager.AXIS_X,
                             android.hardware.SensorManager.AXIS_Z,
                             remappedMatrix
                         )
-
-                        // Get orientation angles
-                        val orientation = FloatArray(3)
                         android.hardware.SensorManager.getOrientation(remappedMatrix, orientation)
 
-                        // Extract pitch (forward/back tilt) and roll (left/right tilt)
-                        // Convert radians to degrees and scale
-                        val pitch = Math.toDegrees(orientation[1].toDouble()).toFloat() // Forward/back
-                        val roll = Math.toDegrees(orientation[2].toDouble()).toFloat()  // Left/right
+                        val pitch = Math.toDegrees(orientation[1].toDouble()).toFloat()
+                        val roll  = Math.toDegrees(orientation[2].toDouble()).toFloat()
 
-                        // Apply low-pass filter to reduce jitter
-                        filteredX = alpha * filteredX + (1 - alpha) * pitch
-                        filteredY = alpha * filteredY + (1 - alpha) * roll
+                        filteredX = lpAlpha * filteredX + (1f - lpAlpha) * pitch
+                        filteredY = lpAlpha * filteredY + (1f - lpAlpha) * roll
 
-                        // Calibration: collect samples for stable initial position
                         if (!calibrationComplete) {
                             if (calibrationSamples < 10) {
                                 initialRotationX += filteredX
@@ -614,25 +584,14 @@ fun ParticlesOverlay(
                         }
 
                         if (calibrationComplete) {
-                            // Calculate delta from calibrated position
-                            val deltaX = filteredX - initialRotationX
-                            val deltaY = filteredY - initialRotationY
-
-                            // Direct linear mapping with gentle scaling
-                            // No special handling for different angles - consistent response throughout
-                            // Scale to a smaller range for subtle effect
-                            rotationX = deltaX * 0.15f  // Simple linear scaling
-                            rotationY = deltaY * 0.15f  // Simple linear scaling
+                            rotationX = (filteredX - initialRotationX) * 0.15f
+                            rotationY = (filteredY - initialRotationY) * 0.15f
                         }
-                    } catch (_: Exception) {
-                        // Sensor read failed — skip this event silently
-                    }
+                    } catch (_: Exception) { }
                 }
             }
 
-            override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {
-                // No-op
-            }
+            override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) { }
         }
 
         // Register sensor with UI delay (~15 Hz) — cuts sensor wake-ups by ~70%
@@ -646,8 +605,11 @@ fun ParticlesOverlay(
 
         onDispose {
             sensorManager?.unregisterListener(listener)
+            // Reset calibration so next registration starts fresh
             calibrationComplete = false
             calibrationSamples = 0
+            initialRotationX = 0f
+            initialRotationY = 0f
         }
     }
 
@@ -686,20 +648,15 @@ fun ParticlesOverlay(
     val physicsInputs = remember { PhysicsInputs() }
 
     // ── Inputs sync — main thread ─────────────────────────────────────────────
-    // Runs whenever any physics-relevant setting changes.  Cheap: just copies
-    // a handful of scalars into the volatile fields.  The physics thread reads
-    // these fields independently — no lock, no coordination needed.
-    LaunchedEffect(
-        animatedRotationX, animatedRotationY, parallaxEnabled,
-        parallaxSensitivity, speedMultiplier, starMode, timeModeEnabled, timeOffsetHours
-    ) {
-        physicsInputs.rotX     = if (parallaxEnabled) animatedRotationX else 0f
-        physicsInputs.rotY     = if (parallaxEnabled) animatedRotationY else 0f
-        physicsInputs.sens     = if (parallaxEnabled) parallaxSensitivity else 0f
-        physicsInputs.speed    = speedMultiplier
-        physicsInputs.star     = starMode
-        physicsInputs.timeMode = timeModeEnabled
-        // daytime is updated by the render trigger (once/sec) — no Calendar alloc here
+    // SideEffect runs synchronously after every successful recomposition that
+    // changes any of these values — no coroutine launch/cancel overhead,
+    // no key-based cancellation noise on every rotation spring frame.
+    SideEffect {
+        physicsInputs.rotX  = if (parallaxEnabled) animatedRotationX else 0f
+        physicsInputs.rotY  = if (parallaxEnabled) animatedRotationY else 0f
+        physicsInputs.sens  = if (parallaxEnabled) parallaxSensitivity else 0f
+        physicsInputs.speed = speedMultiplier
+        // star/timeMode/daytime removed — update() no longer needs them
     }
 
     // ── Actual display refresh rate ───────────────────────────────────────────
@@ -798,19 +755,21 @@ fun ParticlesOverlay(
                     // Math.pow is a JNI transcendental — at 300 particles × 60Hz this saves
                     // ~18,000 Math.pow() calls per second with zero visual difference.
                     val tickDamping = Math.pow(0.94, (delta * 60.0)).toFloat()
+                    val tickDt60 = delta * 60f
 
                     // Read the volatile snapshot once (one memory barrier for the batch)
-                    val inp = physicsInputs
-                    val rotX     = inp.rotX
-                    val rotY     = inp.rotY
-                    val sens     = inp.sens
-                    val spd      = inp.speed
-                    val star     = inp.star
-                    val timeMode = inp.timeMode
-                    val day      = inp.daytime
+                    val inp  = physicsInputs
+                    val spd  = inp.speed
+                    val rotX = inp.rotX
+                    val rotY = inp.rotY
+                    val sens = inp.sens
+
+                    // Pre-compute per-tick constants that are uniform across all particles
+                    val tickMaxVelocity = 15f * spd
+                    // star/timeMode/daytime removed — no longer passed to update()
 
                     particles.forEach { p ->
-                        p.update(spd, now, rotX, rotY, delta, sens, star, timeMode, day, tickDamping)
+                        p.update(spd, rotX, rotY, delta, sens, tickDamping, tickMaxVelocity, tickDt60)
                     }
                 }
 
@@ -848,7 +807,6 @@ fun ParticlesOverlay(
                 if (nowSec != celestialTickSecond) {
                     celestialTickSecond = nowSec
                     frameIsDaytime = isDaytime(timeOffsetHours)
-                    physicsInputs.daytime = frameIsDaytime
                 }
 
                 // Invalidate Canvas — particles have moved since the last render
@@ -915,11 +873,16 @@ fun ParticlesOverlay(
     }
     val starLineCounts  = remember { IntArray(STAR_ALPHA_BUCKETS) }
     val nativeStarPaint = remember {
-        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        android.graphics.Paint().apply {
+            // No ANTI_ALIAS_FLAG — GPU anti-aliasing on 600 line endpoints per frame
+            // is expensive. At star sizes of 2–14px the difference is invisible.
+            // SQUARE caps replace ROUND: no sub-pixel rounding at each endpoint,
+            // so the GPU treats lines as simple rasterised rectangles — much cheaper.
+            // The ✦ sparkle shape is fully preserved; only the 1px cap corners differ.
             style      = android.graphics.Paint.Style.STROKE
-            strokeCap  = android.graphics.Paint.Cap.ROUND
-            strokeJoin = android.graphics.Paint.Join.ROUND
-            strokeWidth = 2.5f   // fixed arm thickness; star SIZE is encoded in arm length (r)
+            strokeCap  = android.graphics.Paint.Cap.SQUARE
+            strokeJoin = android.graphics.Paint.Join.MITER
+            strokeWidth = 2.5f
         }
     }
     // circleBatchPaths still used for circle (non-star) particle mode
@@ -972,7 +935,6 @@ fun ParticlesOverlay(
                 // Use graphicsLayer alpha instead of Modifier.alpha() — graphicsLayer
                 // composites on the GPU without an extra offscreen render pass.
                 .graphicsLayer(alpha = particleAlpha)
-                .pointerInput(Unit) {}
         ) {
             // Reading frameCount tells Compose this Canvas depends on it,
             // so it redraws every time the physics loop increments it.
@@ -994,19 +956,29 @@ fun ParticlesOverlay(
                 // Zero counts (no allocation — just int writes)
                 for (i in 0 until STAR_ALPHA_BUCKETS) starLineCounts[i] = 0
 
-                // Pass 1: write line coords into per-bucket FloatArrays
+                // Pass 1: write line coords into per-bucket FloatArrays.
+                //
+                // Optimisations vs previous version:
+                //  • particle.starR / particle.starRd are pre-baked vals — no float multiply here
+                //  • particle.baseStarAlpha is pre-baked (alpha * 0.6) — one less multiply
+                //  • particleAlpha is the only per-frame factor remaining (single multiply)
+                //  • coerceIn(0f,1f) removed — a is always [0, 0.6] (particle.alpha ∈ [0.3,1.0])
+                //  • early-skip threshold 0.008 (≈2/255) avoids 16 float writes for invisible particles
+                //  • local idx accumulator: avoids re-reading starLineCounts[bucket] each line
                 particles.forEach { particle ->
-                    val cx  = size.width  * particle.x
-                    val cy  = size.height * particle.y
-                    val r   = particle.size * 1.2f
-                    val rd  = r * 0.68f   // diagonal arms slightly shorter for clean ✦ look
-                    val a   = particle.alpha * particleAlpha * 0.6f
+                    val a = particle.baseStarAlpha * particleAlpha
+                    if (a < 0.008f) return@forEach  // invisible — skip 16 float writes + GPU lines
 
-                    val bucket = ((a.coerceIn(0f, 1f)) * (STAR_ALPHA_BUCKETS - 1) + 0.5f).toInt()
+                    val bucket = (a * (STAR_ALPHA_BUCKETS - 1) + 0.5f).toInt()
                         .coerceIn(0, STAR_ALPHA_BUCKETS - 1)
 
                     val buf = starLineBuffers[bucket]
                     var idx = starLineCounts[bucket]
+
+                    val cx  = size.width  * particle.x
+                    val cy  = size.height * particle.y
+                    val r   = particle.starR
+                    val rd  = particle.starRd
 
                     // Horizontal arm ─
                     buf[idx] = cx - r;  buf[idx+1] = cy;       buf[idx+2] = cx + r;  buf[idx+3] = cy
@@ -1020,18 +992,28 @@ fun ParticlesOverlay(
                     starLineCounts[bucket] = idx + 16
                 }
 
-                // Pass 2: one nativeCanvas.drawLines() per non-empty bucket
-                // ≤ STAR_ALPHA_BUCKETS total GPU draw calls, regardless of particle count.
-                drawIntoCanvas { composeCanvas ->
-                    val nc = composeCanvas.nativeCanvas
-                    nativeStarPaint.color = colorArgb  // RGB set once; alpha overridden per bucket
-                    for (bucket in 0 until STAR_ALPHA_BUCKETS) {
-                        val count = starLineCounts[bucket]
-                        if (count == 0) continue
-                        val bucketAlpha = bucket.toFloat() / (STAR_ALPHA_BUCKETS - 1)
-                        nativeStarPaint.alpha = (bucketAlpha * 255f + 0.5f).toInt().coerceIn(0, 255)
-                        nc.drawLines(starLineBuffers[bucket], 0, count, nativeStarPaint)
+                // Pass 2: one nativeCanvas.drawLines() per non-empty bucket.
+                // ≤ STAR_ALPHA_BUCKETS (4) total GPU draw calls, regardless of particle count.
+                //
+                // IMPORTANT: drawContext.canvas.nativeCanvas instead of drawIntoCanvas { }.
+                // drawIntoCanvas forces the entire Canvas composable into SOFTWARE rendering,
+                // which is why star mode was so much laggier than circle mode.
+                // drawContext.canvas.nativeCanvas accesses the same underlying canvas but
+                // stays inside the hardware-accelerated pipeline — zero software fallback.
+                val nc = drawContext.canvas.nativeCanvas
+                nativeStarPaint.color = colorArgb  // RGB set once; alpha overridden per bucket
+                for (bucket in 0 until STAR_ALPHA_BUCKETS) {
+                    val count = starLineCounts[bucket]
+                    if (count == 0) continue
+                    // bucketAlpha255: pre-divided and pre-rounded per bucket.
+                    // Division by (STAR_ALPHA_BUCKETS-1) = 3 is a constant fold at runtime.
+                    nativeStarPaint.alpha = when (bucket) {
+                        0 -> 0
+                        1 -> 85
+                        2 -> 170
+                        else -> 255
                     }
+                    nc.drawLines(starLineBuffers[bucket], 0, count, nativeStarPaint)
                 }
             } else {
                 // Circle mode — batch into alpha buckets exactly like star mode.
@@ -1040,8 +1022,10 @@ fun ParticlesOverlay(
                 for (i in 0 until STAR_ALPHA_BUCKETS) circleBatchPaths[i].reset()
 
                 particles.forEach { particle ->
-                    val a = particle.alpha * particleAlpha * 0.5f
-                    val bucket = ((a.coerceIn(0f, 1f)) * (STAR_ALPHA_BUCKETS - 1) + 0.5f).toInt()
+                    // particle.baseStarAlpha = alpha * 0.6; circle uses * 0.5 so scale down
+                    val a = particle.baseStarAlpha * (5f / 6f) * particleAlpha
+                    if (a < 0.008f) return@forEach
+                    val bucket = (a * (STAR_ALPHA_BUCKETS - 1) + 0.5f).toInt()
                         .coerceIn(0, STAR_ALPHA_BUCKETS - 1)
                     val cx = size.width  * particle.x
                     val cy = size.height * particle.y
@@ -1053,8 +1037,13 @@ fun ParticlesOverlay(
 
                 for (bucket in 0 until STAR_ALPHA_BUCKETS) {
                     if (circleBatchPaths[bucket].isEmpty) continue
-                    val bucketAlpha = bucket.toFloat() / (STAR_ALPHA_BUCKETS - 1)
-                    val aInt = ((bucketAlpha * 255f + 0.5f).toInt().coerceIn(0, 255) shl 24) or colorArgb
+                    // Hardcoded ARGB ints for 4 buckets (0/85/170/255 alpha) — no float math here
+                    val aInt = when (bucket) {
+                        0    -> (0x00 shl 24) or colorArgb
+                        1    -> (0x55 shl 24) or colorArgb
+                        2    -> (0xAA shl 24) or colorArgb
+                        else -> (0xFF shl 24) or colorArgb
+                    }
                     drawPath(path = circleBatchPaths[bucket], color = Color(aInt))
                 }
             }
@@ -1278,7 +1267,9 @@ fun ParticlesOverlay(
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                 celestialBlurAlpha > 0.001f
             ) {
-                (celestialBlurAlpha * 18f).dp
+                // Snap to fixed radius — animating (blurAlpha * 18f).dp rebuilds a
+                // RenderEffect Gaussian kernel every vsync during the transition.
+                18.dp
             } else {
                 0.dp
             }
@@ -1292,7 +1283,6 @@ fun ParticlesOverlay(
                             Modifier.blur(celestialBlurDp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
                         else Modifier
                     )
-                    .pointerInput(Unit) {}
             ) { drawCelestial() }
         } // end if timeModeEnabled
     }
@@ -1586,19 +1576,20 @@ fun MatrixRainOverlay(
             textAlign    = android.graphics.Paint.Align.CENTER
         }
     }
-    // Bloom paint: same text drawn underneath with a large BlurMaskFilter.
-    // BlurMaskFilter is expensive to construct — cached and only rebuilt when
-    // the bloom radius changes (which only happens when fontSizePx changes,
-    // i.e. never at runtime once the overlay is composed).
+    // Bloom paint — previously had a BlurMaskFilter which forces software rasterization
+    // (CPU Gaussian convolution) for every blurred drawText() call.
+    // At medium density, ~30–50 blurred chars/frame × 60fps = thousands of CPU ops/sec.
+    // Replaced: same paint without any maskFilter.  We fake the bloom by drawing each
+    // head/hot-zone character 3× at increasing font sizes and decreasing alphas — pure
+    // GPU alpha compositing, zero software blur path.
     val bloomPaint = remember {
         android.graphics.Paint().apply {
             isAntiAlias  = true
             typeface     = android.graphics.Typeface.MONOSPACE
             textAlign    = android.graphics.Paint.Align.CENTER
+            // maskFilter intentionally NOT set — no BlurMaskFilter
         }
     }
-    // Track last bloom radius so we only rebuild BlurMaskFilter when needed
-    var lastBloomRadius = remember { -1f }
 
     // Pre-compute ARGB ints so Color.toArgb() is never called inside the draw loop
     val headArgb  = remember(headColor)  { headColor.toArgb() }
@@ -1649,11 +1640,12 @@ fun MatrixRainOverlay(
         modifier = Modifier
             .fillMaxSize()
             .graphicsLayer(alpha = overlayAlpha)
-            .pointerInput(Unit) {}  // opaque to touch
     ) {
         @Suppress("UNUSED_EXPRESSION") currentFrame
-        drawIntoCanvas { composeCanvas ->
-            val nc = composeCanvas.nativeCanvas
+        // drawContext.canvas.nativeCanvas — stays hardware-accelerated.
+        // drawIntoCanvas { } here would force software rendering for the entire
+        // matrix Canvas on every frame, same root cause as the star mode lag.
+        val nc = drawContext.canvas.nativeCanvas
 
             // Optional solid background
             if (backgroundAlpha > 0.001f) {
@@ -1677,50 +1669,57 @@ fun MatrixRainOverlay(
             // keeping performance budget low (< 10% of columns visible at any time are
             // head/hot-zone) and preserving visual hierarchy.
 
-            val bloomRadius = fontSizePx * 1.6f
-            if (bloomRadius != lastBloomRadius) {
-                lastBloomRadius = bloomRadius
-                bloomPaint.maskFilter = android.graphics.BlurMaskFilter(
-                    bloomRadius, android.graphics.BlurMaskFilter.Blur.NORMAL
-                )
-            }
-            bloomPaint.textSize = fontSizePx  // will be overridden per-column below
+            // bloomRadius previously drove the BlurMaskFilter; removed with the blur pass.
 
-            // ── PASS 1: Bloom glow ────────────────────────────────────────────
+            // ── PASS 1: Fake bloom glow (no BlurMaskFilter) ───────────────────
+            // Draw each head/hot-zone character 3× at different scales + alphas.
+            // Largest scale = outermost halo; smallest = tight inner ring.
+            // All compositing happens on the GPU (alpha blending); zero software path.
             for (col in columns) {
-                val depth   = col.depth
-                // Far columns (low depth) get smaller glyphs and lower brightness
-                val scaledSize = fontSizePx * (0.45f + depth * 0.55f)  // 0.45×–1.0× font size
-                val depthAlpha = 0.25f + depth * 0.75f                  // 0.25–1.0
-
-                bloomPaint.textSize = scaledSize
+                val depth      = col.depth
+                val scaledSize = fontSizePx * (0.45f + depth * 0.55f)
+                val depthAlpha = 0.25f + depth * 0.75f
 
                 val headY  = col.headRow * scaledSize
                 val slots  = col.chars.size
 
-                for (slot in 0..minOf(3, slots - 1)) {
+                for (slot in 0..minOf(2, slots - 1)) {
                     val charY = headY - slot * scaledSize
                     if (charY < -scaledSize || charY > size.height + scaledSize) continue
 
-                    // Bloom alpha: strong at head, fades quickly through hot zone
-                    // Also modulated by depth so far columns have subtler glow
-                    val bloomAlpha = when (slot) {
-                        0    -> baseA * depthAlpha * 0.55f
-                        1    -> baseA * depthAlpha * 0.35f
-                        2    -> baseA * depthAlpha * 0.20f
-                        else -> baseA * depthAlpha * 0.10f
-                    }
-                    val bAlphaInt = (bloomAlpha.coerceIn(0f, 1f) * 255f).toInt()
-                    if (bAlphaInt < 4) continue
+                    // Per-slot base alpha for bloom (strong at head, falls off fast)
+                    val baseBloom = when (slot) {
+                        0    -> 0.50f
+                        1    -> 0.28f
+                        else -> 0.14f
+                    } * baseA * depthAlpha
 
-                    // Bloom uses head/rain color depending on slot
                     val bArgb = if (slot == 0) headArgb else rainArgb
-                    bloomPaint.color = bArgb
-                    bloomPaint.alpha = bAlphaInt
-                    // drawText(CharArray, offset, count, x, y, paint) avoids allocating
-                    // a new String object for every character drawn — the single biggest
-                    // GC source in the matrix rain at high density / long trails.
-                    nc.drawText(col.chars, slot % slots, 1, col.x, charY, bloomPaint)
+
+                    // Layer 1 — outermost (1.22× size, most transparent)
+                    val alpha1 = (baseBloom * 0.35f).coerceIn(0f, 1f)
+                    if (alpha1 > 0.01f) {
+                        bloomPaint.textSize = scaledSize * 1.22f
+                        bloomPaint.color    = bArgb
+                        bloomPaint.alpha    = (alpha1 * 255f).toInt()
+                        nc.drawText(col.chars, slot % slots, 1, col.x, charY, bloomPaint)
+                    }
+                    // Layer 2 — mid (1.10× size)
+                    val alpha2 = (baseBloom * 0.55f).coerceIn(0f, 1f)
+                    if (alpha2 > 0.01f) {
+                        bloomPaint.textSize = scaledSize * 1.10f
+                        bloomPaint.color    = bArgb
+                        bloomPaint.alpha    = (alpha2 * 255f).toInt()
+                        nc.drawText(col.chars, slot % slots, 1, col.x, charY, bloomPaint)
+                    }
+                    // Layer 3 — tight inner bloom (1.03× size)
+                    val alpha3 = (baseBloom * 0.80f).coerceIn(0f, 1f)
+                    if (alpha3 > 0.01f) {
+                        bloomPaint.textSize = scaledSize * 1.03f
+                        bloomPaint.color    = bArgb
+                        bloomPaint.alpha    = (alpha3 * 255f).toInt()
+                        nc.drawText(col.chars, slot % slots, 1, col.x, charY, bloomPaint)
+                    }
                 }
             }
 
@@ -1774,7 +1773,6 @@ fun MatrixRainOverlay(
                     nc.drawText(col.chars, slot % slots, 1, col.x, charY, nativePaint)
                 }
             }
-        }
     }
 }
 

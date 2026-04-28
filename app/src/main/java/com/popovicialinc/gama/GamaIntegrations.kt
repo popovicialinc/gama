@@ -441,7 +441,7 @@ fun IntegrationInfoCard(
                 ),
             colors = CardDefaults.cardColors(containerColor = cardBackground),
             shape = RoundedCornerShape(28.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
