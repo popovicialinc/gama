@@ -417,6 +417,16 @@ fun ParticlesOverlay(
         with(density) { configuration.screenHeightDp.dp.toPx() }
     }
 
+    // Accent changes must never rebuild / respawn the particle field.
+    // Keep particle positions in their own remembered array and only animate the
+    // paint colour used during draw. This means ACCENT COLOR changes ease smoothly
+    // over the existing stars/celestials instead of creating a fresh particle set.
+    val renderedParticleColor by animateColorAsState(
+        targetValue = color,
+        animationSpec = tween(durationMillis = 520, easing = FastOutSlowInEasing),
+        label = "particles_render_color"
+    )
+
     // Celestial position — recomputed at most once per second via a tick counter.
     // Previously computed inside Canvas on every draw frame (60–120× per second),
     // which allocated a Calendar object and ran trigonometry every frame needlessly
@@ -937,7 +947,7 @@ fun ParticlesOverlay(
         // variant with Color((alpha shl 24) or colorArgb) inside the draw loop —
         // avoiding color.copy(alpha=…) which allocates a new Color object per call.
         // At 150 particles × 120fps this saves ~18,000 allocations/sec.
-        val colorArgb = color.toArgb() and 0x00FFFFFF
+        val colorArgb = renderedParticleColor.toArgb() and 0x00FFFFFF
 
         Canvas(
             modifier = Modifier
@@ -1081,7 +1091,7 @@ fun ParticlesOverlay(
                 // particle draw loop.  Avoids color.copy(alpha=…) which allocates a
                 // new Color object per call.  At 30fps on old 60hz devices these 13
                 // calls would otherwise generate ~390 Color allocations/sec.
-                val colorRgb = color.toArgb() and 0x00FFFFFF
+                val colorRgb = renderedParticleColor.toArgb() and 0x00FFFFFF
                 // Helper: assemble a Color from a pre-stripped RGB int + float alpha [0,1]
                 fun colorWithAlpha(alpha: Float): Color =
                     Color((((alpha * 255f + 0.5f).toInt().coerceIn(0, 255) shl 24) or colorRgb))
@@ -1399,6 +1409,26 @@ fun MatrixRainOverlay(
         with(density) { configuration.screenHeightDp.dp.toPx() }
     }
 
+    // Accent changes must never rebuild / respawn Matrix columns.
+    // Columns are remembered below by geometry/speed settings only; these animated
+    // colours are read by the Canvas draw code, so the rain stays alive and simply
+    // eases into the new ACCENT COLOR.
+    val renderedHeadColor by animateColorAsState(
+        targetValue = headColor,
+        animationSpec = tween(durationMillis = 520, easing = FastOutSlowInEasing),
+        label = "matrix_head_render_color"
+    )
+    val renderedRainColor by animateColorAsState(
+        targetValue = rainColor,
+        animationSpec = tween(durationMillis = 520, easing = FastOutSlowInEasing),
+        label = "matrix_rain_render_color"
+    )
+    val renderedTrailColor by animateColorAsState(
+        targetValue = trailColor,
+        animationSpec = tween(durationMillis = 520, easing = FastOutSlowInEasing),
+        label = "matrix_trail_render_color"
+    )
+
     // ── Derive numeric parameters from the 0/1/2 levels ──────────────────────
     val fontSizePx: Float = remember(fontSizeLevel, density) {
         with(density) {
@@ -1621,9 +1651,9 @@ fun MatrixRainOverlay(
     }
 
     // Pre-compute ARGB ints so Color.toArgb() is never called inside the draw loop
-    val headArgb  = remember(headColor)  { headColor.toArgb() }
-    val rainArgb  = remember(rainColor)  { rainColor.toArgb() }
-    val trailArgb = remember(trailColor) { trailColor.toArgb() }
+    val headArgb  = remember(renderedHeadColor)  { renderedHeadColor.toArgb() }
+    val rainArgb  = remember(renderedRainColor)  { renderedRainColor.toArgb() }
+    val trailArgb = remember(renderedTrailColor) { renderedTrailColor.toArgb() }
     val bgArgb    = remember(backgroundColor, backgroundAlpha) {
         android.graphics.Color.argb(
             (backgroundAlpha * 255f).toInt().coerceIn(0, 255),
@@ -1642,7 +1672,7 @@ fun MatrixRainOverlay(
     // Precompute 64 evenly-spaced RGB steps covering t ∈ [0,1].  At draw time
     // map t → index with one multiply+cast, then read packed RGB from the LUT.
     // The LUT is rebuilt only when rain/trail colours change (never at runtime
-    // once the overlay is composed with default colours).
+    // while ACCENT COLOR eases).
     //
     // 64 steps → max colour error < 2/255 per channel — visually perfect.
     val trailRgbLut: IntArray = remember(rainArgb, trailArgb) {

@@ -128,6 +128,7 @@ data class FloatingBackButtonAvoidance(
 
 val LocalFloatingBackButtonAvoidance = compositionLocalOf { FloatingBackButtonAvoidance() }
 
+
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun GlideOptionSelector(
@@ -641,10 +642,11 @@ fun AnimatedElement(
         targetValue = if (cardShadow && backButtonAvoidance.enabled && overlapsFloatingBackButton)
             backButtonAvoidance.endPadding
         else 0.dp,
-        animationSpec = if (animationLevel == 2) snap() else spring(
-            dampingRatio = if (animationLevel == 0) 0.50f else 0.62f,
-            stiffness = if (animationLevel == 0) 300f else 420f
-        ),
+        animationSpec = when (animationLevel) {
+            2 -> snap()
+            1 -> tween(durationMillis = 180, easing = MotionTokens.Easing.emphasized)
+            else -> spring(dampingRatio = 0.50f, stiffness = 300f)
+        },
         label = "floating_back_button_avoidance"
     )
 
@@ -671,7 +673,7 @@ fun AnimatedElement(
     val scope = rememberCoroutineScope()
 
     val offsetYPx = remember(density, animationLevel) {
-        with(density) { (if (animationLevel == 0) 20f else 14f).dp.toPx() }
+        with(density) { when (animationLevel) { 0 -> 20f; 1 -> 8f; else -> 0f }.dp.toPx() }
     }
 
     // settled = false while this card is mid-stagger, true once it lands.
@@ -688,14 +690,12 @@ fun AnimatedElement(
             if (animationLevel == 2) {
                 progress.snapTo(1f)
             } else {
-                // Spring enter: cards glide up with a subtle overshoot — more organic
-                // than a tween because the motion has real momentum and settles naturally.
-                // Level 0 = expressive (more overshoot), level 1 = refined (barely any).
-                val enterSpring = if (animationLevel == 0)
-                    spring<Float>(dampingRatio = 0.55f, stiffness = 260f)
+                // Full = springy. Reduced = no bounce, simple ease-in-out.
+                val enterSpec: AnimationSpec<Float> = if (animationLevel == 0)
+                    spring(dampingRatio = 0.55f, stiffness = 260f)
                 else
-                    spring<Float>(dampingRatio = 0.70f, stiffness = 380f)
-                progress.animateTo(targetValue = 1f, animationSpec = enterSpring)
+                    tween(durationMillis = 210, easing = MotionTokens.Easing.emphasizedDecelerate)
+                progress.animateTo(targetValue = 1f, animationSpec = enterSpec)
             }
         } else {
             if (resolvedTotal > 0 && resolvedIndex > 0 && animationLevel != 2 && staggerEnabled) {
@@ -1074,10 +1074,14 @@ fun FlatButton(
     LaunchedEffect(isPressed) {
         pressProgress.animateTo(
             targetValue   = if (isPressed && enabled) 1f else 0f,
-            animationSpec = if (animLevel == 2) snap() else spring(
-                dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-            )
+            animationSpec = when (animLevel) {
+                2 -> snap()
+                1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasized)
+                else -> spring(
+                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                    stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+                )
+            }
         )
     }
     val pp = pressProgress.value  // single read; all visuals derived below
@@ -1091,8 +1095,7 @@ fun FlatButton(
     val borderAlpha    = 0.5f + pp * 0.5f
 
     val animatedButtonColor = if (!enabled) colors.textSecondary.copy(alpha = 0.05f)
-    else if (oledMode) Color.Black
-    else if (accent) colors.primaryAccent
+    else if (accent && !oledMode) colors.primaryAccent
     else colors.cardBackground
 
     val contentColor = if (accent && !oledMode) {
@@ -1202,10 +1205,14 @@ fun IllustratedButton(
     LaunchedEffect(isPressed) {
         pressProgress.animateTo(
             targetValue   = if (isPressed && enabled) 1f else 0f,
-            animationSpec = if (animLevel == 2) snap() else spring(
-                dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-            )
+            animationSpec = when (animLevel) {
+                2 -> snap()
+                1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasized)
+                else -> spring(
+                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                    stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+                )
+            }
         )
     }
     val pp = pressProgress.value
@@ -1217,9 +1224,8 @@ fun IllustratedButton(
     // All buttons use the same border spec as the container box: 1.dp, primaryAccent at 0.55f alpha.
     val borderWidthDp = 1.dp
     val animatedButtonColor = if (!enabled) colors.cardBackground
-    else if (oledMode) Color.Black
-    else if (iconType == "resources") colors.cardBackground
-    else Color.Transparent
+    else if (iconType == "vulkan" || iconType == "opengl") Color.Transparent
+    else colors.cardBackground
 
     val contentColor = colors.textPrimary
     val animatedTextColor = if (!enabled) colors.textSecondary.copy(alpha = 0.3f) else contentColor
@@ -1269,12 +1275,40 @@ fun IllustratedButton(
             contentAlignment = Alignment.Center
         ) {
 
+            // Same soft accent glow style used by CURRENT RENDERER.
+            // Drawn outside the clipped button so the glow can bleed past the edges.
+            if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val buttonGlowAlpha = if (oledMode) 0.62f else 0.42f
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .blur(glowBlurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                        .border(borderWidthDp, colors.primaryAccent.copy(alpha = buttonGlowAlpha), shape)
+                )
+            }
+
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(shape)
                     .background(animatedButtonColor)
+                    .background(
+                        Brush.radialGradient(
+                            0.0f to colors.primaryAccent.copy(alpha = if (enabled) 0.12f else 0.04f),
+                            0.58f to colors.primaryAccent.copy(alpha = if (enabled) 0.040f else 0.015f),
+                            1.0f to Color.Transparent,
+                            radius = with(density) { 150.dp.toPx() },
+                            center = Offset.Unspecified
+                        )
+                    )
+                    .background(
+                        Brush.verticalGradient(
+                            0.0f to colors.primaryAccent.copy(alpha = if (enabled) 0.030f else 0.0f),
+                            0.55f to Color.Transparent,
+                            1.0f to colors.primaryAccent.copy(alpha = if (enabled) 0.065f else 0.0f)
+                        )
+                    )
                     .border(borderWidthDp, borderColor, shape)
                     .then(
                         if (enabled) Modifier.pointerInput(enabled) {
@@ -1463,10 +1497,14 @@ fun BigRendererButton(
     LaunchedEffect(isPressed) {
         pressProgress.animateTo(
             targetValue   = if (isPressed && enabled) 1f else 0f,
-            animationSpec = if (animLevel == 2) snap() else spring(
-                dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-            )
+            animationSpec = when (animLevel) {
+                2 -> snap()
+                1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasized)
+                else -> spring(
+                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                    stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+                )
+            }
         )
     }
     val pp         = pressProgress.value
@@ -1478,7 +1516,7 @@ fun BigRendererButton(
     val highlighted = isSelected || forceHighlight
     val bgColor = when {
         !enabled -> colors.cardBackground
-        oledMode -> Color.Black
+        oledMode -> colors.cardBackground
         else     -> colors.cardBackground
     }
     // Border: both buttons use the same accent-based style as the Resources button
@@ -1527,6 +1565,7 @@ fun BigRendererButton(
         val shape      = RoundedCornerShape((buttonSize.value * 0.18f).dp.coerceIn(16.dp, 32.dp))
         val iconSizeDp = (buttonSize.value * 0.34f).dp.coerceIn(36.dp, 72.dp)
         val spacerDp   = (buttonSize.value * 0.065f).dp.coerceIn(6.dp, 14.dp)
+        val glowBlurRadius = (buttonSize.value * 0.11f).dp.coerceIn(8.dp, 16.dp)
 
 
 
@@ -1537,12 +1576,44 @@ fun BigRendererButton(
                 .graphicsLayer(scaleX = pressScale, scaleY = pressScale),
             contentAlignment = Alignment.Center
         ) {
+        // Same soft accent glow style used by CURRENT RENDERER.
+        // It sits behind the clipped card so the glow can bleed around the square buttons.
+        if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val buttonGlowAlpha = when {
+                highlighted -> if (oledMode) 0.78f else 0.55f
+                oledMode    -> 0.58f
+                else        -> 0.38f
+            }
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .blur(glowBlurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    .border(1.dp, colors.primaryAccent.copy(alpha = buttonGlowAlpha), shape)
+            )
+        }
+
         // ── Card (clipped) ────────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(shape)
                 .background(bgColor)
+                .background(
+                    Brush.radialGradient(
+                        0.0f to colors.primaryAccent.copy(alpha = if (enabled) 0.13f else 0.04f),
+                        0.58f to colors.primaryAccent.copy(alpha = if (enabled) 0.045f else 0.015f),
+                        1.0f to Color.Transparent,
+                        radius = with(density) { 210.dp.toPx() },
+                        center = Offset.Unspecified
+                    )
+                )
+                .background(
+                    Brush.verticalGradient(
+                        0.0f to colors.primaryAccent.copy(alpha = if (enabled) 0.035f else 0.0f),
+                        0.55f to Color.Transparent,
+                        1.0f to colors.primaryAccent.copy(alpha = if (enabled) 0.075f else 0.0f)
+                    )
+                )
                 .border(1.dp, borderColor, shape)
                 .then(if (enabled) Modifier.pointerInput(enabled) {
                     detectTapGestures(
@@ -2020,10 +2091,14 @@ fun RendererCard(
     LaunchedEffect(isPressed) {
         rendererCardPress.animateTo(
             targetValue   = if (isPressed) 1f else 0f,
-            animationSpec = if (animLevel == 2) snap() else spring(
-                dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-            )
+            animationSpec = when (animLevel) {
+                2 -> snap()
+                1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasized)
+                else -> spring(
+                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                    stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+                )
+            }
         )
     }
     val rcp        = rendererCardPress.value  // single read; all visuals derived below
@@ -3190,10 +3265,14 @@ fun PanelBackButton(
     LaunchedEffect(isPressed) {
         pressProgress.animateTo(
             targetValue   = if (isPressed) 1f else 0f,
-            animationSpec = if (animLevel == 2) snap() else spring(
-                dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-            )
+            animationSpec = when (animLevel) {
+                2 -> snap()
+                1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasized)
+                else -> spring(
+                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                    stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+                )
+            }
         )
     }
     val pp = pressProgress.value
@@ -3323,10 +3402,14 @@ fun PanelSearchButton(
     LaunchedEffect(isPressed) {
         pressProgress.animateTo(
             targetValue = if (isPressed) 1f else 0f,
-            animationSpec = if (animLevel == 2) snap() else spring(
-                dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                stiffness = if (isPressed) MotionTokens.Springs.pressDown.stiffness else MotionTokens.Springs.pressUp.stiffness
-            )
+            animationSpec = when (animLevel) {
+                2 -> snap()
+                1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasized)
+                else -> spring(
+                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                    stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+                )
+            }
         )
     }
 
@@ -3462,10 +3545,14 @@ fun DialogButton(
     LaunchedEffect(isPressed) {
         pressProgress.animateTo(
             targetValue   = if (isPressed) 1f else 0f,
-            animationSpec = if (animLevel == 2) snap() else spring(
-                dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-            )
+            animationSpec = when (animLevel) {
+                2 -> snap()
+                1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasized)
+                else -> spring(
+                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                    stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+                )
+            }
         )
     }
     val pp = pressProgress.value
@@ -3602,21 +3689,15 @@ fun BouncyDialog(
             animScale.snapTo(0.88f)
             animAlpha.snapTo(0f)
 
-            // Spring enter: scale overshoots past 1.0 then snaps back — that springy pop.
-            // Level 0: more expressive overshoot. Level 1: barely perceptible, just physical.
-            val enterSpring = when (animLevel) {
-                0    -> spring<Float>(dampingRatio = 0.42f, stiffness = 190f)
-                // Slightly relaxed so panel transitions feel smooth instead of abrupt.
-                else -> spring<Float>(dampingRatio = 0.74f, stiffness = 300f)
+            // Full = springy pop. Reduced = no bounce, lighter fade/scale.
+            val enterSpec: AnimationSpec<Float> = when (animLevel) {
+                0 -> spring(dampingRatio = 0.42f, stiffness = 190f)
+                else -> tween(durationMillis = 210, easing = MotionTokens.Easing.emphasizedDecelerate)
             }
-            val alphaEnterDuration = when (animLevel) { 0 -> 280; else -> 230 }
+            val alphaEnterDuration = when (animLevel) { 0 -> 280; else -> 190 }
 
-            // Scale (spring) and alpha (tween) run in parallel
             scope.launch {
-                animScale.animateTo(
-                    targetValue = 1f,
-                    animationSpec = enterSpring
-                )
+                animScale.animateTo(targetValue = 1f, animationSpec = enterSpec)
             }
             animAlpha.animateTo(
                 targetValue = 1f,
@@ -3636,11 +3717,11 @@ fun BouncyDialog(
                 return@LaunchedEffect
             }
 
-            val exitDuration = when (animLevel) { 0 -> 340; else -> 260 }
+            val exitDuration = when (animLevel) { 0 -> 340; else -> 190 }
 
             scope.launch {
                 animScale.animateTo(
-                    targetValue = 0.78f,  // less dramatic shrink — avoids feeling like content is imploding
+                    targetValue = if (animLevel == 0) 0.78f else 0.96f,
                     animationSpec = tween(durationMillis = exitDuration, easing = MotionTokens.Easing.exit)
                 )
             }
@@ -3748,10 +3829,14 @@ fun SecondaryIconButton(
     LaunchedEffect(isPressed) {
         pressProgress.animateTo(
             targetValue   = if (isPressed) 1f else 0f,
-            animationSpec = if (animLevel == 2) snap() else spring(
-                dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-            )
+            animationSpec = when (animLevel) {
+                2 -> snap()
+                1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasized)
+                else -> spring(
+                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                    stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+                )
+            }
         )
     }
     val pp = pressProgress.value
@@ -3760,7 +3845,7 @@ fun SecondaryIconButton(
     val borderWidthDp  = (if (oledMode) 0.75f else 1f) + pp * (if (oledMode) 0.75f else 1f)
     val borderColor    = colors.primaryAccent.copy(alpha = borderAlphaVal)
 
-    val bgColor = if (oledMode) Color.Black else colors.cardBackground
+    val bgColor = colors.cardBackground
     val iconSizeDp = 18.dp
 
     Box(

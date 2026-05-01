@@ -129,6 +129,7 @@ private fun cp(c: Color) = ColorProvider(c)
 // ─────────────────────────────────────────────────────────────────────────────
 // Responsive size breakpoints
 // ─────────────────────────────────────────────────────────────────────────────
+private val S11 = DpSize(73.dp,  73.dp)
 private val S21 = DpSize(146.dp,  73.dp)
 private val S22 = DpSize(146.dp, 146.dp)
 private val S32 = DpSize(219.dp, 146.dp)
@@ -157,7 +158,7 @@ class GamaWidget : GlanceAppWidget() {
     override val stateDefinition: GlanceStateDefinition<*>
         get() = PreferencesGlanceStateDefinition
 
-    override val sizeMode = SizeMode.Responsive(setOf(S21, S22, S32, S42, S43, S44))
+    override val sizeMode = SizeMode.Responsive(setOf(S11, S21, S22, S32, S42, S43, S44))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val p = context.getSharedPreferences("gama_prefs", Context.MODE_PRIVATE)
@@ -192,6 +193,56 @@ class GamaWidget : GlanceAppWidget() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Dedicated 1×1 single-tap toggle widget variant
+// ─────────────────────────────────────────────────────────────────────────────
+class GamaToggleWidget : GlanceAppWidget() {
+
+    override val stateDefinition: GlanceStateDefinition<*>
+        get() = PreferencesGlanceStateDefinition
+
+    override val sizeMode = SizeMode.Responsive(setOf(S11, S21))
+
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val p = context.getSharedPreferences("gama_prefs", Context.MODE_PRIVATE)
+
+        val r: String = try {
+            val binderOk = ShizukuHelper.checkBinder()
+            val permOk   = ShizukuHelper.checkPermission()
+            if (binderOk && permOk) {
+                val detected = withContext(Dispatchers.IO) { ShizukuHelper.getCurrentRenderer() }
+                if (detected != "Unknown") {
+                    p.edit().putString("last_renderer", detected).apply()
+                    detected
+                } else {
+                    ShizukuHelper.guessRendererWithoutShizuku(p)
+                }
+            } else {
+                ShizukuHelper.guessRendererWithoutShizuku(p)
+            }
+        } catch (_: Exception) {
+            p.getString("last_renderer", "OpenGL") ?: "OpenGL"
+        }
+
+        val binderOk = try { ShizukuHelper.checkBinder() } catch (_: Exception) { false }
+        val permOk   = try { ShizukuHelper.checkPermission() } catch (_: Exception) { false }
+        val s        = binderOk && permOk
+        val c        = wc(context)
+
+        provideContent {
+            GlanceTheme {
+                val ctx = androidx.glance.LocalContext.current
+                val op = actionStartActivity(
+                    Intent(ctx, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    }
+                )
+                WMicro(r, s, binderOk, c, op)
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Root dispatcher
 // ─────────────────────────────────────────────────────────────────────────────
 @androidx.compose.runtime.Composable
@@ -204,6 +255,7 @@ private fun Root(r: String, s: Boolean, binderOk: Boolean, c: WC) {
         }
     )
     when {
+        sz.width <= S11.width && sz.height <= S11.height -> WMicro(r, s, binderOk, c, op)
         sz.width <= S21.width && sz.height <= S21.height -> WNano(r, s, binderOk, c, op)
         sz.width <= S22.width && sz.height <= S22.height -> WSmall(r, s, binderOk, c, op)
         sz.width <= S32.width                            -> WMedium(r, s, binderOk, c, op)
@@ -296,30 +348,103 @@ private fun ThinDivider(c: WC) {
     GB(modifier = GlanceModifier.fillMaxWidth().height(0.5.dp).background(c.divider)) {}
 }
 
+private fun nextRenderer(current: String): String = if (current == "Vulkan") "OpenGL" else "Vulkan"
+
+@androidx.compose.runtime.Composable
+private fun UtilityPill(
+    label: String,
+    action: androidx.glance.action.Action,
+    c: WC,
+    mod: GlanceModifier = GlanceModifier
+) {
+    GB(
+        modifier = mod
+            .background(c.surfMed)
+            .cornerRadius(R.dimen.widget_corner_radius_pill)
+            .clickable(action),
+        contentAlignment = GA.Center
+    ) {
+        GT(
+            label,
+            style = TextStyle(
+                color = cp(c.sub),
+                fontSize = sp(10f),
+                fontWeight = GFW.Bold,
+                textAlign = GTA.Center
+            )
+        )
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1×1  Micro toggle — one tap switches renderer when Shizuku is ready
+// ─────────────────────────────────────────────────────────────────────────────
+@androidx.compose.runtime.Composable
+private fun WMicro(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.glance.action.Action) {
+    val accent = W.accent(r)
+    val toggle = if (s) actionRunCallback<WidgetActionCallback>(actionParametersOf(KEY_ACT to "toggle")) else op
+    GB(
+        modifier = GlanceModifier.fillMaxSize()
+            .background(c.bg)
+            .cornerRadius(R.dimen.widget_corner_radius_large)
+            .clickable(toggle)
+            .padding(9.dp),
+        contentAlignment = GA.Center
+    ) {
+        GC(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = GA.CenterHorizontally, verticalAlignment = GA.CenterVertically) {
+            GB(
+                modifier = GlanceModifier.size(30.dp)
+                    .background(accent.copy(alpha = if (c.dark) 0.22f else 0.16f))
+                    .cornerRadius(R.dimen.widget_corner_radius_medium),
+                contentAlignment = GA.Center
+            ) {
+                GT(if (r == "Vulkan") "VK" else "GL", style = TextStyle(color = cp(accent), fontSize = sp(10f), fontWeight = GFW.Bold, textAlign = GTA.Center))
+            }
+            GS(GlanceModifier.height(5.dp))
+            GT(if (s) "SWITCH" else "OPEN", style = TextStyle(color = cp(c.muted), fontSize = sp(7f), fontWeight = GFW.Bold, textAlign = GTA.Center))
+            GS(GlanceModifier.height(3.dp))
+            StatusDot(s, binderOk, 5)
+        }
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 2×1  Nano bar
 // ─────────────────────────────────────────────────────────────────────────────
 @androidx.compose.runtime.Composable
 private fun WNano(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.glance.action.Action) {
+    val localCtx = androidx.glance.LocalContext.current
     val accent = W.accent(r)
+    val toggle = if (s) actionRunCallback<WidgetActionCallback>(actionParametersOf(KEY_ACT to "toggle")) else op
+    val hint = when {
+        s -> localCtx.widgetStr("widget", "tap_to_switch", "Tap to switch")
+        !binderOk -> localCtx.widgetStr("widget", "tap_to_fix", "Tap to fix")
+        else -> localCtx.widgetStr("widget", "tap_for_permission", "Grant permission")
+    }
     GB(
         modifier = GlanceModifier.fillMaxSize().background(c.bg)
             .cornerRadius(R.dimen.widget_corner_radius_large)
-            .clickable(op).padding(horizontal = 14.dp),
+            .clickable(toggle)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         contentAlignment = GA.Center
     ) {
-        GR(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = GA.CenterVertically) {
-            // Colored accent bar — immediate renderer context even at tiny size
-            GB(modifier = GlanceModifier.width(3.dp).height(30.dp).background(accent)
-                .cornerRadius(R.dimen.widget_corner_radius_dot)) {}
-            GS(GlanceModifier.width(10.dp))
-            GC(verticalAlignment = GA.CenterVertically) {
+        GC(modifier = GlanceModifier.fillMaxSize()) {
+            GR(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = GA.CenterVertically) {
                 GT("GAMA", style = TextStyle(color = cp(c.muted), fontSize = sp(7.5f), fontWeight = GFW.Bold))
-                GS(GlanceModifier.height(1.dp))
-                GT(r, style = TextStyle(color = cp(accent), fontSize = sp(15f), fontWeight = GFW.Bold))
+                GS(GlanceModifier.defaultWeight())
+                StatusDot(s, binderOk, 6)
             }
             GS(GlanceModifier.defaultWeight())
-            StatusDot(s, binderOk, 7)
+            GR(verticalAlignment = GA.CenterVertically) {
+                GB(modifier = GlanceModifier.width(4.dp).height(26.dp).background(accent)
+                    .cornerRadius(R.dimen.widget_corner_radius_dot)) {}
+                GS(GlanceModifier.width(10.dp))
+                GC {
+                    GT(r, style = TextStyle(color = cp(accent), fontSize = sp(16f), fontWeight = GFW.Bold))
+                    GT(hint, style = TextStyle(color = cp(c.muted), fontSize = sp(8f)))
+                }
+            }
         }
     }
 }
@@ -331,24 +456,38 @@ private fun WNano(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.
 private fun WSmall(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.glance.action.Action) {
     val localCtx = androidx.glance.LocalContext.current
     val accent = W.accent(r)
+    val toggle = if (s) actionRunCallback<WidgetActionCallback>(actionParametersOf(KEY_ACT to "toggle")) else op
     GB(
         modifier = GlanceModifier.fillMaxSize().background(c.bg)
             .cornerRadius(R.dimen.widget_corner_radius_large)
-            .clickable(op).padding(16.dp),
+            .padding(16.dp),
         contentAlignment = GA.TopStart
     ) {
         GC(modifier = GlanceModifier.fillMaxSize()) {
             GR(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = GA.CenterVertically) {
                 GT("GAMA", style = TextStyle(color = cp(c.muted), fontSize = sp(9f), fontWeight = GFW.Bold))
                 GS(GlanceModifier.defaultWeight())
-                StatusDot(s, binderOk, 6)
+                StatusBadge(s, binderOk, c)
+            }
+            GS(GlanceModifier.height(10.dp))
+            GB(
+                modifier = GlanceModifier.fillMaxWidth()
+                    .background(c.surf)
+                    .cornerRadius(R.dimen.widget_corner_radius_medium)
+                    .clickable(toggle)
+                    .padding(horizontal = 14.dp, vertical = 16.dp),
+                contentAlignment = GA.Center
+            ) {
+                GC(horizontalAlignment = GA.CenterHorizontally) {
+                    GT(localCtx.widgetStr("widget","renderer_label","RENDERER"), style = TextStyle(color = cp(c.muted), fontSize = sp(7.5f), fontWeight = GFW.Bold))
+                    GS(GlanceModifier.height(2.dp))
+                    GT(r, style = TextStyle(color = cp(accent), fontSize = sp(28f), fontWeight = GFW.Bold))
+                    GS(GlanceModifier.height(3.dp))
+                    GT(if (s) localCtx.widgetStr("widget","tap_to_switch","Tap to switch") else localCtx.widgetStr("widget","tap_to_open","Tap to open"), style = TextStyle(color = cp(c.muted), fontSize = sp(8.5f)))
+                }
             }
             GS(GlanceModifier.defaultWeight())
-            GT(localCtx.widgetStr("widget","renderer_label","RENDERER"), style = TextStyle(color = cp(c.muted), fontSize = sp(7.5f), fontWeight = GFW.Bold))
-            GS(GlanceModifier.height(2.dp))
-            GT(r, style = TextStyle(color = cp(accent), fontSize = sp(27f), fontWeight = GFW.Bold))
-            GS(GlanceModifier.height(6.dp))
-            StatusBadge(s, binderOk, c)
+            UtilityPill(localCtx.widgetStr("widget","open_app","OPEN APP"), op, c, GlanceModifier.fillMaxWidth().height(30.dp))
         }
     }
 }
@@ -360,6 +499,7 @@ private fun WSmall(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx
 private fun WMedium(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.glance.action.Action) {
     val localCtx = androidx.glance.LocalContext.current
     val accent = W.accent(r)
+    val toggle = if (s) actionRunCallback<WidgetActionCallback>(actionParametersOf(KEY_ACT to "toggle")) else op
     GB(
         modifier = GlanceModifier.fillMaxSize().background(c.bg)
             .cornerRadius(R.dimen.widget_corner_radius_large)
@@ -368,25 +508,44 @@ private fun WMedium(r: String, s: Boolean, binderOk: Boolean, c: WC, op: android
     ) {
         GC(modifier = GlanceModifier.fillMaxSize()) {
             GR(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = GA.CenterVertically) {
-                GT("GAMA", style = TextStyle(color = cp(c.sub), fontSize = sp(11f), fontWeight = GFW.Bold))
+                GC {
+                    GT("GAMA", style = TextStyle(color = cp(c.sub), fontSize = sp(11f), fontWeight = GFW.Bold))
+                    GT(localCtx.widgetStr("widget","renderer_control","Renderer control"), style = TextStyle(color = cp(c.muted), fontSize = sp(8.5f)))
+                }
                 GS(GlanceModifier.defaultWeight())
                 StatusBadge(s, binderOk, c)
             }
-            GS(GlanceModifier.defaultWeight())
-            GT(r, style = TextStyle(color = cp(accent), fontSize = sp(30f), fontWeight = GFW.Bold))
-            GT(localCtx.widgetStr("widget","active_renderer","Active renderer"), style = TextStyle(color = cp(c.muted), fontSize = sp(9f)))
-            GS(GlanceModifier.defaultWeight())
+            GS(GlanceModifier.height(10.dp))
+            GB(
+                modifier = GlanceModifier.fillMaxWidth()
+                    .background(c.surf)
+                    .cornerRadius(R.dimen.widget_corner_radius_medium)
+                    .clickable(toggle)
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                contentAlignment = GA.Center
+            ) {
+                GC(horizontalAlignment = GA.CenterHorizontally) {
+                    GT(localCtx.widgetStr("widget","active_renderer","Active renderer"), style = TextStyle(color = cp(c.muted), fontSize = sp(8.5f), fontWeight = GFW.Bold))
+                    GS(GlanceModifier.height(3.dp))
+                    GT(r, style = TextStyle(color = cp(accent), fontSize = sp(31f), fontWeight = GFW.Bold))
+                    GS(GlanceModifier.height(2.dp))
+                    GT(if (s) localCtx.widgetStr("widget","tap_to_switch","Tap to switch") else localCtx.widgetStr("widget","tap_to_fix","Tap to fix"), style = TextStyle(color = cp(c.muted), fontSize = sp(8.5f)))
+                }
+            }
+            GS(GlanceModifier.height(8.dp))
             if (s) {
                 GR(modifier = GlanceModifier.fillMaxWidth()) {
                     RendererPill("Vulkan", r == "Vulkan", "vulkan", W.vulkan, c,
-                        GlanceModifier.defaultWeight().height(34.dp))
+                        GlanceModifier.defaultWeight().height(36.dp))
                     GS(GlanceModifier.width(8.dp))
                     RendererPill("OpenGL", r == "OpenGL", "opengl", W.opengl, c,
-                        GlanceModifier.defaultWeight().height(34.dp))
+                        GlanceModifier.defaultWeight().height(36.dp))
                 }
             } else {
-                OfflineBanner(binderOk, op, c, 34)
+                OfflineBanner(binderOk, op, c, 36)
             }
+            GS(GlanceModifier.height(8.dp))
+            UtilityPill(localCtx.widgetStr("widget","open_app","OPEN APP"), op, c, GlanceModifier.fillMaxWidth().height(32.dp))
         }
     }
 }
@@ -398,50 +557,49 @@ private fun WMedium(r: String, s: Boolean, binderOk: Boolean, c: WC, op: android
 private fun WWide(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.glance.action.Action) {
     val localCtx = androidx.glance.LocalContext.current
     val accent = W.accent(r)
+    val toggle = if (s) actionRunCallback<WidgetActionCallback>(actionParametersOf(KEY_ACT to "toggle")) else op
     GB(
         modifier = GlanceModifier.fillMaxSize().background(c.bg)
             .cornerRadius(R.dimen.widget_corner_radius_large)
-            .padding(horizontal = 18.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         contentAlignment = GA.Center
     ) {
-        GC(modifier = GlanceModifier.fillMaxSize()) {
-            GR(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = GA.CenterVertically) {
-                GT("GAMA", style = TextStyle(color = cp(c.sub), fontSize = sp(11f), fontWeight = GFW.Bold))
-                GS(GlanceModifier.width(5.dp))
-                GT("·  Renderer Control", style = TextStyle(color = cp(c.muted), fontSize = sp(10f)))
-                GS(GlanceModifier.defaultWeight())
-                StatusBadge(s, binderOk, c)
+        GR(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = GA.CenterVertically) {
+            GC(modifier = GlanceModifier.defaultWeight()) {
+                GR(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = GA.CenterVertically) {
+                    GT("GAMA", style = TextStyle(color = cp(c.text), fontSize = sp(13f), fontWeight = GFW.Bold))
+                    GS(GlanceModifier.defaultWeight())
+                    StatusBadge(s, binderOk, c)
+                }
+                GS(GlanceModifier.height(8.dp))
+                GB(
+                    modifier = GlanceModifier.fillMaxWidth()
+                        .background(c.surf)
+                        .cornerRadius(R.dimen.widget_corner_radius_medium)
+                        .clickable(toggle)
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                    contentAlignment = GA.Center
+                ) {
+                    GC {
+                        GT(localCtx.widgetStr("widget","current_renderer","CURRENT RENDERER"), style = TextStyle(color = cp(c.muted), fontSize = sp(8f), fontWeight = GFW.Bold))
+                        GS(GlanceModifier.height(4.dp))
+                        GT(r, style = TextStyle(color = cp(accent), fontSize = sp(30f), fontWeight = GFW.Bold))
+                        GS(GlanceModifier.height(2.dp))
+                        GT(if (s) localCtx.widgetStr("widget","tap_to_switch","Tap to switch") else localCtx.widgetStr("widget","tap_to_fix","Tap to fix"), style = TextStyle(color = cp(c.muted), fontSize = sp(8.5f)))
+                    }
+                }
             }
-            GS(GlanceModifier.defaultWeight())
-            GR(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = GA.CenterVertically) {
-                GC(modifier = GlanceModifier.defaultWeight()) {
-                    GT(r, style = TextStyle(color = cp(accent), fontSize = sp(36f), fontWeight = GFW.Bold))
-                    GT(localCtx.widgetStr("widget","active_pipeline","Active pipeline"), style = TextStyle(color = cp(c.muted), fontSize = sp(9f)))
-                }
-                GS(GlanceModifier.width(12.dp))
+            GS(GlanceModifier.width(10.dp))
+            GC(modifier = GlanceModifier.width(104.dp), verticalAlignment = GA.CenterVertically) {
                 if (s) {
-                    GC(horizontalAlignment = GA.End) {
-                        RendererPill("Vulkan", r == "Vulkan", "vulkan", W.vulkan, c,
-                            GlanceModifier.width(96.dp).height(28.dp))
-                        GS(GlanceModifier.height(6.dp))
-                        RendererPill("OpenGL", r == "OpenGL", "opengl", W.opengl, c,
-                            GlanceModifier.width(96.dp).height(28.dp))
-                    }
+                    RendererPill("Vulkan", r == "Vulkan", "vulkan", W.vulkan, c, GlanceModifier.fillMaxWidth().height(44.dp))
+                    GS(GlanceModifier.height(8.dp))
+                    RendererPill("OpenGL", r == "OpenGL", "opengl", W.opengl, c, GlanceModifier.fillMaxWidth().height(44.dp))
                 } else {
-                    val errColor = if (!binderOk) W.dotRed else W.dotAmber
-                    GB(
-                        modifier = GlanceModifier.width(96.dp).height(62.dp)
-                            .background(errColor.copy(alpha = 0.10f))
-                            .cornerRadius(R.dimen.widget_corner_radius_medium)
-                            .clickable(op),
-                        contentAlignment = GA.Center
-                    ) {
-                        GT("Open\nGAMA", style = TextStyle(
-                            color = cp(errColor), fontSize = sp(11f),
-                            fontWeight = GFW.Bold, textAlign = GTA.Center
-                        ))
-                    }
+                    OfflineBanner(binderOk, op, c, 44)
                 }
+                GS(GlanceModifier.height(8.dp))
+                UtilityPill(localCtx.widgetStr("widget","open_app","OPEN APP"), op, c, GlanceModifier.fillMaxWidth().height(32.dp))
             }
         }
     }
@@ -454,6 +612,7 @@ private fun WWide(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.
 private fun WTall(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.glance.action.Action) {
     val localCtx = androidx.glance.LocalContext.current
     val accent = W.accent(r)
+    val toggle = if (s) actionRunCallback<WidgetActionCallback>(actionParametersOf(KEY_ACT to "toggle")) else op
     GB(
         modifier = GlanceModifier.fillMaxSize().background(c.bg)
             .cornerRadius(R.dimen.widget_corner_radius_large)
@@ -467,47 +626,42 @@ private fun WTall(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.
                 StatusBadge(s, binderOk, c)
             }
             GS(GlanceModifier.height(10.dp))
-            // Hero card — frosted inner surface
             GB(
                 modifier = GlanceModifier.fillMaxWidth()
                     .background(c.surf)
                     .cornerRadius(R.dimen.widget_corner_radius_medium)
-                    .padding(horizontal = 16.dp, vertical = 18.dp)
-                    .clickable(op),
+                    .clickable(toggle)
+                    .padding(horizontal = 16.dp, vertical = 18.dp),
                 contentAlignment = GA.Center
             ) {
-                GC(horizontalAlignment = GA.CenterHorizontally, verticalAlignment = GA.CenterVertically) {
-                    GT(localCtx.widgetStr("widget","current_renderer","CURRENT RENDERER"), style = TextStyle(
-                        color = cp(c.muted), fontSize = sp(8f), fontWeight = GFW.Bold, textAlign = GTA.Center))
-                    GS(GlanceModifier.height(5.dp))
-                    GT(r, style = TextStyle(color = cp(accent), fontSize = sp(38f), fontWeight = GFW.Bold, textAlign = GTA.Center))
+                GC(horizontalAlignment = GA.CenterHorizontally) {
+                    GT(localCtx.widgetStr("widget","current_renderer","CURRENT RENDERER"), style = TextStyle(color = cp(c.muted), fontSize = sp(8f), fontWeight = GFW.Bold))
+                    GS(GlanceModifier.height(4.dp))
+                    GT(r, style = TextStyle(color = cp(accent), fontSize = sp(40f), fontWeight = GFW.Bold))
                     GS(GlanceModifier.height(3.dp))
-                    GT(
-                        if (r == "Vulkan") localCtx.widgetStr("widget","vulkan_pipeline","Skia Vulkan pipeline") else localCtx.widgetStr("widget","opengl_pipeline","Skia OpenGL pipeline"),
-                        style = TextStyle(color = cp(c.muted), fontSize = sp(9f), textAlign = GTA.Center)
-                    )
+                    GT(if (r == "Vulkan") localCtx.widgetStr("widget","vulkan_pipeline","Skia Vulkan pipeline") else localCtx.widgetStr("widget","opengl_pipeline","Skia OpenGL pipeline"), style = TextStyle(color = cp(c.muted), fontSize = sp(9f), textAlign = GTA.Center))
+                    GS(GlanceModifier.height(4.dp))
+                    GT(if (s) localCtx.widgetStr("widget","tap_to_switch","Tap to switch") else localCtx.widgetStr("widget","tap_to_fix","Tap to fix"), style = TextStyle(color = cp(c.muted), fontSize = sp(8.5f)))
                 }
             }
             GS(GlanceModifier.height(9.dp))
             if (s) {
                 GR(modifier = GlanceModifier.fillMaxWidth()) {
                     RendererPill("Vulkan", r == "Vulkan", "vulkan", W.vulkan, c,
-                        GlanceModifier.defaultWeight().height(40.dp))
+                        GlanceModifier.defaultWeight().height(42.dp))
                     GS(GlanceModifier.width(8.dp))
                     RendererPill("OpenGL", r == "OpenGL", "opengl", W.opengl, c,
-                        GlanceModifier.defaultWeight().height(40.dp))
+                        GlanceModifier.defaultWeight().height(42.dp))
                 }
             } else {
-                OfflineBanner(binderOk, op, c, 40)
+                OfflineBanner(binderOk, op, c, 42)
             }
+            GS(GlanceModifier.height(8.dp))
+            UtilityPill(localCtx.widgetStr("widget","open_app","OPEN APP"), op, c, GlanceModifier.fillMaxWidth().height(34.dp))
             GS(GlanceModifier.defaultWeight())
             ThinDivider(c)
             GS(GlanceModifier.height(7.dp))
-            GR(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = GA.CenterVertically) {
-                GT("Tap card to open GAMA", style = TextStyle(color = cp(c.muted), fontSize = sp(8.5f)))
-                GS(GlanceModifier.defaultWeight())
-                GT("→", style = TextStyle(color = cp(c.muted), fontSize = sp(10f), fontWeight = GFW.Bold))
-            }
+            GT(localCtx.widgetStr("widget","footer_hint","long press for widget settings"), style = TextStyle(color = cp(c.muted), fontSize = sp(8.5f), textAlign = GTA.Center))
         }
     }
 }
@@ -519,6 +673,7 @@ private fun WTall(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.
 private fun WFull(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.glance.action.Action) {
     val localCtx = androidx.glance.LocalContext.current
     val accent = W.accent(r)
+    val toggle = if (s) actionRunCallback<WidgetActionCallback>(actionParametersOf(KEY_ACT to "toggle")) else op
     GB(
         modifier = GlanceModifier.fillMaxSize().background(c.bg)
             .cornerRadius(R.dimen.widget_corner_radius_large)
@@ -526,49 +681,27 @@ private fun WFull(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.
         contentAlignment = GA.Center
     ) {
         GC(modifier = GlanceModifier.fillMaxSize()) {
-            // Header
             GR(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = GA.CenterVertically) {
                 GC {
                     GT("GAMA", style = TextStyle(color = cp(c.text), fontSize = sp(18f), fontWeight = GFW.Bold))
-                    GT("Renderer Control", style = TextStyle(color = cp(c.muted), fontSize = sp(9f)))
+                    GT(localCtx.widgetStr("widget","renderer_control","Renderer control"), style = TextStyle(color = cp(c.muted), fontSize = sp(9f)))
                 }
                 GS(GlanceModifier.defaultWeight())
-                // Shizuku status pill
-                GB(
-                    modifier = GlanceModifier
-                        .background(when { s -> W.dotGreen.copy(alpha = 0.14f); !binderOk -> W.dotRed.copy(alpha = 0.12f); else -> W.dotAmber.copy(alpha = 0.12f) })
-                        .cornerRadius(R.dimen.widget_corner_radius_small)
-                        .padding(horizontal = 10.dp, vertical = 7.dp),
-                    contentAlignment = GA.Center
-                ) {
-                    GR(verticalAlignment = GA.CenterVertically) {
-                        StatusDot(s, binderOk, 5)
-                        GS(GlanceModifier.width(5.dp))
-                        GT(
-                            when { s -> "Shizuku"; !binderOk -> "Shizuku off"; else -> "No permission" },
-                            style = TextStyle(
-                                color = cp(when { s -> W.dotGreen; !binderOk -> W.dotRed; else -> W.dotAmber }),
-                                fontSize = sp(10f), fontWeight = GFW.Bold
-                            )
-                        )
-                    }
-                }
+                StatusBadge(s, binderOk, c)
             }
             GS(GlanceModifier.height(14.dp))
             ThinDivider(c)
             GS(GlanceModifier.height(14.dp))
-            // Hero renderer card
             GB(
                 modifier = GlanceModifier.fillMaxWidth()
                     .background(c.surf)
                     .cornerRadius(R.dimen.widget_corner_radius_medium)
-                    .padding(horizontal = 20.dp, vertical = 22.dp)
-                    .clickable(op),
+                    .clickable(toggle)
+                    .padding(horizontal = 20.dp, vertical = 22.dp),
                 contentAlignment = GA.Center
             ) {
                 GC(horizontalAlignment = GA.CenterHorizontally, verticalAlignment = GA.CenterVertically) {
-                    GT(localCtx.widgetStr("widget","active_renderer_full","ACTIVE RENDERER"), style = TextStyle(
-                        color = cp(c.muted), fontSize = sp(8f), fontWeight = GFW.Bold, textAlign = GTA.Center))
+                    GT(localCtx.widgetStr("widget","active_renderer_full","ACTIVE RENDERER"), style = TextStyle(color = cp(c.muted), fontSize = sp(8f), fontWeight = GFW.Bold, textAlign = GTA.Center))
                     GS(GlanceModifier.height(6.dp))
                     GT(r, style = TextStyle(color = cp(accent), fontSize = sp(44f), fontWeight = GFW.Bold, textAlign = GTA.Center))
                     GS(GlanceModifier.height(4.dp))
@@ -576,10 +709,11 @@ private fun WFull(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.
                         if (r == "Vulkan") localCtx.widgetStr("widget","vulkan_detail","Skia Vulkan  ·  High performance") else localCtx.widgetStr("widget","opengl_detail","Skia OpenGL  ·  Compatibility mode"),
                         style = TextStyle(color = cp(c.muted), fontSize = sp(9f), textAlign = GTA.Center)
                     )
+                    GS(GlanceModifier.height(5.dp))
+                    GT(if (s) localCtx.widgetStr("widget","tap_to_switch","Tap the card to switch") else localCtx.widgetStr("widget","tap_to_fix","Tap the card to fix setup"), style = TextStyle(color = cp(c.muted), fontSize = sp(8.5f), textAlign = GTA.Center))
                 }
             }
             GS(GlanceModifier.height(10.dp))
-            // Action pills
             if (s) {
                 GR(modifier = GlanceModifier.fillMaxWidth()) {
                     RendererPill("Vulkan", r == "Vulkan", "vulkan", W.vulkan, c,
@@ -591,12 +725,13 @@ private fun WFull(r: String, s: Boolean, binderOk: Boolean, c: WC, op: androidx.
             } else {
                 OfflineBanner(binderOk, op, c, 48)
             }
+            GS(GlanceModifier.height(10.dp))
+            UtilityPill(localCtx.widgetStr("widget","open_app","OPEN APP"), op, c, GlanceModifier.fillMaxWidth().height(36.dp))
             GS(GlanceModifier.defaultWeight())
             ThinDivider(c)
             GS(GlanceModifier.height(8.dp))
-            // Footer
             GR(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = GA.CenterVertically) {
-                GT("Tap card to open GAMA", style = TextStyle(color = cp(c.muted), fontSize = sp(8.5f)))
+                GT(localCtx.widgetStr("widget","footer_hint","long press for widget settings"), style = TextStyle(color = cp(c.muted), fontSize = sp(8.5f)))
                 GS(GlanceModifier.defaultWeight())
                 GT("→", style = TextStyle(color = cp(c.muted), fontSize = sp(10f), fontWeight = GFW.Bold))
             }
@@ -620,24 +755,24 @@ class WidgetActionCallback : ActionCallback {
         }
         withContext(Dispatchers.IO) {
             try {
-                when (action) {
-                    "vulkan" -> {
-                        ShizukuHelper.runCommand("setprop debug.hwui.renderer skiavk")
-                        prefs.edit()
-                            .putString("last_renderer", "Vulkan")
-                            .putLong("last_switch_time", System.currentTimeMillis())
-                            .putLong("last_switch_uptime", android.os.SystemClock.elapsedRealtime())
-                            .commit()
-                    }
-                    "opengl" -> {
-                        ShizukuHelper.runCommand("setprop debug.hwui.renderer opengl")
-                        prefs.edit()
-                            .putString("last_renderer", "OpenGL")
-                            .putLong("last_switch_time", System.currentTimeMillis())
-                            .putLong("last_switch_uptime", android.os.SystemClock.elapsedRealtime())
-                            .commit()
-                    }
+                val lastKnown = prefs.getString("last_renderer", "OpenGL") ?: "OpenGL"
+                val target = when (action) {
+                    "vulkan" -> "Vulkan"
+                    "opengl" -> "OpenGL"
+                    "toggle" -> nextRenderer(lastKnown)
+                    else -> return@withContext
                 }
+                val command = if (target == "Vulkan") {
+                    "setprop debug.hwui.renderer skiavk"
+                } else {
+                    "setprop debug.hwui.renderer opengl"
+                }
+                ShizukuHelper.runCommand(command)
+                prefs.edit()
+                    .putString("last_renderer", target)
+                    .putLong("last_switch_time", System.currentTimeMillis())
+                    .putLong("last_switch_uptime", android.os.SystemClock.elapsedRealtime())
+                    .commit()
             } catch (_: Exception) {}
             try { GamaWidget().updateAll(context) } catch (_: Exception) {}
         }
@@ -790,4 +925,9 @@ private fun WidgetSettingsRow(
 // ─────────────────────────────────────────────────────────────────────────────
 class GamaWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = GamaWidget()
+}
+
+
+class GamaToggleWidgetReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = GamaToggleWidget()
 }

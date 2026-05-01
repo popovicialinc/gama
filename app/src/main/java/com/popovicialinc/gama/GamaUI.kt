@@ -260,7 +260,7 @@ fun GamaUI(
 
     // ── Notifications panel ───────────────────────────────────────────────────
     var showNotifications by remember { mutableStateOf(false) }
-    var notificationsEnabled by remember { mutableStateOf(prefs.getBoolean("notif_enabled", true)) }
+    var notificationsEnabled by remember { mutableStateOf(prefs.getBoolean("notif_enabled", false)) }
     // 0=2 h, 1=4 h, 2=6 h, 3=12 h, 4=24 h
     var notifIntervalIndex by remember { mutableStateOf(prefs.getInt("notif_interval_idx", 2)) }
     var lastNotifSentTime by remember { mutableStateOf(prefs.getLong("notif_last_sent", 0L)) }
@@ -328,16 +328,19 @@ fun GamaUI(
     BackHandler(enabled = showParticlesAppearance) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showParticlesAppearance = false
+        showParticlesSettings = true
     }
 
     BackHandler(enabled = showParticlesMotion) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showParticlesMotion = false
+        showParticlesSettings = true
     }
 
     BackHandler(enabled = showParticlesPerformance) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showParticlesPerformance = false
+        showParticlesSettings = true
     }
     BackHandler(enabled = showMatrixAppearance) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
@@ -466,7 +469,7 @@ fun GamaUI(
     var gradientEnabled by remember { mutableStateOf(prefs.getBoolean("gradient_enabled", true)) }
     var blurEnabled by remember { mutableStateOf(prefs.getBoolean("blur_enabled", true)) }
     var particlesEnabled by remember { mutableStateOf(prefs.getBoolean("particles_enabled", true)) }
-    var particleSpeed by remember { mutableStateOf(prefs.getInt("particle_speed", 0)) } // 0=low, 1=medium, 2=high (default: low)
+    var particleSpeed by remember { mutableStateOf(prefs.getInt("particle_speed", 1)) } // 0=low, 1=medium, 2=high (default: medium)
     var particleParallaxEnabled by remember { mutableStateOf(prefs.getBoolean("particle_parallax_enabled", true)) }
     var particleParallaxSensitivity by remember { mutableStateOf(prefs.getInt("particle_parallax_sensitivity", 0)) } // 0=low(0.15), 1=medium(0.3), 2=high(0.5)
     var particleStarMode by remember { mutableStateOf(prefs.getBoolean("particle_star_mode", false)) } // New: star mode toggle
@@ -492,6 +495,7 @@ fun GamaUI(
     var dozeMode by remember { mutableStateOf(prefs.getBoolean("doze_mode", false)) }
     var showGpuWatchButton by remember { mutableStateOf(prefs.getBoolean("show_gpuwatch_button", false)) }
     var staggerEnabled by remember { mutableStateOf(prefs.getBoolean("stagger_enabled", true)) }
+    var backButtonAvoidanceEnabled by remember { mutableStateOf(prefs.getBoolean("back_button_avoidance_enabled", true)) }
     var shadowsEnabled by remember { mutableStateOf(prefs.getBoolean("shadows_enabled", true)) }
     var particleNativeRefreshRate  by remember { mutableStateOf(prefs.getBoolean("particle_native_refresh_rate", false)) }
     var particleQuarterRefreshRate by remember { mutableStateOf(prefs.getBoolean("particle_quarter_refresh_rate", false)) }
@@ -528,6 +532,21 @@ fun GamaUI(
         else -> systemInDarkTheme // Auto: always follow the OS dark/light mode setting
     }
 
+    // In GAMA, dark mode is OLED mode. There is no separate dark-grey theme anymore.
+    // This also makes Auto follow the system: if the phone is in dark mode, GAMA uses pure black.
+    val effectiveOledMode = isDarkTheme || oledMode
+
+    // Manual light/dark switching used to feel laggy because every major theme color
+    // animated for hundreds of milliseconds, forcing the whole UI to redraw every frame.
+    // During an actual mode flip we use a very short transition instead: still not a
+    // harsh snap, but cheap enough to feel instant even with blur + matrix enabled.
+    var themeModeSwitchInProgress by remember { mutableStateOf(false) }
+    LaunchedEffect(effectiveOledMode) {
+        themeModeSwitchInProgress = true
+        delay(140)
+        themeModeSwitchInProgress = false
+    }
+
     // remember(…): context.getColor() is a JNI call — memoize to avoid per-recomposition overhead.
     val dynamicAccent = remember(useDynamicColor, isDarkTheme, customAccentColor) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
@@ -541,17 +560,23 @@ fun GamaUI(
         }
     }
 
-    // Separate dynamic color for OLED mode — only pulls from wallpaper when useDynamicColorOLED is on.
-    // Previously this always used system_accent1_400 regardless of the toggle.
-    val oledDynamicAccent = remember(useDynamicColorOLED, oledAccentColor) {
-        if (useDynamicColorOLED && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Color(context.getColor(android.R.color.system_accent1_400))
-        } else {
-            oledAccentColor
-        }
+    // Single accent source for the whole app.
+    // Important: since GAMA now treats dark mode as OLED mode, the old separate
+    // oledAccentColor path made dark/OLED visuals ignore the main ACCENT COLOR.
+    // This keeps cards, particles, Matrix rain, and the background gradient synced.
+    val appAccent = dynamicAccent
+
+    // Absolute visual accent used by background effects.
+    // When Dynamic Color is OFF, this is the manual ACCENT COLOR picker value.
+    // We pass this directly to Stars/Particles/Matrix instead of routing through
+    // animated theme colors, so the background effects cannot stay stuck on blue/green.
+    val effectsAccent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
+        dynamicAccent
+    } else {
+        customAccentColor
     }
 
-    val dynamicGradientStart = remember(useDynamicColor, isDarkTheme, customGradientStart) {
+    val dynamicGradientStart = remember(useDynamicColor, isDarkTheme, effectsAccent) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
             if (isDarkTheme) {
                 Color(context.getColor(android.R.color.system_accent1_700))
@@ -559,11 +584,14 @@ fun GamaUI(
                 Color(context.getColor(android.R.color.system_accent1_400))
             }
         } else {
-            customGradientStart
+            // Dynamic Color OFF: derive the gradient from ACCENT COLOR instead of
+            // using stale saved gradient colors that can drift away from the accent.
+            if (isDarkTheme) lerp(effectsAccent, Color.Black, 0.68f)
+            else lerp(effectsAccent, Color.White, 0.22f)
         }
     }
 
-    val dynamicGradientEnd = remember(useDynamicColor, isDarkTheme, customGradientEnd) {
+    val dynamicGradientEnd = remember(useDynamicColor, isDarkTheme, effectsAccent) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
             if (isDarkTheme) {
                 Color(0xFF000000)
@@ -571,42 +599,68 @@ fun GamaUI(
                 Color(context.getColor(android.R.color.system_neutral1_50))
             }
         } else {
-            customGradientEnd
+            // Dynamic Color OFF: keep the lower gradient tied to the same accent,
+            // just much softer so the UI stays readable.
+            if (isDarkTheme) Color.Black
+            else lerp(effectsAccent, Color.White, 0.90f)
         }
     }
 
-    // ── Matrix rain colors — driven by accent / Dynamic Color ─────────────────
-    // Head: bright version of the accent (near-white tint when dynamic)
-    // Rain: the accent itself
-    // Trail: a darkened version for the fading tail
-    val matrixHeadColor = remember(useDynamicColor, isDarkTheme, dynamicAccent) {
+    // ── Matrix/stars visual colors — driven by ACCENT COLOR / Dynamic Color ──
+    // Important: these are animated colors, NOT keys. Changing ACCENT COLOR should
+    // smoothly repaint existing Matrix/Stars particles instead of disposing and
+    // respawning the overlays.
+    val targetEffectsAccent = effectsAccent
+
+    val targetMatrixHeadColor = remember(useDynamicColor, isDarkTheme, effectsAccent) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
-            // Lighten the dynamic accent toward white for the head highlight
             Color(context.getColor(android.R.color.system_accent1_100))
         } else {
-            Color(0xFFFFFFFF) // classic white head when no dynamic color
+            lerp(effectsAccent, Color.White, 0.72f)
         }
     }
-    val matrixRainColor = remember(useDynamicColor, isDarkTheme, dynamicAccent) {
+    val targetMatrixRainColor = remember(useDynamicColor, isDarkTheme, effectsAccent) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
             if (isDarkTheme) Color(context.getColor(android.R.color.system_accent1_300))
             else Color(context.getColor(android.R.color.system_accent1_600))
         } else {
-            Color(0xFF00FF41) // classic matrix green
+            effectsAccent
         }
     }
-    val matrixTrailColor = remember(useDynamicColor, isDarkTheme, dynamicAccent) {
+    val targetMatrixTrailColor = remember(useDynamicColor, isDarkTheme, effectsAccent) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && useDynamicColor) {
             Color(context.getColor(android.R.color.system_accent1_900))
         } else {
-            Color(0xFF003B00) // classic dark green tail
+            lerp(effectsAccent, Color.Black, 0.70f)
         }
     }
 
-    // Determine target colors (Normal or OLED — dark mode is overridden by OLED)
-    val baseColors = when {
-        oledMode || isDarkTheme -> ThemeColors.oledMode(dynamicAccent)
-        else -> ThemeColors.light(dynamicAccent, dynamicGradientStart, dynamicGradientEnd)
+    val animatedEffectsAccent by animateColorAsState(
+        targetValue = targetEffectsAccent,
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 110 else 240, easing = FastOutSlowInEasing),
+        label = "effects_accent_anim"
+    )
+    val matrixHeadColor by animateColorAsState(
+        targetValue = targetMatrixHeadColor,
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 110 else 240, easing = FastOutSlowInEasing),
+        label = "matrix_head_color_anim"
+    )
+    val matrixRainColor by animateColorAsState(
+        targetValue = targetMatrixRainColor,
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 110 else 240, easing = FastOutSlowInEasing),
+        label = "matrix_rain_color_anim"
+    )
+    val matrixTrailColor by animateColorAsState(
+        targetValue = targetMatrixTrailColor,
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 110 else 240, easing = FastOutSlowInEasing),
+        label = "matrix_trail_color_anim"
+    )
+    // Determine target colors.
+    // Dark mode is OLED mode now: no dark-grey card theme, only pure black.
+    val baseColors = if (effectiveOledMode) {
+        ThemeColors.oledMode(appAccent)
+    } else {
+        ThemeColors.light(appAccent, dynamicGradientStart, dynamicGradientEnd)
     }
 
     // Use base colors directly - no color changing for success dialog
@@ -617,44 +671,51 @@ fun GamaUI(
     // The accent color picker produces a natural wave feel just from the way
     // Compose recomposes (accent-derived values like border update one frame later
     // naturally), without needing artificial delays that desync fast toggles.
+    val themeColorAnimSpec: AnimationSpec<Color> = when {
+        animationLevel == 2 -> snap()
+        themeModeSwitchInProgress -> tween(durationMillis = 110, easing = MotionTokens.Easing.emphasized)
+        animationLevel == 1 -> tween(durationMillis = 140, easing = MotionTokens.Easing.emphasized)
+        else -> tween(durationMillis = 220, easing = MotionTokens.Easing.emphasized)
+    }
+
     val animatedAccent by animateColorAsState(
         targetValue = targetColors.primaryAccent,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = themeColorAnimSpec,
         label = "accent_anim"
     )
     val animatedBorder by animateColorAsState(
         targetValue = targetColors.border,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = themeColorAnimSpec,
         label = "border_anim"
     )
     val animatedTextPrimary by animateColorAsState(
         targetValue = targetColors.textPrimary,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = themeColorAnimSpec,
         label = "text_primary_anim"
     )
     val animatedTextSecondary by animateColorAsState(
         targetValue = targetColors.textSecondary,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = themeColorAnimSpec,
         label = "text_secondary_anim"
     )
     val animatedCardBackground by animateColorAsState(
         targetValue = targetColors.cardBackground,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = themeColorAnimSpec,
         label = "card_bg_anim"
     )
     val animatedBackgroundColor by animateColorAsState(
         targetValue = targetColors.background,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = themeColorAnimSpec,
         label = "bg_anim"
     )
     val animatedGradientStart by animateColorAsState(
         targetValue = targetColors.gradientStart,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = themeColorAnimSpec,
         label = "grad_start_anim"
     )
     val animatedGradientEnd by animateColorAsState(
         targetValue = targetColors.gradientEnd,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = 500, easing = MotionTokens.Easing.emphasized),
+        animationSpec = themeColorAnimSpec,
         label = "grad_end_anim"
     )
 
@@ -669,7 +730,8 @@ fun GamaUI(
         border = animatedBorder
     )
 
-    val cardBackground = animatedCardBackground
+    // Keep every card synced to the active theme colors.
+    val cardBackground = colors.cardBackground
 
     fun savePreferences() {
         // Capture the excluded-apps list as an immutable snapshot *before* handing
@@ -708,6 +770,7 @@ fun GamaUI(
         val snapDoze             = dozeMode
         val snapShowGpuWatch     = showGpuWatchButton
         val snapStagger          = staggerEnabled
+        val snapBackButtonAvoidance = backButtonAvoidanceEnabled
         val snapShadows          = shadowsEnabled
         val snapParticleNativeRefresh  = particleNativeRefreshRate
         val snapParticleQuarterRefresh = particleQuarterRefreshRate
@@ -754,6 +817,7 @@ fun GamaUI(
                 putBoolean("doze_mode",                 snapDoze)
                 putBoolean("show_gpuwatch_button",      snapShowGpuWatch)
                 putBoolean("stagger_enabled",           snapStagger)
+                putBoolean("back_button_avoidance_enabled", snapBackButtonAvoidance)
                 putBoolean("shadows_enabled",           snapShadows)
                 putBoolean("particle_native_refresh_rate",  snapParticleNativeRefresh)
                 putBoolean("particle_quarter_refresh_rate", snapParticleQuarterRefresh)
@@ -1062,7 +1126,8 @@ fun GamaUI(
         LocalUIScale provides uiScale,
         LocalDismissOnClickOutside provides dismissOnClickOutside,
         LocalStaggerEnabled provides staggerEnabled,
-        LocalShadowsEnabled provides (shadowsEnabled && !isDarkTheme && !oledMode),
+        LocalBackButtonAvoidanceEnabled provides backButtonAvoidanceEnabled,
+        LocalShadowsEnabled provides (shadowsEnabled && !effectiveOledMode),
         LocalTypeScale provides typeScale,
         LocalDensity provides Density(
             density = currentDensity.density * animatedUiScale,
@@ -1077,8 +1142,8 @@ fun GamaUI(
         ) {
             // Gradient Overlay
             val gradientAlpha by animateFloatAsState(
-                targetValue = if (gradientEnabled && !isDarkTheme && !oledMode) 1f else 0f,
-                animationSpec = if (animationLevel == 2) snap<Float>() else tween<Float>(1000, easing = MotionTokens.Easing.emphasizedDecelerate),
+                targetValue = if (gradientEnabled && !effectiveOledMode) 1f else 0f,
+                animationSpec = if (animationLevel == 2) snap<Float>() else tween<Float>(durationMillis = if (themeModeSwitchInProgress) 90 else 260, easing = MotionTokens.Easing.emphasizedDecelerate),
                 label = "gradient_visibility"
             )
 
@@ -1380,7 +1445,7 @@ fun GamaUI(
                                                             openMainPanelExclusive { showShizukuHelp = true }
                                                         }
                                                     },
-                                                    oledMode = oledMode,
+                                                    oledMode = effectiveOledMode,
                                                     rendererLoading = rendererLoading,
                                                     lastSwitchTime = lastSwitchTime
                                                 )
@@ -1426,7 +1491,7 @@ fun GamaUI(
                                                         forceHighlight = true,
                                                         enabled = lsShizukuReady,
                                                         colors = colors,
-                                                        oledMode = oledMode,
+                                                        oledMode = effectiveOledMode,
                                                         iconType = "vulkan"
                                                     )
                                                     BigRendererButton(
@@ -1458,7 +1523,7 @@ fun GamaUI(
                                                         isSelected = false,
                                                         enabled = lsShizukuReady,
                                                         colors = colors,
-                                                        oledMode = oledMode,
+                                                        oledMode = effectiveOledMode,
                                                         iconType = "opengl"
                                                     )
                                                 }
@@ -1482,7 +1547,7 @@ fun GamaUI(
                                                         },
                                                         modifier = if (showGpuWatchButton) Modifier.weight(1f) else Modifier.fillMaxWidth(),
                                                         accent = false, enabled = true,
-                                                        colors = colors, oledMode = oledMode, iconType = "resources"
+                                                        colors = colors, oledMode = effectiveOledMode, iconType = "resources"
                                                     )
                                                     AnimatedVisibility(
                                                         modifier = Modifier.weight(1f),
@@ -1520,7 +1585,7 @@ fun GamaUI(
                                                             },
                                                             modifier = Modifier.fillMaxWidth(),
                                                             accent = false, enabled = true,
-                                                            colors = colors, oledMode = oledMode, iconType = "gpuwatch"
+                                                            colors = colors, oledMode = effectiveOledMode, iconType = "gpuwatch"
                                                         )
                                                     }
                                                 }
@@ -1744,7 +1809,7 @@ fun GamaUI(
                                                         openMainPanelExclusive { showShizukuHelp = true }
                                                     }
                                                 },
-                                                oledMode = oledMode,
+                                                oledMode = effectiveOledMode,
                                                 rendererLoading = rendererLoading,
                                                 lastSwitchTime = lastSwitchTime
                                             )
@@ -1791,7 +1856,7 @@ fun GamaUI(
                                                     forceHighlight = true,
                                                     enabled = shizukuReady,
                                                     colors = colors,
-                                                    oledMode = oledMode,
+                                                    oledMode = effectiveOledMode,
                                                     iconType = "vulkan"
                                                 )
                                                 BigRendererButton(
@@ -1823,7 +1888,7 @@ fun GamaUI(
                                                     isSelected = false,
                                                     enabled = shizukuReady,
                                                     colors = colors,
-                                                    oledMode = oledMode,
+                                                    oledMode = effectiveOledMode,
                                                     iconType = "opengl"
                                                 )
                                             }
@@ -1848,7 +1913,7 @@ fun GamaUI(
                                                     },
                                                     modifier = if (showGpuWatchButton) Modifier.weight(1f) else Modifier.fillMaxWidth(),
                                                     accent = false, enabled = true,
-                                                    colors = colors, oledMode = oledMode, iconType = "resources"
+                                                    colors = colors, oledMode = effectiveOledMode, iconType = "resources"
                                                 )
                                                 AnimatedVisibility(
                                                     modifier = Modifier.weight(1f),
@@ -1886,7 +1951,7 @@ fun GamaUI(
                                                         },
                                                         modifier = Modifier.fillMaxWidth(),
                                                         accent = false, enabled = true,
-                                                        colors = colors, oledMode = oledMode, iconType = "gpuwatch"
+                                                        colors = colors, oledMode = effectiveOledMode, iconType = "gpuwatch"
                                                     )
                                                 }
                                             }
@@ -1925,7 +1990,7 @@ fun GamaUI(
             // Scrim is theme-aware: dark/OLED = darkening, light mode = brightening.
 
             // Theme-aware scrim: darken in dark/OLED, brighten in light mode.
-            val scrimColor = if (isDarkTheme || oledMode)
+            val scrimColor = if (effectiveOledMode)
                 Color.Black.copy(alpha = 0.32f)
             else
                 Color.White.copy(alpha = 0.45f)
@@ -1961,11 +2026,14 @@ fun GamaUI(
             //   • When a panel opens the blur+scrim (below) covers particles too,
             //     which is intentional: the whole background dims together ✓
             if (matrixMode) {
+                // Do NOT key this by accent color. The Matrix columns must stay alive
+                // while the color eases to the new ACCENT COLOR. Keying this block by
+                // color disposes/recreates the overlay, which makes the rain respawn.
                 MatrixRainOverlay(
                     enabled          = particlesEnabled,
-                    headColor        = matrixHeadColor,
-                    rainColor        = matrixRainColor,
-                    trailColor       = matrixTrailColor,
+                    headColor        = targetMatrixHeadColor,
+                    rainColor        = targetMatrixRainColor,
+                    trailColor       = targetMatrixTrailColor,
                     backgroundColor  = Color.Black,
                     backgroundAlpha  = matrixBgAlpha,
                     speedLevel       = matrixSpeed,
@@ -1976,9 +2044,11 @@ fun GamaUI(
             }
             // Always composed so the sun/moon can fade out smoothly via its internal
             // celestialAlpha animation (600 ms tween) even when switching modes.
+            // Use the raw ACCENT COLOR directly, not the animated theme accent, so stars
+            // update immediately when Dynamic Color is OFF.
             ParticlesOverlay(
                 enabled          = particlesEnabled && !matrixMode,
-                color            = colors.primaryAccent,
+                color            = effectsAccent,
                 particleSpeed    = particleSpeed,
                 parallaxEnabled  = particleParallaxEnabled,
                 particleCount    = particleCount,
@@ -2201,7 +2271,7 @@ fun GamaUI(
                 colors = colors,
                 cardBackground = cardBackground,
                 isBlurred = showExternalLinkConfirm || showIntegrationInfoDialog,
-                oledMode = oledMode
+                oledMode = effectiveOledMode
             )
 
             ExternalLinkConfirmDialog(
@@ -2255,7 +2325,7 @@ fun GamaUI(
                 colors = colors,
                 cardBackground = cardBackground,
                 performHaptic = { performHaptic() },
-                oledMode = oledMode
+                oledMode = effectiveOledMode
             )
 
             SettingsSearchPanel(
@@ -2273,11 +2343,13 @@ fun GamaUI(
                 onUiScaleChange = { uiScale = it; savePreferences() },
                 staggerEnabled = staggerEnabled,
                 onStaggerEnabledChange = { staggerEnabled = it; savePreferences() },
+                backButtonAvoidanceEnabled = backButtonAvoidanceEnabled,
+                onBackButtonAvoidanceEnabledChange = { backButtonAvoidanceEnabled = it; savePreferences() },
                 shadowsEnabled = shadowsEnabled,
                 onShadowsEnabledChange = { shadowsEnabled = it; savePreferences() },
                 // Colors
-                oledMode = oledMode,
-                darkModeActive = isDarkTheme || oledMode,
+                oledMode = effectiveOledMode,
+                darkModeActive = effectiveOledMode,
                 onOledModeChange = { oledMode = it; savePreferences() },
                 useDynamicColor = useDynamicColor,
                 onDynamicColorChange = { useDynamicColor = it; savePreferences() },
@@ -2381,6 +2453,12 @@ fun GamaUI(
                         killLauncher = enabled
                         savePreferences()
                     },
+                    killKeyboard = killKeyboard,
+                    onKillKeyboardChange = { enabled ->
+                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                        killKeyboard = enabled
+                        savePreferences()
+                    },
                     dozeMode = dozeMode,
                     onDozeModeChange = { enabled ->
                         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
@@ -2414,7 +2492,7 @@ fun GamaUI(
                     isTablet = isTablet,
                     colors = colors,
                     cardBackground = cardBackground,
-                    oledMode = oledMode,
+                    oledMode = effectiveOledMode,
                     performHaptic = { performHaptic(HapticFeedbackConstants.CONTEXT_CLICK) }
                 )
             } // End of blur wrapper
@@ -2461,7 +2539,7 @@ fun GamaUI(
                 isTablet = isTablet,
                 colors = colors,
                 cardBackground = cardBackground,
-                oledMode = oledMode,
+                oledMode = effectiveOledMode,
                 performHaptic = { performHaptic(HapticFeedbackConstants.CONTEXT_CLICK) }
             )
 
@@ -2514,7 +2592,7 @@ fun GamaUI(
                 isTablet = isTablet,
                 colors = colors,
                 cardBackground = cardBackground,
-                oledMode = oledMode
+                oledMode = effectiveOledMode
             )
 
             // ── Backup & Restore panel ────────────────────────────────────────
@@ -2544,7 +2622,7 @@ fun GamaUI(
                                 gradientEnabled      = prefs.getBoolean("gradient_enabled", true)
                                 blurEnabled          = prefs.getBoolean("blur_enabled", true)
                                 particlesEnabled     = prefs.getBoolean("particles_enabled", true)
-                                particleSpeed        = prefs.getInt("particle_speed", 0)
+                                particleSpeed        = prefs.getInt("particle_speed", 1)
                                 particleParallaxEnabled = prefs.getBoolean("particle_parallax_enabled", true)
                                 particleParallaxSensitivity = prefs.getInt("particle_parallax_sensitivity", 0)
                                 particleStarMode     = prefs.getBoolean("particle_star_mode", false)
@@ -2558,6 +2636,7 @@ fun GamaUI(
                                 aggressiveMode       = prefs.getBoolean("aggressive_mode", false)
                                 killLauncher         = prefs.getBoolean("kill_launcher", false)
                                 staggerEnabled       = prefs.getBoolean("stagger_enabled", true)
+                                backButtonAvoidanceEnabled = prefs.getBoolean("back_button_avoidance_enabled", true)
                                 particleNativeRefreshRate  = prefs.getBoolean("particle_native_refresh_rate", false)
                                 particleQuarterRefreshRate = prefs.getBoolean("particle_quarter_refresh_rate", false)
                                 matrixMode       = prefs.getBoolean("matrix_mode", true)
@@ -2574,7 +2653,7 @@ fun GamaUI(
                                 customGradientStart  = Color(prefs.getInt("custom_gradient_start", 0xFF0A2540.toInt()))
                                 customGradientEnd    = Color(prefs.getInt("custom_gradient_end", 0xFF000000.toInt()))
                                 dismissOnClickOutside = prefs.getBoolean("dismiss_on_click_outside", true)
-                                notificationsEnabled = prefs.getBoolean("notif_enabled", true)
+                                notificationsEnabled = prefs.getBoolean("notif_enabled", false)
                                 notifIntervalIndex   = prefs.getInt("notif_interval_idx", 2)
                                 userName             = prefs.getString("user_name", "") ?: ""
                                 excludedAppsList.clear()
@@ -2591,7 +2670,7 @@ fun GamaUI(
                 isTablet = isTablet,
                 colors = colors,
                 cardBackground = cardBackground,
-                oledMode = oledMode
+                oledMode = effectiveOledMode
             )
 
             // ── Crash Log panel ───────────────────────────────────────────────
@@ -2606,7 +2685,7 @@ fun GamaUI(
                 isTablet = isTablet,
                 colors = colors,
                 cardBackground = cardBackground,
-                oledMode = oledMode,
+                oledMode = effectiveOledMode,
                 onExportCrashLog = onExportCrashLog
             )
 
@@ -2623,7 +2702,7 @@ fun GamaUI(
                 colors = colors,
                 cardBackground = cardBackground,
                 performHaptic = { performHaptic() },
-                oledMode = oledMode
+                oledMode = effectiveOledMode
             )
 
             // ── Info dialog for QS Tiles / Widget (shown from Resources panel) ──
@@ -2692,7 +2771,7 @@ fun GamaUI(
                 isTablet = isTablet,
                 colors = colors,
                 cardBackground = cardBackground,
-                oledMode = oledMode,
+                oledMode = effectiveOledMode,
                 performHaptic = { performHaptic(HapticFeedbackConstants.CONTEXT_CLICK) },
                 timeOffsetHours = timeOffsetHours,
                 onTimeOffsetChange = { value ->
@@ -2728,7 +2807,7 @@ fun GamaUI(
                     userName = newName
                     prefs.edit().putString("user_name", newName).apply()
                 },
-                oledMode = oledMode,
+                oledMode = effectiveOledMode,
                 isSmallScreen = isSmallScreen,
                 isLandscape = isLandscape,
                 isTablet = isTablet,
@@ -2736,6 +2815,8 @@ fun GamaUI(
                 cardBackground = cardBackground,
                 staggerEnabled = staggerEnabled,
                 onStaggerEnabledChange = { staggerEnabled = it; savePreferences() },
+                backButtonAvoidanceEnabled = backButtonAvoidanceEnabled,
+                onBackButtonAvoidanceEnabledChange = { backButtonAvoidanceEnabled = it; savePreferences() },
                 shadowsEnabled = shadowsEnabled,
                 onShadowsEnabledChange = { shadowsEnabled = it; savePreferences() },
                 onEffectsClick = {
@@ -2770,6 +2851,12 @@ fun GamaUI(
                     blurEnabled = value
                     savePreferences()
                 },
+                shadowsEnabled = shadowsEnabled,
+                onShadowsEnabledChange = { value ->
+                    performHaptic(HapticFeedbackConstants.CLOCK_TICK)
+                    shadowsEnabled = value
+                    savePreferences()
+                },
                 onParticlesClick = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showParticles = true
@@ -2781,7 +2868,7 @@ fun GamaUI(
                 colors = colors,
                 cardBackground = cardBackground,
                 performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
-                oledMode = oledMode
+                oledMode = effectiveOledMode
             )
 
             // ── Particles hub — visible when no sub-panel is open ─────────────
@@ -2818,7 +2905,7 @@ fun GamaUI(
                 colors        = colors,
                 cardBackground = cardBackground,
                 performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
-                oledMode      = oledMode
+                oledMode      = effectiveOledMode
             )
 
             // ── Particles Settings sub-panel ──────────────────────────────────
@@ -2849,7 +2936,7 @@ fun GamaUI(
                 colors        = colors,
                 cardBackground = cardBackground,
                 performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
-                oledMode      = oledMode
+                oledMode      = effectiveOledMode
             )
 
             // ── Particles › Appearance sub-panel ─────────────────────────────
@@ -2858,6 +2945,7 @@ fun GamaUI(
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showParticlesAppearance = false
+                    showParticlesSettings = true
                 },
                 particlesEnabled = particlesEnabled,
                 particleStarMode = particleStarMode,
@@ -2876,7 +2964,7 @@ fun GamaUI(
                 colors = colors,
                 cardBackground = cardBackground,
                 performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
-                oledMode = oledMode
+                oledMode = effectiveOledMode
             )
 
             // ── Particles › Motion sub-panel ──────────────────────────────────
@@ -2885,6 +2973,7 @@ fun GamaUI(
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showParticlesMotion = false
+                    showParticlesSettings = true
                 },
                 particlesEnabled = particlesEnabled,
                 particleSpeed = particleSpeed,
@@ -2907,7 +2996,7 @@ fun GamaUI(
                 colors = colors,
                 cardBackground = cardBackground,
                 performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
-                oledMode = oledMode
+                oledMode = effectiveOledMode
             )
 
             // ── Particles › Performance sub-panel ────────────────────────────
@@ -2916,6 +3005,7 @@ fun GamaUI(
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showParticlesPerformance = false
+                    showParticlesSettings = true
                 },
                 particlesEnabled = particlesEnabled,
                 particleCount = particleCount,
@@ -2938,7 +3028,7 @@ fun GamaUI(
                 colors = colors,
                 cardBackground = cardBackground,
                 performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
-                oledMode = oledMode
+                oledMode = effectiveOledMode
             )
 
             // ── Matrix rain settings panel ────────────────────────────────────
@@ -2962,7 +3052,7 @@ fun GamaUI(
                 colors            = colors,
                 cardBackground    = cardBackground,
                 performHaptic     = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
-                oledMode          = oledMode
+                oledMode          = effectiveOledMode
             )
 
             MatrixAppearancePanel(
@@ -2979,7 +3069,7 @@ fun GamaUI(
                 colors                        = colors,
                 cardBackground                = cardBackground,
                 performHaptic                 = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
-                oledMode                      = oledMode
+                oledMode                      = effectiveOledMode
             )
 
             MatrixMotionPanel(
@@ -3000,7 +3090,7 @@ fun GamaUI(
                 colors                   = colors,
                 cardBackground           = cardBackground,
                 performHaptic            = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) },
-                oledMode                 = oledMode
+                oledMode                 = effectiveOledMode
             )
 
 
@@ -3010,7 +3100,7 @@ fun GamaUI(
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showColorCustomization = false
                 },
-                oledMode = oledMode,
+                oledMode = effectiveOledMode,
                 onOledModeChange = { enabled ->
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     oledMode = enabled
@@ -3070,8 +3160,8 @@ fun GamaUI(
                 },
                 useDynamicColor = useDynamicColor,
                 advancedColorPicker = advancedColorPicker,
-                oledMode = oledMode,
-                darkModeActive = isDarkTheme || oledMode,
+                oledMode = effectiveOledMode,
+                darkModeActive = effectiveOledMode,
                 isSmallScreen = isSmallScreen,
                 isLandscape = isLandscape,
                 isTablet = isTablet,
@@ -3091,7 +3181,7 @@ fun GamaUI(
                 colors = colors,
                 cardBackground = cardBackground,
                 blurEnabled = blurEnabled,
-                oledMode = oledMode
+                oledMode = effectiveOledMode
             )
 
             AggressiveWarningDialog(
@@ -3113,7 +3203,7 @@ fun GamaUI(
                 isSmallScreen = isSmallScreen,
                 colors = colors,
                 cardBackground = cardBackground,
-                oledMode = oledMode,
+                oledMode = effectiveOledMode,
                 dontShowAgain = dontShowAggressiveWarning,
                 onDontShowAgainChange = { checked ->
                     dontShowAggressiveWarning = checked
@@ -3146,7 +3236,7 @@ fun GamaUI(
                 isSmallScreen = isSmallScreen,
                 colors = colors,
                 cardBackground = cardBackground,
-                oledMode = oledMode
+                oledMode = effectiveOledMode
             )
 
             // Easter egg — triggered by long-pressing the GAMA title

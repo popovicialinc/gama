@@ -181,6 +181,49 @@ object ShizukuHelper {
         }
     }
 
+    private fun shellQuote(value: String): String {
+        return "'" + value.replace("'", "'\\''") + "'"
+    }
+
+    private fun packageFromComponent(component: String): String {
+        return component.substringBefore('/').trim()
+    }
+
+    private fun isXiaomiFamilyDevice(): Boolean {
+        val maker = listOf(Build.MANUFACTURER, Build.BRAND, Build.DEVICE, Build.PRODUCT)
+            .joinToString(" ")
+            .lowercase()
+        return maker.contains("xiaomi") || maker.contains("redmi") || maker.contains("poco") || maker.contains("miui") || maker.contains("hyperos")
+    }
+
+    private fun knownLauncherPackages(): Set<String> = setOf(
+        "com.miui.home",
+        "com.sec.android.app.launcher",
+        "com.google.android.apps.nexuslauncher",
+        "com.android.launcher3",
+        "com.android.launcher",
+        "com.huawei.android.launcher",
+        "com.oppo.launcher",
+        "com.coloros.launcher",
+        "com.vivo.launcher",
+        "com.realme.launcher",
+        "com.oneplus.launcher"
+    )
+
+    private fun neverForceStopPackages(): Set<String> = setOf(
+        "android",
+        "system",
+        "com.android.systemui",
+        "com.android.phone",
+        "com.android.providers.settings",
+        "com.android.providers.media",
+        "com.android.permissioncontroller",
+        "com.google.android.permissioncontroller",
+        "moe.shizuku.privileged.api",
+        "rikka.shizuku",
+        "com.popovicialinc.gama"
+    )
+
     // ── Renderer switch: shared implementation ────────────────────────────────
     // Both Vulkan and OpenGL switching are identical except for the prop value
     // and the display label. A single private function eliminates the duplication
@@ -199,60 +242,112 @@ object ShizukuHelper {
         onVerboseOutput: ((String) -> Unit)? = null
     ) = withContext(Dispatchers.IO) {
         withContext(Dispatchers.Main) { onStatusUpdate("Running $label commands...") }
+
+        val originalIme = runCommand("settings get secure default_input_method")
+            .lineSequence()
+            .firstOrNull()
+            ?.trim()
+            .orEmpty()
+            .takeIf { it.isNotBlank() && it != "null" }
+        val originalImePackage = originalIme?.let { packageFromComponent(it) }.orEmpty()
+        val launcherPackages = knownLauncherPackages()
+        val xiaomiFamilyDevice = isXiaomiFamilyDevice()
+        val protectedPackages = neverForceStopPackages().toMutableSet().apply {
+            addAll(excludedApps)
+            if (!killKeyboard && originalImePackage.isNotBlank()) add(originalImePackage)
+            if (!killLauncher || xiaomiFamilyDevice) addAll(launcherPackages)
+            // com.miui.home is never force-stopped. Xiaomi / HyperOS launchers have
+            // repeatedly caused severe launcher loops / soft-bootloop behavior when
+            // killed from a third-party Shizuku flow.
+            add("com.miui.home")
+        }
+
+        fun canForceStopPackage(pkg: String): Boolean {
+            if (pkg.isBlank()) return false
+            if (pkg in protectedPackages) return false
+            if (pkg.startsWith("com.android.inputmethod") && !killKeyboard) return false
+            if (pkg in launcherPackages && (!killLauncher || xiaomiFamilyDevice || pkg == "com.miui.home")) return false
+            return true
+        }
+
+        suspend fun restoreOriginalImeIfNeeded(reason: String) {
+            val ime = originalIme ?: return
+            if (killKeyboard) return
+            val quoted = shellQuote(ime)
+            val current = runCommand("settings get secure default_input_method")
+                .lineSequence()
+                .firstOrNull()
+                ?.trim()
+                .orEmpty()
+            if (current == ime) return
+            onVerboseOutput?.invoke("Restoring original IME after $reason: $ime\n")
+            // `ime set` is the clean path; the settings write is the fallback for ROMs
+            // where ime exits non-zero even though shell can update secure settings.
+            runCommand("ime set $quoted >/dev/null 2>&1 || settings put secure default_input_method $quoted").also {
+                onVerboseOutput?.invoke("Output: $it\n\n")
+            }
+        }
+
         onVerboseOutput?.invoke("Running: setprop debug.hwui.renderer $propValue\n")
         runCommand("setprop debug.hwui.renderer $propValue").also { onVerboseOutput?.invoke("Output: $it\n\n") }
 
         if (aggressiveMode) {
             val packages = runCommand("pm list packages").split("\n")
-                .filter { it.startsWith("package:") }.map { it.substring(8) }
-                .filter { it !in excludedApps && it != "com.popovicialinc.gama" }
+                .filter { it.startsWith("package:") }
+                .map { it.substring(8).trim() }
+                .filter { it.isNotBlank() }
+                .filter { pkg -> canForceStopPackage(pkg) }
+
             packages.forEach { pkg ->
                 onVerboseOutput?.invoke("Stopping: $pkg\n")
-                runCommand("am force-stop $pkg").also { onVerboseOutput?.invoke("Output: $it\n") }
+                runCommand("am force-stop ${shellQuote(pkg)}").also { onVerboseOutput?.invoke("Output: $it\n") }
             }
         } else if (targetedApps.isNotEmpty()) {
-            targetedApps.forEach { pkg ->
-                onVerboseOutput?.invoke("Stopping: $pkg\n")
-                runCommand("am force-stop $pkg").also { onVerboseOutput?.invoke("Output: $it\n") }
-            }
+            targetedApps
+                .filter { pkg -> canForceStopPackage(pkg) }
+                .forEach { pkg ->
+                    onVerboseOutput?.invoke("Stopping: $pkg\n")
+                    runCommand("am force-stop ${shellQuote(pkg)}").also { onVerboseOutput?.invoke("Output: $it\n") }
+                }
         } else {
-            // Always restart Settings so it picks up the new renderer prop.
+            // Restart Settings so it picks up the new renderer prop. This is safe and
+            // does not touch launcher / keyboard packages.
             runCommand("am force-stop com.android.settings").also {
                 onVerboseOutput?.invoke("Running: am force-stop com.android.settings\n")
                 onVerboseOutput?.invoke("Output: $it\n\n")
             }
+        }
 
-            // ── Keyboard restart (opt-in) ─────────────────────────────────────
-            // Some keyboards cache HWUI state aggressively. Keep this optional because
-            // killing the active input method can briefly close the keyboard mid-typing.
-            if (killKeyboard) {
-                val cmd = "ime_pkg=\$(settings get secure default_input_method | cut -d/ -f1); [ -n \"\$ime_pkg\" ] && [ \"\$ime_pkg\" != \"null\" ] && am force-stop \"\$ime_pkg\""
-                onVerboseOutput?.invoke("Running: $cmd\n")
-                runCommand(cmd).also { onVerboseOutput?.invoke("Output: $it\n\n") }
-            }
+        // ── Keyboard restart (opt-in) ─────────────────────────────────────────
+        // Done outside aggressive/targeted branches so the toggle is the ONLY path
+        // that may restart the keyboard. If disabled, we protect and restore the
+        // original IME to prevent Samsung/OneUI from falling back to Samsung Keyboard.
+        if (killKeyboard && originalImePackage.isNotBlank()) {
+            val cmd = "am force-stop ${shellQuote(originalImePackage)}; sleep 0.2; ime set ${shellQuote(originalIme ?: "")} >/dev/null 2>&1 || true"
+            onVerboseOutput?.invoke("Running: $cmd\n")
+            runCommand(cmd).also { onVerboseOutput?.invoke("Output: $it\n\n") }
+        } else {
+            restoreOriginalImeIfNeeded("renderer switch")
+        }
 
-            // ── Launcher restart (opt-in) ─────────────────────────────────────
-            // OFF by default.  On Xiaomi / MIUI / HyperOS, force-stopping the
-            // launcher from a third-party app twice in one session triggers the
-            // MIUI App Behavior Monitor and silently restricts GAMA's launch intents
-            // (app appears to "never open" until reinstalled — reboot does not fix it).
-            //
-            // The renderer prop is system-wide; any app that has not yet launched will
-            // automatically use the new renderer without a force-stop.  Users who want
-            // launchers restarted immediately (e.g. on stock AOSP / Pixel) can enable
-            // "Kill launcher on switch" in Functionality settings.
-            if (killLauncher) {
-                listOf(
-                    "am force-stop com.miui.home",
-                    "am force-stop com.sec.android.app.launcher",
-                    "am force-stop com.google.android.apps.nexuslauncher",
-                    "am force-stop com.android.launcher3"
-                ).forEach { cmd ->
-                    onVerboseOutput?.invoke("Running: $cmd\n")
-                    runCommand(cmd).also { onVerboseOutput?.invoke("Output: $it\n\n") }
-                }
+        // ── Launcher restart (opt-in, Xiaomi guarded) ────────────────────────
+        // Never force-stop com.miui.home. On Xiaomi / Redmi / POCO / HyperOS,
+        // skip launcher restarts entirely, even if the toggle is enabled.
+        if (killLauncher) {
+            if (xiaomiFamilyDevice) {
+                onVerboseOutput?.invoke("Skipping launcher restart: Xiaomi/Redmi/POCO/HyperOS safety guard is active.\n\n")
+            } else {
+                launcherPackages
+                    .filter { it != "com.miui.home" }
+                    .filter { pkg -> canForceStopPackage(pkg) }
+                    .forEach { pkg ->
+                        val cmd = "am force-stop ${shellQuote(pkg)}"
+                        onVerboseOutput?.invoke("Running: $cmd\n")
+                        runCommand(cmd).also { onVerboseOutput?.invoke("Output: $it\n\n") }
+                    }
             }
         }
+
         withContext(Dispatchers.Main) {
             onStatusUpdate("$label commands executed!")
             Toast.makeText(context, "Switched to $label", Toast.LENGTH_SHORT).show()

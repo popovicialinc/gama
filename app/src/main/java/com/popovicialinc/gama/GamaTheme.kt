@@ -105,9 +105,13 @@ import kotlin.math.roundToInt
 // Theme: fonts, type scale, motion tokens, colors, locals
 // ============================================================
 
-// Rebuilt project fallback: use the system sans-serif family so the project
-// compiles even when the original Quicksand font asset is missing.
-val quicksandFontFamily = FontFamily.SansSerif
+val quicksandFontFamily = FontFamily(
+    Font(R.font.quicksand_light, FontWeight.Light),
+    Font(R.font.quicksand_regular, FontWeight.Normal),
+    Font(R.font.quicksand_medium, FontWeight.Medium),
+    Font(R.font.quicksand_semibold, FontWeight.SemiBold),
+    Font(R.font.quicksand_bold, FontWeight.Bold)
+)
 
 
 // ============================================================================
@@ -312,19 +316,19 @@ data class ThemeColors(
     companion object {
         fun dark(
             accent: Color = Color(0xFF4895EF),
-            gradStart: Color = Color(0xFF0A2540),
+            gradStart: Color = Color(0xFF000000),
             gradEnd: Color = Color(0xFF000000)
         ) = ThemeColors(
             background = Color(0xFF000000),
-            cardBackground = Color(0xFF111111),  // Fully opaque
+            cardBackground = Color(0xFF000000),
             primaryAccent = accent,
             textPrimary = Color.White,
-            textSecondary = Color.White.copy(alpha = 0.6f),
-            border = accent.copy(alpha = 0.3f),
+            textSecondary = Color.White.copy(alpha = 0.7f),
+            border = accent.copy(alpha = 0f),
             successColor = accent,
-            errorColor = Color(0xFFF44336),
-            gradientStart = gradStart,
-            gradientEnd = gradEnd
+            errorColor = accent,
+            gradientStart = Color(0xFF000000),
+            gradientEnd = Color(0xFF000000)
         )
 
         fun light(
@@ -371,6 +375,7 @@ val LocalThemeColors = compositionLocalOf { ThemeColors.dark() }
 val LocalUIScale = compositionLocalOf { 1 } // 0=75%, 1=100%, 2=125%
 val LocalDismissOnClickOutside = compositionLocalOf { true } // New global setting for back behavior
 val LocalStaggerEnabled = compositionLocalOf { true } // true = cascading stagger, false = simultaneous fade+scale
+val LocalBackButtonAvoidanceEnabled = compositionLocalOf { true } // true = cards duck away from floating back button
 val LocalShadowsEnabled = compositionLocalOf { true } // true = card elevation shadows, false = flat (no shadow blur pass)
 val LocalCardSettled   = compositionLocalOf { true }  // false while AnimatedElement is mid-stagger, true once it lands
 val LocalCardProgress  = compositionLocalOf { 1f }    // mirrors AnimatedElement's progress [0,1]; drives directional shadow intensity

@@ -135,6 +135,9 @@ class BootRendererWorker(
     private fun notifyBootResult(context: Context, success: Boolean, renderer: String) {
         if (!ShizukuHelper.hasNotificationPermission(context)) return
 
+        val prefs = context.getSharedPreferences("gama_prefs", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("notif_enabled", false)) return
+
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -151,8 +154,8 @@ class BootRendererWorker(
             "GAMA ✓  $renderer restored" to
                 "$renderer renderer re-applied after reboot. Newly launched apps will use it."
         } else {
-            "GAMA ⚠  Could not restore $renderer" to
-                "Shizuku wasn't ready in time after multiple attempts. Open GAMA and switch manually."
+            "GAMA · $renderer restore skipped" to
+                "Shizuku was not ready after boot. Open GAMA and switch manually when you want."
         }
 
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)

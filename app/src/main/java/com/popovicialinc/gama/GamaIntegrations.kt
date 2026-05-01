@@ -4,6 +4,8 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,6 +13,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.view.HapticFeedbackConstants
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -281,11 +284,11 @@ fun IntegrationsPanel(
                         description = LocalStrings.current["integrations.widget_desc"].ifEmpty { "Put a Vulkan / OpenGL toggle right on your home screen. One tap and you're switched" },
                         statusLabel = "Available",
                         statusOk = true,
-                        actionLabel = "How to add",
+                        actionLabel = "Add widget",
                         onAction = {
                             onInfoRequested(
                                 "Adding the Widget",
-                                "Long-press an empty area on your home screen and select Widgets from the menu that appears. Scroll through the list until you find GAMA, then long-press the widget and drag it to wherever you want it placed. The widget lets you switch between Vulkan and OpenGL with a single tap, right from your home screen."
+                                "Use the launcher's widget picker, or tap the add button below to open Android's native widget pin sheet when supported. Once placed, the GAMA widget gives you quick renderer switching, live status, and a fast shortcut back into the app."
                             )
                         },
                         colors = colors,
@@ -328,55 +331,314 @@ fun IntegrationInfoDialog(
     cardBackground: Color
 ) {
     val ts = LocalTypeScale.current
+    val context = LocalContext.current
+    val isWidgetDialog = title.contains("widget", ignoreCase = true)
+    val canPinWidget = remember(context) {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            AppWidgetManager.getInstance(context).isRequestPinAppWidgetSupported
+    }
+
     BouncyDialog(visible = visible, onDismiss = onDismiss) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
-                .widthIn(max = 500.dp)
-                .border(0.75.dp, colors.primaryAccent.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                .fillMaxWidth(if (isLandscape && !isTablet) 0.64f else 0.9f)
+                .widthIn(max = 540.dp)
+                .border(0.75.dp, colors.primaryAccent.copy(alpha = 0.3f), RoundedCornerShape(28.dp))
                 .pointerInput(Unit) { detectTapGestures { } },
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(28.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(if (isSmallScreen) 24.dp else 32.dp),
+                    .padding(if (isSmallScreen) 22.dp else 30.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 20.dp else 24.dp)
+                verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 18.dp else 22.dp)
             ) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = title,
-                        fontSize = ts.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = quicksandFontFamily,
-                        color = colors.primaryAccent,
-                        textAlign = TextAlign.Center
-                    )
-                }
                 Text(
-                    text = body,
-                    fontSize = ts.bodyLarge,
-                    lineHeight = (ts.bodyLarge.value * 1.4f).sp,
-                    color = colors.textPrimary.copy(alpha = 0.85f),
-                    fontFamily = quicksandFontFamily,
-                    textAlign = TextAlign.Center,
+                    text = title,
+                    fontSize = ts.headlineLarge,
                     fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily,
+                    color = colors.primaryAccent,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
-                DialogButton(
-                    text = LocalStrings.current["dialogs.btn_close"].ifEmpty { "Close" },
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = colors,
-                    cardBackground = cardBackground
+
+                if (isWidgetDialog) {
+                    WidgetSetupPreview(colors = colors, cardBackground = cardBackground)
+
+                    Text(
+                        text = "the easiest way is the native android pin sheet. if your launcher supports it, tap the button below and android will offer the widget instantly.",
+                        fontSize = ts.bodyMedium,
+                        lineHeight = (ts.bodyMedium.value * 1.35f).sp,
+                        color = colors.textPrimary.copy(alpha = 0.85f),
+                        fontFamily = quicksandFontFamily,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        WidgetInstructionRow(
+                            step = "1",
+                            title = if (canPinWidget) "tap add widget" else "open the widget picker",
+                            body = if (canPinWidget)
+                                "this opens android's own widget pin panel, which is the fastest way to place the widget."
+                            else
+                                "long-press an empty area on your home screen and choose widgets."
+                            ,
+                            colors = colors,
+                            cardBackground = cardBackground
+                        )
+                        WidgetInstructionRow(
+                            step = "2",
+                            title = "find gama",
+                            body = "look for the GAMA widget, then place it wherever you want on your home screen.",
+                            colors = colors,
+                            cardBackground = cardBackground
+                        )
+                        WidgetInstructionRow(
+                            step = "3",
+                            title = "switch instantly",
+                            body = "the revamped widget shows renderer status, lets you switch fast, and gives you a direct route back into the app.",
+                            colors = colors,
+                            cardBackground = cardBackground
+                        )
+                    }
+
+                    if (canPinWidget) {
+                        DialogButton(
+                            text = "Add full widget",
+                            onClick = {
+                                val ok = requestPinGamaWidget(context, compactToggle = false)
+                                if (ok) {
+                                    Toast.makeText(context, "launcher widget sheet opened", Toast.LENGTH_SHORT).show()
+                                    onDismiss()
+                                } else {
+                                    Toast.makeText(context, "your launcher does not support widget pin requests", Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = colors,
+                            cardBackground = cardBackground
+                        )
+                        DialogButton(
+                            text = "Add 1x1 toggle",
+                            onClick = {
+                                val ok = requestPinGamaWidget(context, compactToggle = true)
+                                if (ok) {
+                                    Toast.makeText(context, "launcher toggle sheet opened", Toast.LENGTH_SHORT).show()
+                                    onDismiss()
+                                } else {
+                                    Toast.makeText(context, "your launcher does not support widget pin requests", Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = colors,
+                            cardBackground = cardBackground
+                        )
+                    }
+
+                    DialogButton(
+                        text = if (canPinWidget) "Close" else "Got it",
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = colors,
+                        cardBackground = cardBackground
+                    )
+                } else {
+                    Text(
+                        text = body,
+                        fontSize = ts.bodyLarge,
+                        lineHeight = (ts.bodyLarge.value * 1.4f).sp,
+                        color = colors.textPrimary.copy(alpha = 0.85f),
+                        fontFamily = quicksandFontFamily,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    DialogButton(
+                        text = LocalStrings.current["dialogs.btn_close"].ifEmpty { "Close" },
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = colors,
+                        cardBackground = cardBackground
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun requestPinGamaWidget(context: Context, compactToggle: Boolean = false): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+    return try {
+        val manager = AppWidgetManager.getInstance(context)
+        if (!manager.isRequestPinAppWidgetSupported) return false
+        val providerClass = if (compactToggle) GamaToggleWidgetReceiver::class.java else GamaWidgetReceiver::class.java
+        val provider = ComponentName(context, providerClass)
+        manager.requestPinAppWidget(provider, null, null)
+    } catch (_: Exception) {
+        false
+    }
+}
+
+@Composable
+private fun WidgetSetupPreview(
+    colors: ThemeColors,
+    cardBackground: Color
+) {
+    val chipBg = colors.primaryAccent.copy(alpha = 0.12f)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, colors.primaryAccent.copy(alpha = 0.28f), RoundedCornerShape(26.dp))
+            .background(cardBackground, RoundedCornerShape(26.dp))
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = "gama widget",
+                    color = colors.textPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily
+                )
+                Text(
+                    text = "quick renderer control, straight from the launcher",
+                    color = colors.textSecondary,
+                    fontSize = 12.sp,
+                    fontFamily = quicksandFontFamily
                 )
             }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(chipBg)
+                    .border(0.8.dp, colors.primaryAccent.copy(alpha = 0.35f), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "live",
+                    color = colors.primaryAccent,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(22.dp))
+                .background(colors.primaryAccent.copy(alpha = 0.08f))
+                .border(0.9.dp, colors.primaryAccent.copy(alpha = 0.24f), RoundedCornerShape(22.dp))
+                .padding(16.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "current renderer",
+                    color = colors.textSecondary,
+                    fontSize = 11.sp,
+                    fontFamily = quicksandFontFamily,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "vulkan",
+                    color = colors.primaryAccent,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    listOf("vulkan", "opengl").forEachIndexed { index, label ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(if (index == 0) colors.primaryAccent.copy(alpha = 0.16f) else colors.textSecondary.copy(alpha = 0.08f))
+                                .border(
+                                    0.9.dp,
+                                    if (index == 0) colors.primaryAccent.copy(alpha = 0.45f) else colors.textSecondary.copy(alpha = 0.18f),
+                                    RoundedCornerShape(999.dp)
+                                )
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (index == 0) colors.primaryAccent else colors.textSecondary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = quicksandFontFamily
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WidgetInstructionRow(
+    step: String,
+    title: String,
+    body: String,
+    colors: ThemeColors,
+    cardBackground: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(cardBackground)
+            .border(0.75.dp, colors.primaryAccent.copy(alpha = 0.18f), RoundedCornerShape(20.dp))
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(colors.primaryAccent.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = step,
+                color = colors.primaryAccent,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = quicksandFontFamily
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = title,
+                color = colors.textPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = quicksandFontFamily
+            )
+            Text(
+                text = body,
+                color = colors.textSecondary,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                fontFamily = quicksandFontFamily
+            )
         }
     }
 }
@@ -400,44 +662,75 @@ fun IntegrationInfoCard(
 ) {
     val ts = LocalTypeScale.current
     var isPressed by remember { mutableStateOf(false) }
+    val enabled = onAction != null
 
-    // In OLED mode show a thin accent outline matching the OLED MODE card style.
-    val borderColor = when {
-        isPressed && onAction != null -> colors.primaryAccent
-        oledMode                      -> colors.primaryAccent.copy(alpha = 0.3f)
-        else                          -> colors.primaryAccent.copy(alpha = 0.55f)
+    // Keep this outline mathematically identical to SettingsNavigationCard,
+    // so TASKER / QUICK SETTINGS TILES / HOME SCREEN WIDGET match
+    // GITHUB / DISCORD / SHIZUKU in color, thickness, radius, and press behavior.
+    val pressProgress = remember { Animatable(0f) }
+    val animLevel = LocalAnimationLevel.current
+
+    LaunchedEffect(isPressed, enabled) {
+        val target = if (isPressed && enabled) 1f else 0f
+        if (animLevel == 2) {
+            pressProgress.snapTo(target)
+        } else {
+            pressProgress.animateTo(
+                targetValue = target,
+                animationSpec = spring(
+                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                    stiffness = if (isPressed) MotionTokens.Springs.pressDown.stiffness else MotionTokens.Springs.pressUp.stiffness
+                )
+            )
+        }
     }
-    val borderWidth by animateDpAsState(
-        targetValue = if (isPressed && onAction != null) 2.dp else if (oledMode) 0.75.dp else 1.dp,
-        animationSpec = tween(durationMillis = MotionTokens.Duration.quick),
-        label = "intcard_border"
-    )
-    val pressScale by animateFloatAsState(
-        targetValue = if (isPressed && onAction != null) MotionTokens.Scale.subtle else 1f,
-        animationSpec = spring(
-            dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-            stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-        ),
-        label = "intcard_scale"
-    )
+
+    val p = pressProgress.value
+    val pressScale = 1f - p * (1f - MotionTokens.Scale.subtle)
+    val baseBorderWidth = if (oledMode) 0.75f else 1f
+    val cardBorderWidth = (baseBorderWidth + p * baseBorderWidth).dp
+    val cardBorderColor = if (isPressed && enabled) {
+        colors.primaryAccent
+    } else {
+        colors.primaryAccent.copy(alpha = 0.55f)
+    }
     val statusColor = if (statusOk) colors.successColor else Color(0xFFF59E0B)
+    val minCardHeight = if (LocalConfiguration.current.screenWidthDp.dp < 360.dp) 72.dp else 80.dp
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer(scaleX = pressScale, scaleY = pressScale)
-            .border(borderWidth, borderColor, RoundedCornerShape(28.dp))
+            .heightIn(min = minCardHeight)
+            .graphicsLayer(
+                scaleX = pressScale,
+                scaleY = pressScale,
+                clip = false
+            )
+            .border(
+                width = cardBorderWidth,
+                color = cardBorderColor,
+                shape = RoundedCornerShape(28.dp)
+            )
     ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(min = minCardHeight)
                 .then(
-                    if (onAction != null) Modifier.pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = { isPressed = true; tryAwaitRelease(); isPressed = false },
-                            onTap = { onAction() }
-                        )
-                    } else Modifier
+                    if (enabled) {
+                        Modifier.pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    isPressed = true
+                                    val released = tryAwaitRelease()
+                                    isPressed = false
+                                    if (released) onAction?.invoke()
+                                }
+                            )
+                        }
+                    } else {
+                        Modifier
+                    }
                 ),
             colors = CardDefaults.cardColors(containerColor = cardBackground),
             shape = RoundedCornerShape(28.dp),
@@ -446,7 +739,9 @@ fun IntegrationInfoCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(if (isSmallScreen) 18.dp else 22.dp)
+                    .heightIn(min = minCardHeight)
+                    .padding(if (isSmallScreen) 20.dp else 24.dp),
+                verticalArrangement = Arrangement.Center
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -459,9 +754,12 @@ fun IntegrationInfoCard(
                         fontSize = ts.labelLarge,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 2.sp,
-                        fontFamily = quicksandFontFamily
+                        fontFamily = quicksandFontFamily,
+                        modifier = Modifier.weight(1f)
                     )
-                    // Status pill
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
                     Box(
                         modifier = Modifier
                             .background(statusColor.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
@@ -472,7 +770,8 @@ fun IntegrationInfoCard(
                             color = statusColor,
                             fontSize = ts.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = quicksandFontFamily
+                            fontFamily = quicksandFontFamily,
+                            maxLines = 1
                         )
                     }
                 }
@@ -495,7 +794,7 @@ fun IntegrationInfoCard(
                         horizontalArrangement = Arrangement.End
                     ) {
                         Text(
-                            text = actionLabel + "  →",
+                            text = "$actionLabel  →",
                             color = colors.primaryAccent,
                             fontSize = ts.labelMedium,
                             fontWeight = FontWeight.Bold,

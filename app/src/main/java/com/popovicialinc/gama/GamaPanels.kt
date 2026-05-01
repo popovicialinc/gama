@@ -36,6 +36,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.asPaddingValues
@@ -46,6 +47,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -66,6 +69,8 @@ private fun PanelScaffold(
     oledMode: Boolean = false,
     colors: ThemeColors,
     leadingFloatingButton: (@Composable (Modifier) -> Unit)? = null,
+    reserveBackButtonSpace: Boolean = true,
+    contentAvoidsBackButton: Boolean = true,
     content: @Composable ColumnScope.(scrollState: ScrollState) -> Unit
 ) {
     val dismissOnClickOutside = LocalDismissOnClickOutside.current
@@ -159,7 +164,7 @@ private fun PanelScaffold(
 
                 CompositionLocalProvider(
                     LocalFloatingBackButtonAvoidance provides FloatingBackButtonAvoidance(
-                        enabled = visible && !isLandscape,
+                        enabled = visible && !isLandscape && contentAvoidsBackButton && LocalBackButtonAvoidanceEnabled.current,
                         endPadding = backButtonSize + 32.dp,
                         bottomPadding = if (isSmallScreen) 44.dp else 52.dp,
                         buttonSize = backButtonSize
@@ -172,7 +177,7 @@ private fun PanelScaffold(
                             .padding(horizontal = horizontalPadding)
                             .padding(
                                 top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-                                bottom = bottomPaddingDp.dp
+                                bottom = if (reserveBackButtonSpace) bottomPaddingDp.dp else 0.dp
                             )
                             .pointerInput(Unit) { detectTapGestures { } },
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -322,7 +327,7 @@ fun SettingsPanel(
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 3) {
             SettingsNavigationCard(
                 title = strings["settings.system"].ifEmpty { "APP" },
-                description = strings["settings.system_desc"].ifEmpty { "Notifications, backup, language, integrations, and crash logs" },
+                description = strings["settings.system_desc"].ifEmpty { "Notifications, backup, language, integrations, and logs" },
                 onClick = { performHaptic(); onSystemClick() },
                 isSmallScreen = isSmallScreen, colors = colors,
                 cardBackground = cardBackground, oledMode = oledMode
@@ -551,6 +556,8 @@ fun SettingsSearchPanel(
     onUiScaleChange: (Int) -> Unit,
     staggerEnabled: Boolean,
     onStaggerEnabledChange: (Boolean) -> Unit,
+    backButtonAvoidanceEnabled: Boolean,
+    onBackButtonAvoidanceEnabledChange: (Boolean) -> Unit,
     shadowsEnabled: Boolean,
     onShadowsEnabledChange: (Boolean) -> Unit,
     // ── Colors ────────────────────────────────────────────────────────────────
@@ -629,48 +636,88 @@ fun SettingsSearchPanel(
     val gradientAvailable = !darkModeActive
 
     // ── Helper: a breadcrumb pill shown above each result ─────────────────────
+    // It uses the same floating-back-button avoidance as cards, so long PATH pills
+    // duck left when the bottom-right back button would overlap them.
     @Composable
     fun PathLabel(path: String) {
         val segments = path.split("→").map { it.trim() }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(0.dp),
+        val backButtonAvoidance = LocalFloatingBackButtonAvoidance.current
+        val density = LocalDensity.current
+        val view = LocalView.current
+        val animationLevel = LocalAnimationLevel.current
+        var overlapsFloatingBackButton by remember { mutableStateOf(false) }
+        val avoidEndPadding by animateDpAsState(
+            targetValue = if (backButtonAvoidance.enabled && overlapsFloatingBackButton)
+                backButtonAvoidance.endPadding
+            else 0.dp,
+            animationSpec = if (animationLevel == 2) snap() else spring(
+                dampingRatio = if (animationLevel == 0) 0.50f else 0.62f,
+                stiffness = if (animationLevel == 0) 300f else 420f
+            ),
+            label = "search_path_back_button_avoidance"
+        )
+
+        val overlapDetector = if (backButtonAvoidance.enabled) {
+            Modifier.onGloballyPositioned { coordinates ->
+                val position = coordinates.positionInWindow()
+                val itemTop = position.y
+                val itemBottom = itemTop + coordinates.size.height
+                val screenHeight = view.height.toFloat().takeIf { it > 0f } ?: return@onGloballyPositioned
+
+                val avoidZoneTop = screenHeight - with(density) {
+                    (backButtonAvoidance.bottomPadding + backButtonAvoidance.buttonSize + 16.dp).toPx()
+                }
+
+                val overlaps = itemBottom > avoidZoneTop && itemTop < screenHeight
+                if (overlapsFloatingBackButton != overlaps) overlapsFloatingBackButton = overlaps
+            }
+        } else Modifier
+
+        Box(
             modifier = Modifier
-                .padding(start = 2.dp, bottom = 6.dp)
-                .clip(RoundedCornerShape(50))
-                .border(1.dp, colors.primaryAccent.copy(alpha = 0.28f), RoundedCornerShape(50))
-                .background(colors.primaryAccent.copy(alpha = 0.08f))
-                .padding(horizontal = 12.dp, vertical = 5.dp)
+                .fillMaxWidth()
+                .then(overlapDetector)
+                .padding(end = avoidEndPadding.coerceAtLeast(0.dp)),
+            contentAlignment = Alignment.Center
         ) {
-            segments.forEachIndexed { index, segment ->
-                Text(
-                    text = segment,
-                    fontSize = ts.bodySmall,
-                    color = colors.primaryAccent.copy(alpha = if (index == segments.lastIndex) 0.85f else 0.5f),
-                    fontFamily = quicksandFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
-                if (index < segments.lastIndex) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
+                modifier = Modifier
+                    .padding(start = 2.dp, bottom = 6.dp)
+                    .clip(RoundedCornerShape(50))
+                    .border(1.dp, colors.primaryAccent.copy(alpha = 0.28f), RoundedCornerShape(50))
+                    .background(colors.primaryAccent.copy(alpha = 0.08f))
+                    .padding(horizontal = 12.dp, vertical = 5.dp)
+            ) {
+                segments.forEachIndexed { index, segment ->
                     Text(
-                        text = "  ›  ",
+                        text = segment,
                         fontSize = ts.bodySmall,
-                        color = colors.primaryAccent.copy(alpha = 0.35f),
+                        color = colors.primaryAccent.copy(alpha = if (index == segments.lastIndex) 0.85f else 0.5f),
                         fontFamily = quicksandFontFamily,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.sp
+                        letterSpacing = 1.sp
                     )
+                    if (index < segments.lastIndex) {
+                        Text(
+                            text = "  ›  ",
+                            fontSize = ts.bodySmall,
+                            color = colors.primaryAccent.copy(alpha = 0.35f),
+                            fontFamily = quicksandFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.sp
+                        )
+                    }
                 }
             }
         }
     }
 
-    // The render lambdas capture state by closure reference — they always see
-    // fresh values at composition time without being in the remember key.
-    // Only id/title/keywords need to be stable for scoring, and those are constants.
-    // Wrapping in remember{} prevents ~35 lambda allocations on every recomposition.
-    val items = remember {
-    listOf(
+    // Search results must render live state. Do not remember these lambdas:
+    // if a ToggleCard or GlideOptionSelector changes a setting, the result card
+    // needs to recompose with the new checked/selected value immediately.
+    val items = listOf(
         // ── VISUALS ───────────────────────────────────────────────────────────
         SettingsSearchItem(
             id = "theme",
@@ -679,9 +726,9 @@ fun SettingsSearchPanel(
             path = "VISUALS"
         ) {
             Column {
-            SearchSelectorCard(title = "THEME", description = if (oledMode) "Forced to Dark while OLED mode is on." else "Choose how GAMA follows light, dark, or system appearance.", colors = colors, cardBackground = cardBackground) {
-                GlideOptionSelector(options = listOf("Auto", "Dark", "Light"), selectedIndex = if (oledMode) 1 else themePreference,
-                    onOptionSelected = { if (!oledMode) { performHaptic(); onThemeChange(it) } }, colors = colors, modifier = Modifier.fillMaxWidth(), enabled = !oledMode)
+            SearchSelectorCard(title = "THEME", description = "Choose how GAMA follows light, dark, or system appearance.", colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf("Auto", "Dark", "Light"), selectedIndex = themePreference,
+                    onOptionSelected = { performHaptic(); onThemeChange(it) }, colors = colors, modifier = Modifier.fillMaxWidth(), enabled = true)
             } }
         },
         SettingsSearchItem(
@@ -720,10 +767,21 @@ fun SettingsSearchPanel(
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
         },
         SettingsSearchItem(
+            id = "back_button_avoidance",
+            title = "BACK BUTTON AVOIDANCE",
+            keywords = listOf("back", "button", "avoid", "avoidance", "duck", "rescale", "layout", "overlap", "floating", "arrow"),
+            path = "VISUALS"
+        ) {
+            Column {
+            ToggleCard(title = "BACK BUTTON AVOIDANCE", description = "Cards duck left when the floating < button would overlap them. Turn off if you prefer the button to float over the UI.",
+                checked = backButtonAvoidanceEnabled, onCheckedChange = { performHaptic(); onBackButtonAvoidanceEnabledChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
+        },
+        SettingsSearchItem(
             id = "card_shadows",
             title = "CARD SHADOWS",
             keywords = listOf("card", "cards", "shadow", "shadows", "drop shadow", "gpu", "performance", "visual", "depth", "elevation"),
-            path = "VISUALS"
+            path = "VISUALS → EFFECTS"
         ) {
             Column {
             ToggleCard(title = "CARD SHADOWS", description = "Drop shadows under cards — disable to reduce GPU load or fix visual glitches during animations.",
@@ -1105,43 +1163,23 @@ fun SettingsSearchPanel(
                     colors = colors, modifier = Modifier.fillMaxWidth(), enabled = notificationsEnabled)
             } }
         }
-    ) } // end remember { listOf(... }
+    )
 
-    // ── Debounced async search — scoring runs off the UI thread ───────────────
-    // Previously: remember(query, …30 state keys…) recomputed Levenshtein for
-    // every keystroke synchronously on the composition thread, blocking the frame.
-    // Also: the 30-key remember invalidated on ANY state change (e.g. a particle
-    // slider moving in another panel), re-running scoring even with no query change.
-    //
-    // Now:
-    //  • Scoring runs in a background coroutine (Dispatchers.Default) — the UI
-    //    thread is never blocked by string distance math.
-    //  • 80 ms debounce absorbs fast typing so scoring fires once per "pause",
-    //    not once per character.
-    //  • The only dependency is `query`; the rendered state (toggles, sliders)
-    //    does not affect which items are returned, only how they look when rendered.
-    var results by remember { mutableStateOf(items) }
-    val searchScope = rememberCoroutineScope()
-    var debounceJob by remember { mutableStateOf<Job?>(null) }
-    LaunchedEffect(query) {
-        debounceJob?.cancel()
-        debounceJob = searchScope.launch {
-            val q = query.trim()
-            if (q.isBlank()) {
-                results = items
-                return@launch
-            }
-            delay(80L) // debounce: don't score on every single keystroke
+    // Search scoring is intentionally cheap and synchronous now. The previous
+    // debounced remembered result list kept old render lambdas alive, so controls
+    // inside search results could update the real setting but stay visually stale.
+    val results = run {
+        val q = query.trim()
+        if (q.isBlank()) {
+            items
+        } else {
             val qLower = q.lowercase()
             val queryTokens = qLower.split(Regex("\\s+")).filter { it.isNotBlank() }
-            val scored = withContext(Dispatchers.Default) {
-                items
-                    .map { it to settingsSearchScore(qLower, queryTokens, it) }
-                    .filter { (_, score) -> score >= 45 }
-                    .sortedByDescending { (_, score) -> score }
-                    .map { it.first }
-            }
-            results = scored
+            items
+                .map { it to settingsSearchScore(qLower, queryTokens, it) }
+                .filter { (_, score) -> score >= 45 }
+                .sortedByDescending { (_, score) -> score }
+                .map { it.first }
         }
     }
 
@@ -1224,6 +1262,8 @@ fun VisualEffectsPanel(
     cardBackground: Color,
     staggerEnabled: Boolean,
     onStaggerEnabledChange: (Boolean) -> Unit,
+    backButtonAvoidanceEnabled: Boolean,
+    onBackButtonAvoidanceEnabledChange: (Boolean) -> Unit,
     shadowsEnabled: Boolean,
     onShadowsEnabledChange: (Boolean) -> Unit,
     onEffectsClick: () -> Unit,
@@ -1264,20 +1304,11 @@ fun VisualEffectsPanel(
             )
         }
 
-        // Theme — zooms out when OLED mode is active (locked to Dark, less relevant)
+        // Theme — always available. Dark mode itself now uses pure OLED black.
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 8) {
-            val themeCardScale by animateFloatAsState(
-                targetValue = if (oledMode) 0.92f else 1f,
-                animationSpec = spring(
-                    dampingRatio = MotionTokens.Springs.smooth.dampingRatio,
-                    stiffness = MotionTokens.Springs.smooth.stiffness
-                ),
-                label = "theme_card_oled_scale"
-            )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .graphicsLayer(scaleX = themeCardScale, scaleY = themeCardScale)
                     .border(
                         width = 1.dp,
                         color = colors.primaryAccent.copy(alpha = 0.55f),
@@ -1300,22 +1331,15 @@ fun VisualEffectsPanel(
                         Text(
                             text = LocalStrings.current["appearance.theme"].ifEmpty { "THEME" }, fontSize = ts.labelLarge, fontWeight = FontWeight.Bold,
                             letterSpacing = 2.sp, fontFamily = quicksandFontFamily,
-                            color = colors.primaryAccent.copy(alpha = if (oledMode) 0.3f else 0.7f)
+                            color = colors.primaryAccent.copy(alpha = 0.7f)
                         )
                         GlideOptionSelector(
                             options = listOf("Auto", "Dark", "Light"),
-                            selectedIndex = if (oledMode) 1 else themePreference,
-                            onOptionSelected = { if (!oledMode) { performHaptic(); onThemeChange(it) } },
+                            selectedIndex = themePreference,
+                            onOptionSelected = { performHaptic(); onThemeChange(it) },
                             colors = colors, modifier = Modifier.fillMaxWidth(),
-                            enabled = !oledMode
+                            enabled = true
                         )
-                        if (oledMode) {
-                            Text(
-                                text = LocalStrings.current["appearance.theme_locked_oled"].ifEmpty { "Forced to Dark while OLED mode is on" },
-                                fontSize = ts.bodySmall, color = colors.textSecondary.copy(alpha = 0.5f),
-                                fontFamily = quicksandFontFamily, fontWeight = FontWeight.Bold
-                            )
-                        }
                     }
                 }
             } // end Box
@@ -1414,10 +1438,10 @@ fun VisualEffectsPanel(
 
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 7, totalItems = 8) {
             ToggleCard(
-                title = LocalStrings.current["appearance.card_shadows"].ifEmpty { "CARD SHADOWS" },
-                description = LocalStrings.current["appearance.card_shadows_desc"].ifEmpty { "Drop shadows under cards — disable to reduce GPU load or fix visual glitches during animations" },
-                checked = shadowsEnabled,
-                onCheckedChange = { performHaptic(); onShadowsEnabledChange(it) },
+                title = LocalStrings.current["appearance.back_button_avoidance"].ifEmpty { "BACK BUTTON AVOIDANCE" },
+                description = LocalStrings.current["appearance.back_button_avoidance_desc"].ifEmpty { "Cards duck left when the floating < button would overlap them. Turn off to let the button float above the UI." },
+                checked = backButtonAvoidanceEnabled,
+                onCheckedChange = { performHaptic(); onBackButtonAvoidanceEnabledChange(it) },
                 colors = colors, cardBackground = cardBackground,
                 isSmallScreen = isSmallScreen, oledMode = oledMode
             )
@@ -1543,6 +1567,8 @@ fun EffectsPanel(
     onDismiss: () -> Unit,
     blurEnabled: Boolean,
     onBlurChange: (Boolean) -> Unit,
+    shadowsEnabled: Boolean,
+    onShadowsEnabledChange: (Boolean) -> Unit,
     onParticlesClick: () -> Unit,
     userName: String,
     isSmallScreen: Boolean,
@@ -1561,7 +1587,7 @@ fun EffectsPanel(
     ) { _ ->
         CleanTitle(text = LocalStrings.current["effects.title"].ifEmpty { "EFFECTS" }, fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
 
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 2) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3) {
             ToggleCard(
                 title = LocalStrings.current["blur.blur_toggle"].ifEmpty { "BLUR" },
                 description = LocalStrings.current["blur.blur_toggle_desc"].ifEmpty { "Frosted glass behind panels and dialogs — subtle depth that makes the UI feel premium" },
@@ -1571,9 +1597,19 @@ fun EffectsPanel(
                 isSmallScreen = isSmallScreen, oledMode = oledMode
             )
         }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 2) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 3) {
+            ToggleCard(
+                title = LocalStrings.current["appearance.card_shadows"].ifEmpty { "CARD SHADOWS" },
+                description = LocalStrings.current["appearance.card_shadows_desc"].ifEmpty { "Drop shadows under cards — disable to reduce GPU load or fix visual glitches during animations" },
+                checked = shadowsEnabled,
+                onCheckedChange = { performHaptic(); onShadowsEnabledChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode
+            )
+        }
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 3) {
             SettingsNavigationCard(
-                title = LocalStrings.current["particles.toggle"].ifEmpty { "PARTICLES" }, description = if (oledMode) LocalStrings.current["effects.particles_oled_desc"].ifEmpty { "Visible in OLED mode — some effects are limited by black backgrounds" } else LocalStrings.current["effects.particles_desc"].ifEmpty { "Floating dots, twinkling stars, or Matrix rain — choose your style" },
+                title = LocalStrings.current["particles.toggle"].ifEmpty { "PARTICLES" }, description = LocalStrings.current["effects.particles_desc"].ifEmpty { "Floating dots, twinkling stars, or Matrix rain — choose your style" },
                 onClick = { performHaptic(); onParticlesClick() },
                 isSmallScreen = isSmallScreen, colors = colors, cardBackground = cardBackground, oledMode = oledMode
             )
@@ -2502,8 +2538,8 @@ fun FunctionalityPanel(
         }
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 5, totalItems = 5) {
             SettingsNavigationCard(
-                title = LocalStrings.current["crash_log.title"].ifEmpty { "CRASH LOG" },
-                description = LocalStrings.current["system.crash_log_desc"].ifEmpty { "View recent crash reports and copy them for troubleshooting" },
+                title = LocalStrings.current["crash_log.title"].ifEmpty { "LOGS" },
+                description = LocalStrings.current["system.crash_log_desc"].ifEmpty { "View recent reports and copy them for troubleshooting" },
                 onClick = { performHaptic(); onCrashLogClick() },
                 isSmallScreen = isSmallScreen, colors = colors,
                 cardBackground = cardBackground, oledMode = oledMode
@@ -2677,8 +2713,8 @@ fun SystemPanel(
         }
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 4, totalItems = 6) {
             SettingsNavigationCard(
-                title = strings["system.crash_log"].ifEmpty { "CRASH LOG" },
-                description = strings["system.crash_log_desc"].ifEmpty { "View recent crash reports and copy details for troubleshooting" },
+                title = strings["system.crash_log"].ifEmpty { "LOGS" },
+                description = strings["system.crash_log_desc"].ifEmpty { "View recent reports and copy details for troubleshooting" },
                 onClick = { performHaptic(); onCrashLogClick() },
                 isSmallScreen = isSmallScreen, colors = colors,
                 cardBackground = cardBackground, oledMode = oledMode
@@ -3052,6 +3088,106 @@ private fun parseGamaCrashLog(raw: String): List<GamaCrashEntry> {
         .sortedByDescending { it.timestamp }
 }
 
+
+private fun crashDateFromTimestamp(timestamp: String): String {
+    return timestamp.substringBefore(" ", "unknown date").ifBlank { "unknown date" }
+}
+
+private fun crashTimeFromTimestamp(timestamp: String): String {
+    return timestamp.substringAfter(" ", "unknown time").ifBlank { "unknown time" }
+}
+
+private fun crashDateFromMillis(timeMillis: Long): String {
+    return if (timeMillis > 0L) {
+        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+            .format(java.util.Date(timeMillis))
+    } else "unknown date"
+}
+
+private fun crashTimeFromMillis(timeMillis: Long): String {
+    return if (timeMillis > 0L) {
+        java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
+            .format(java.util.Date(timeMillis))
+    } else "unknown time"
+}
+
+@Composable
+private fun CrashLogEntryCard(
+    date: String,
+    time: String,
+    onSave: () -> Unit,
+    onView: () -> Unit,
+    isSmallScreen: Boolean,
+    colors: ThemeColors,
+    cardBackground: Color,
+    oledMode: Boolean
+) {
+    val ts = LocalTypeScale.current
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, colors.primaryAccent.copy(alpha = 0.42f), RoundedCornerShape(28.dp))
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = cardBackground),
+            shape = RoundedCornerShape(28.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(if (isSmallScreen) 18.dp else 20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalAlignment = Alignment.Start
+            ) {
+                Text(
+                    text = LocalStrings.current["crash_log.entry_title"].ifEmpty { "LOG" },
+                    fontSize = ts.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily,
+                    color = colors.textPrimary,
+                    letterSpacing = 1.1.sp
+                )
+                Text(
+                    text = date,
+                    fontSize = ts.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily,
+                    color = colors.textSecondary
+                )
+                Text(
+                    text = time,
+                    fontSize = ts.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily,
+                    color = colors.textSecondary.copy(alpha = 0.82f)
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                FlatButton(
+                    text = LocalStrings.current["crash_log.save_button"].ifEmpty { "SAVE LOG" },
+                    onClick = onSave,
+                    modifier = Modifier.fillMaxWidth(),
+                    accent = true,
+                    colors = colors,
+                    maxLines = 1,
+                    oledMode = oledMode
+                )
+                FlatButton(
+                    text = LocalStrings.current["crash_log.view_button"].ifEmpty { "VIEW LOG" },
+                    onClick = onView,
+                    modifier = Modifier.fillMaxWidth(),
+                    accent = false,
+                    colors = colors,
+                    maxLines = 1,
+                    oledMode = oledMode
+                )
+            }
+        }
+    }
+}
+
 // ── CrashLogPanel (list) ──────────────────────────────────────────────────────
 
 @Composable
@@ -3116,46 +3252,32 @@ fun CrashLogPanel(
         CrashDetailPanel(
             visible       = isThisOpen,
             onDismiss     = { openedEntryKey = null },
-            title         = entry.timestamp,
-            subtitle      = "Thread: ${entry.thread}",
+            date          = crashDateFromTimestamp(entry.timestamp),
+            time          = crashTimeFromTimestamp(entry.timestamp),
             fullText      = entry.fullText,
             isSystemUI    = false,
             isSmallScreen = isSmallScreen,
             isLandscape   = isLandscape,
             colors        = colors,
             cardBackground = cardBackground,
-            oledMode      = oledMode,
-            onSave        = { onExportCrashLog(entry.fullText, "GAMA_crash_${entry.timestamp.replace(" ", "_").replace(":", "-")}.txt") }
+            oledMode      = oledMode
         )
     }
     systemCrashes.forEachIndexed { idx, entry ->
         val isThisOpen = openedEntryKey == "system:$idx"
-        val fileTimestamp = remember(entry.timeMillis) {
-            if (entry.timeMillis > 0L)
-                java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.US)
-                    .format(java.util.Date(entry.timeMillis))
-            else "unknown"
-        }
-        val displayTimestamp = remember(entry.timeMillis) {
-            if (entry.timeMillis > 0L)
-                java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.US)
-                    .format(java.util.Date(entry.timeMillis))
-            else "unknown time"
-        }
         BackHandler(enabled = isThisOpen) { openedEntryKey = null }
         CrashDetailPanel(
             visible       = isThisOpen,
             onDismiss     = { openedEntryKey = null },
-            title         = entry.tag,
-            subtitle      = displayTimestamp,
+            date          = crashDateFromMillis(entry.timeMillis),
+            time          = crashTimeFromMillis(entry.timeMillis),
             fullText      = entry.fullText,
             isSystemUI    = entry.isSystemUI,
             isSmallScreen = isSmallScreen,
             isLandscape   = isLandscape,
             colors        = colors,
             cardBackground = cardBackground,
-            oledMode      = oledMode,
-            onSave        = { onExportCrashLog(entry.fullText, "GAMA_system_crash_${entry.tag}_$fileTimestamp.txt") }
+            oledMode      = oledMode
         )
     }
 
@@ -3185,7 +3307,7 @@ fun CrashLogPanel(
         oledMode  = oledMode,
         colors    = colors
     ) { _ ->
-        CleanTitle(text = LocalStrings.current["crash_log.title"].ifEmpty { "CRASH LOG" }, fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
+        CleanTitle(text = LocalStrings.current["crash_log.title"].ifEmpty { "LOGS" }, fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
 
         // ── GAMA crashes section header ───────────────────────────────────────
         AnimatedElement(visible = listItemsVisible, staggerIndex = 0, totalItems = totalListItems) {
@@ -3221,10 +3343,11 @@ fun CrashLogPanel(
             gamaCrashes.forEachIndexed { idx, entry ->
                 // staggerIndex: header=0, cards start at 1
                 AnimatedElement(visible = listItemsVisible, staggerIndex = idx + 1, totalItems = totalListItems) {
-                    SettingsNavigationCard(
-                        title = entry.timestamp,
-                        description = entry.summary,
-                        onClick = { openedEntryKey = "gama:$idx" },
+                    CrashLogEntryCard(
+                        date = crashDateFromTimestamp(entry.timestamp),
+                        time = crashTimeFromTimestamp(entry.timestamp),
+                        onSave = { onExportCrashLog(entry.fullText, "GAMA_crash_${entry.timestamp.replace(" ", "_").replace(":", "-")}.txt") },
+                        onView = { openedEntryKey = "gama:$idx" },
                         isSmallScreen = isSmallScreen,
                         colors = colors,
                         cardBackground = cardBackground,
@@ -3311,21 +3434,22 @@ fun CrashLogPanel(
             }
             else -> {
                 systemCrashes.take(20).forEachIndexed { idx, entry ->
-                    val displayTimestamp = remember(entry.timeMillis) {
+                    val fileTimestamp = remember(entry.timeMillis) {
                         if (entry.timeMillis > 0L)
-                            java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.US)
+                            java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.US)
                                 .format(java.util.Date(entry.timeMillis))
-                        else "unknown time"
+                        else "unknown"
                     }
                     AnimatedElement(
                         visible      = listItemsVisible,
                         staggerIndex = systemHeaderIdx + 1 + idx,
                         totalItems   = totalListItems
                     ) {
-                        SettingsNavigationCard(
-                            title = entry.tag,
-                            description = "$displayTimestamp  ·  ${entry.summary}",
-                            onClick = { openedEntryKey = "system:$idx" },
+                        CrashLogEntryCard(
+                            date = crashDateFromMillis(entry.timeMillis),
+                            time = crashTimeFromMillis(entry.timeMillis),
+                            onSave = { onExportCrashLog(entry.fullText, "GAMA_system_crash_${entry.tag}_$fileTimestamp.txt") },
+                            onView = { openedEntryKey = "system:$idx" },
                             isSmallScreen = isSmallScreen,
                             colors = if (entry.isSystemUI)
                                 colors.copy(border = colors.primaryAccent.copy(alpha = 0.4f))
@@ -3346,16 +3470,15 @@ fun CrashLogPanel(
 private fun CrashDetailPanel(
     visible: Boolean,
     onDismiss: () -> Unit,
-    title: String,
-    subtitle: String,
+    date: String,
+    time: String,
     fullText: String,
     isSystemUI: Boolean,
     isSmallScreen: Boolean,
     isLandscape: Boolean,
     colors: ThemeColors,
     cardBackground: Color,
-    oledMode: Boolean,
-    onSave: () -> Unit
+    oledMode: Boolean
 ) {
     val ts = LocalTypeScale.current
 
@@ -3365,26 +3488,42 @@ private fun CrashDetailPanel(
         isLandscape   = isLandscape,
         isSmallScreen = isSmallScreen,
         oledMode  = oledMode,
-        colors    = colors
+        colors    = colors,
+        reserveBackButtonSpace = false,
+        contentAvoidsBackButton = false
     ) { _ ->
-        // Title: timestamp or tag
         CleanTitle(
-            text     = title,
+            text     = LocalStrings.current["crash_log.entry_title"].ifEmpty { "LOG" },
             fontSize = if (isLandscape) ts.displaySmall else ts.displayMedium,
             colors   = colors
         )
 
-        // Subtitle: thread or formatted time
         AnimatedElement(visible = visible, cardShadow = false, staggerIndex = 1, totalItems = 3) {
-            PanelCaption(
-                text = subtitle,
-                colors = colors,
-                accent = isSystemUI
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = date,
+                    fontSize = ts.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily,
+                    color = colors.textSecondary,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = time,
+                    fontSize = ts.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily,
+                    color = colors.textSecondary.copy(alpha = 0.82f),
+                    textAlign = TextAlign.Center
+                )
+            }
         }
 
-        // Full log body in a scrollable card
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 3) {
+        AnimatedElement(visible = visible, cardShadow = false, staggerIndex = 2, totalItems = 3) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -3406,18 +3545,6 @@ private fun CrashDetailPanel(
                     fontWeight = FontWeight.Bold
                 )
             }
-        }
-
-        // Save button — triggers SAF file picker via the parent callback
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 3) {
-            FlatButton(
-                text     = LocalStrings.current["crash_log.save_button"].ifEmpty { "Save Log" },
-                onClick  = onSave,
-                modifier = Modifier.fillMaxWidth(),
-                accent   = true,
-                colors   = colors,
-                maxLines = 1
-            )
         }
     }
 }
@@ -3604,11 +3731,11 @@ fun ResourcesPanel(
                 description = LocalStrings.current["integrations.widget_desc"].ifEmpty { "A Vulkan / OpenGL toggle you can place on your home screen — switch renderers without opening the app" },
                 statusLabel = strings["integrations.widget_status"].ifEmpty { "Available" },
                 statusOk = true,
-                actionLabel = strings["integrations.widget_action"].ifEmpty { "Library" },
+                actionLabel = strings["integrations.widget_action"].ifEmpty { "Add widget" },
                 onAction = {
                     onInfoRequested(
                         strings["integrations.widget_dialog_title"].ifEmpty { "Adding the Widget" },
-                        strings["integrations.widget_dialog_body"].ifEmpty { "Long-press an empty area on your home screen and select Widgets from the menu that appears. Scroll through the list until you find GAMA, then long-press the widget and drag it to wherever you want it placed. The widget lets you switch between Vulkan and OpenGL with a single tap, right from your home screen." }
+                        strings["integrations.widget_dialog_body"].ifEmpty { "Use the launcher's widget picker, or tap the add button below to open Android's native widget pin sheet when supported. Once placed, the GAMA widget gives you quick renderer switching, live status, and a fast shortcut back into the app." }
                     )
                 },
                 colors = colors, cardBackground = cardBackground,
@@ -3703,14 +3830,15 @@ fun LanguagePanel(
     var availableLanguages by remember { mutableStateOf<List<LanguageEntry>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
 
-    // Reload the language list every time the panel opens; clear it on close
-    // so stale results from a previous session never persist.
+    // Reload the language list every time the panel opens.
+    // Important: do NOT clear the list immediately when the panel starts closing.
+    // The close animation still measures this content for a moment; clearing it on
+    // dismiss made the language list vanish instantly, causing the whole panel to
+    // jump downward before the exit transition finished.
     LaunchedEffect(visible) {
         if (visible) {
-            availableLanguages = LocalizationManager.loadAvailableLanguages(context)
-        } else {
-            availableLanguages = emptyList()
             searchQuery = ""
+            availableLanguages = LocalizationManager.loadAvailableLanguages(context)
         }
     }
 
