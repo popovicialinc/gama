@@ -3380,24 +3380,9 @@ fun HapticsPanel(
             colors = colors
         )
 
-        AnimatedContent(
+        Crossfade(
             targetState = section,
-            transitionSpec = {
-                // Match normal settings panels such as APPEARANCE: compressed pop-in,
-                // then a quick shrinking fade-out instead of the old vertical slide.
-                (fadeIn(animationSpec = tween(190, easing = MotionTokens.Easing.enter)) +
-                    scaleIn(
-                        initialScale = 0.88f,
-                        animationSpec = spring(dampingRatio = 0.42f, stiffness = 190f)
-                    ))
-                    .togetherWith(
-                        fadeOut(animationSpec = tween(220, easing = MotionTokens.Easing.exit)) +
-                            scaleOut(
-                                targetScale = 0.78f,
-                                animationSpec = tween(240, easing = MotionTokens.Easing.exit)
-                            )
-                    )
-            },
+            animationSpec = tween(durationMillis = 170, easing = MotionTokens.Easing.enter),
             label = "haptics_section_transition"
         ) { activeSection ->
             when (activeSection) {
