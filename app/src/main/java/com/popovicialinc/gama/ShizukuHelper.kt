@@ -1,5 +1,6 @@
 package com.popovicialinc.gama
 
+import android.app.Notification
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,7 +8,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
-import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -192,6 +192,7 @@ object ShizukuHelper {
         context: Context,
         aggressiveMode: Boolean,
         killLauncher: Boolean,
+        killKeyboard: Boolean,
         excludedApps: Set<String>,
         targetedApps: Set<String>,
         onStatusUpdate: (String) -> Unit,
@@ -215,11 +216,17 @@ object ShizukuHelper {
                 runCommand("am force-stop $pkg").also { onVerboseOutput?.invoke("Output: $it\n") }
             }
         } else {
-            // Always restart settings and keyboard so they pick up the new renderer prop.
-            listOf(
-                "am force-stop com.android.settings",
-                "am force-stop com.google.android.inputmethod.latin"
-            ).forEach { cmd ->
+            // Always restart Settings so it picks up the new renderer prop.
+            runCommand("am force-stop com.android.settings").also {
+                onVerboseOutput?.invoke("Running: am force-stop com.android.settings\n")
+                onVerboseOutput?.invoke("Output: $it\n\n")
+            }
+
+            // ── Keyboard restart (opt-in) ─────────────────────────────────────
+            // Some keyboards cache HWUI state aggressively. Keep this optional because
+            // killing the active input method can briefly close the keyboard mid-typing.
+            if (killKeyboard) {
+                val cmd = "ime_pkg=\$(settings get secure default_input_method | cut -d/ -f1); [ -n \"\$ime_pkg\" ] && [ \"\$ime_pkg\" != \"null\" ] && am force-stop \"\$ime_pkg\""
                 onVerboseOutput?.invoke("Running: $cmd\n")
                 runCommand(cmd).also { onVerboseOutput?.invoke("Output: $it\n\n") }
             }
@@ -256,21 +263,23 @@ object ShizukuHelper {
         context: Context,
         aggressiveMode: Boolean,
         killLauncher: Boolean = false,
+        killKeyboard: Boolean = false,
         excludedApps: Set<String>,
         targetedApps: Set<String>,
         onStatusUpdate: (String) -> Unit,
         onVerboseOutput: ((String) -> Unit)? = null
-    ) = switchRendererSuspend("skiavk", "Vulkan", context, aggressiveMode, killLauncher, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput)
+    ) = switchRendererSuspend("skiavk", "Vulkan", context, aggressiveMode, killLauncher, killKeyboard, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput)
 
     suspend fun runOpenGLSuspend(
         context: Context,
         aggressiveMode: Boolean,
         killLauncher: Boolean = false,
+        killKeyboard: Boolean = false,
         excludedApps: Set<String>,
         targetedApps: Set<String>,
         onStatusUpdate: (String) -> Unit,
         onVerboseOutput: ((String) -> Unit)? = null
-    ) = switchRendererSuspend("opengl", "OpenGL", context, aggressiveMode, killLauncher, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput)
+    ) = switchRendererSuspend("opengl", "OpenGL", context, aggressiveMode, killLauncher, killKeyboard, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput)
 
     // ── Per-app custom renderers ──────────────────────────────────────────────
 
@@ -320,19 +329,21 @@ object ShizukuHelper {
     fun runVulkan(
         context: Context, scope: CoroutineScope, aggressiveMode: Boolean,
         killLauncher: Boolean = false,
+        killKeyboard: Boolean = false,
         excludedApps: Set<String>, targetedApps: Set<String>,
         onStatusUpdate: (String) -> Unit, onVerboseOutput: ((String) -> Unit)? = null
     ) = guardedLaunch(context, scope) {
-        runVulkanSuspend(context, aggressiveMode, killLauncher, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput)
+        runVulkanSuspend(context, aggressiveMode, killLauncher, killKeyboard, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput)
     }
 
     fun runOpenGL(
         context: Context, scope: CoroutineScope, aggressiveMode: Boolean,
         killLauncher: Boolean = false,
+        killKeyboard: Boolean = false,
         excludedApps: Set<String>, targetedApps: Set<String>,
         onStatusUpdate: (String) -> Unit, onVerboseOutput: ((String) -> Unit)? = null
     ) = guardedLaunch(context, scope) {
-        runOpenGLSuspend(context, aggressiveMode, killLauncher, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput)
+        runOpenGLSuspend(context, aggressiveMode, killLauncher, killKeyboard, excludedApps, targetedApps, onStatusUpdate, onVerboseOutput)
     }
 
     fun applyCustomRenderers(
@@ -540,11 +551,15 @@ object ShizukuHelper {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.notify(
                 System.currentTimeMillis().toInt(),
-                NotificationCompat.Builder(context, "gama_test")
-                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                Notification.Builder(context, "gama_test")
+                    // Android notification small icons must be an app-provided monochrome drawable.
+                    // Framework icons can render as a blank white square on some ROMs.
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setColor(0xFF5A63A8.toInt())
+                    .setColorized(false)
                     .setContentTitle(if (userName.isNotEmpty()) "Hey $userName! 👋" else "Test Notification")
                     .setContentText(if (userName.isNotEmpty()) "Your notification system is working perfectly!" else "Notifications are working correctly!")
-                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .setPriority(Notification.PRIORITY_DEFAULT)
                     .setAutoCancel(true)
                     .setVibrate(longArrayOf(0, 250, 250, 250))
                     .build()

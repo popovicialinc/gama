@@ -90,7 +90,8 @@ object LocalizationManager {
                 try {
                     val raw = assets.open("$TRANSLATIONS_DIR/$file").bufferedReader().readText()
                     val obj = JSONObject(raw)
-                    val meta = obj.optJSONObject("meta") ?: run {
+                    val meta = obj.optJSONObject("meta")
+                    if (meta == null) {
                         android.util.Log.w(TAG, "$file has no 'meta' block — skipping")
                         continue
                     }

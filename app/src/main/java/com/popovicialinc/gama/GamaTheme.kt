@@ -105,16 +105,10 @@ import kotlin.math.roundToInt
 // Theme: fonts, type scale, motion tokens, colors, locals
 // ============================================================
 
-val quicksandFontFamily = try {
-    FontFamily(
-        Font(R.font.quicksand_bold, FontWeight.Normal),
-        Font(R.font.quicksand_bold, FontWeight.SemiBold),
-        Font(R.font.quicksand_bold, FontWeight.Bold),
-        Font(R.font.quicksand_bold, FontWeight.ExtraBold)
-    )
-} catch (e: Exception) {
-    FontFamily.Default
-}
+// Rebuilt project fallback: use the system sans-serif family so the project
+// compiles even when the original Quicksand font asset is missing.
+val quicksandFontFamily = FontFamily.SansSerif
+
 
 // ============================================================================
 // ADAPTIVE TYPE SYSTEM

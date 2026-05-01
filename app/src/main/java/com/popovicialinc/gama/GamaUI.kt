@@ -235,6 +235,7 @@ fun GamaUI(
     var pendingExternalLinkLabel by remember { mutableStateOf("") }
     var pendingExternalLinkDescription by remember { mutableStateOf("") }
     var showSettings by remember { mutableStateOf(false) }
+    var showSettingsSearch by remember { mutableStateOf(false) }
     var showAppearance by remember { mutableStateOf(false) }
     var showEffects by remember { mutableStateOf(false) }
     var showColorCustomization by remember { mutableStateOf(false) }
@@ -406,9 +407,15 @@ fun GamaUI(
 
     // ── Top-level Settings ────────────────────────────────────────────────────
 
-    BackHandler(enabled = showSettings && !showAppearance && !showColorCustomization && !showGradient && !showEffects && !showParticles && !showSystem && !showNotifications && !showRendererPanel && !showLanguage) {
+    BackHandler(enabled = showSettingsSearch) {
+        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+        showSettingsSearch = false
+    }
+
+    BackHandler(enabled = showSettings && !showSettingsSearch && !showAppearance && !showColorCustomization && !showGradient && !showEffects && !showParticles && !showSystem && !showNotifications && !showBackup && !showCrashLog && !showRendererPanel && !showLanguage) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showSettings = false
+        showSettingsSearch = false
     }
 
     BackHandler(enabled = showWarningDialog) {
@@ -429,6 +436,7 @@ fun GamaUI(
 
     BackHandler(enabled = showResourcesPanel) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+        showWarningDialog = false
         showResourcesPanel = false
     }
 
@@ -466,7 +474,7 @@ fun GamaUI(
     var timeOffsetHours by remember { mutableStateOf(prefs.getFloat("time_offset_hours", 0f)) } // Developer: time offset
     var particleCount by remember { mutableStateOf(prefs.getInt("particle_count", 0)) } // 0=low(75), 1=medium(150), 2=high(300), 3=custom (default: low)
     var particleCountCustom by remember { mutableStateOf(prefs.getInt("particle_count_custom", 150).toString()) }
-    var matrixMode          by remember { mutableStateOf(prefs.getBoolean("matrix_mode", false)) }
+    var matrixMode          by remember { mutableStateOf(prefs.getBoolean("matrix_mode", true)) }
     var matrixSpeed         by remember { mutableStateOf(prefs.getInt("matrix_speed", 1)) }          // 0=slow 1=medium 2=fast
     var matrixDensity       by remember { mutableStateOf(prefs.getInt("matrix_density", 1)) }        // 0=sparse 1=medium 2=dense
     var matrixFontSize      by remember { mutableStateOf(prefs.getInt("matrix_font_size", 1)) }      // 0=small 1=medium 2=large
@@ -480,6 +488,7 @@ fun GamaUI(
     var verboseMode by remember { mutableStateOf(prefs.getBoolean("verbose_mode", false)) }
     var aggressiveMode by remember { mutableStateOf(prefs.getBoolean("aggressive_mode", false)) }
     var killLauncher by remember { mutableStateOf(prefs.getBoolean("kill_launcher", false)) }
+    var killKeyboard by remember { mutableStateOf(prefs.getBoolean("kill_keyboard", false)) }
     var dozeMode by remember { mutableStateOf(prefs.getBoolean("doze_mode", false)) }
     var showGpuWatchButton by remember { mutableStateOf(prefs.getBoolean("show_gpuwatch_button", false)) }
     var staggerEnabled by remember { mutableStateOf(prefs.getBoolean("stagger_enabled", true)) }
@@ -695,6 +704,7 @@ fun GamaUI(
         val snapVerbose          = verboseMode
         val snapAggressive       = aggressiveMode
         val snapKillLauncher     = killLauncher
+        val snapKillKeyboard     = killKeyboard
         val snapDoze             = dozeMode
         val snapShowGpuWatch     = showGpuWatchButton
         val snapStagger          = staggerEnabled
@@ -740,6 +750,7 @@ fun GamaUI(
                 putBoolean("verbose_mode",              snapVerbose)
                 putBoolean("aggressive_mode",           snapAggressive)
                 putBoolean("kill_launcher",             snapKillLauncher)
+                putBoolean("kill_keyboard",             snapKillKeyboard)
                 putBoolean("doze_mode",                 snapDoze)
                 putBoolean("show_gpuwatch_button",      snapShowGpuWatch)
                 putBoolean("stagger_enabled",           snapStagger)
@@ -781,6 +792,45 @@ fun GamaUI(
         }
     }
 
+    fun closeAllPanelsForMainAction() {
+        showWarningDialog = false
+        showShizukuHelp = false
+        showResourcesPanel = false
+        showExternalLinkConfirm = false
+        showGitHubDialog = false
+        showIntegrationInfoDialog = false
+        showSettings = false
+        showSettingsSearch = false
+        showAppearance = false
+        showEffects = false
+        showColorCustomization = false
+        showGradient = false
+        showSystem = false
+        showRendererPanel = false
+        showDeveloper = false
+        showParticles = false
+        showParticlesAppearance = false
+        showParticlesMotion = false
+        showParticlesPerformance = false
+        showParticlesSettings = false
+        showMatrixSettings = false
+        showMatrixAppearance = false
+        showMatrixMotion = false
+        showNotifications = false
+        showBackup = false
+        showCrashLog = false
+        showLanguage = false
+        showEasterEgg = false
+        showVerbosePanel = false
+        showAggressiveWarning = false
+        showGPUWatchConfirm = false
+    }
+
+    fun openMainPanelExclusive(open: () -> Unit) {
+        closeAllPanelsForMainAction()
+        open()
+    }
+
     val animDuration = when (animationLevel) {
         0 -> 585
         1 -> 450
@@ -793,7 +843,7 @@ fun GamaUI(
     val anyPanelOpen by remember {
         derivedStateOf {
             showWarningDialog || showGitHubDialog || showResourcesPanel || showExternalLinkConfirm ||
-            showSettings || showAppearance || showColorCustomization || showGradient ||
+            showSettings || showSettingsSearch || showAppearance || showColorCustomization || showGradient ||
             showSystem || showRendererPanel ||
             showShizukuHelp || showSuccessDialog || showClearRecentsDialog ||
             showVerbosePanel || showAggressiveWarning || showGPUWatchConfirm ||
@@ -807,7 +857,7 @@ fun GamaUI(
     val anyFullPanelOpen by remember {
         derivedStateOf {
             showWarningDialog || showGitHubDialog || showResourcesPanel ||
-            showSettings || showAppearance || showColorCustomization || showGradient ||
+            showSettings || showSettingsSearch || showAppearance || showColorCustomization || showGradient ||
             showSystem || showRendererPanel ||
             showShizukuHelp || showSuccessDialog || showClearRecentsDialog ||
             showVerbosePanel || showAggressiveWarning || showGPUWatchConfirm ||
@@ -1027,7 +1077,7 @@ fun GamaUI(
         ) {
             // Gradient Overlay
             val gradientAlpha by animateFloatAsState(
-                targetValue = if (gradientEnabled) 1f else 0f,
+                targetValue = if (gradientEnabled && !isDarkTheme && !oledMode) 1f else 0f,
                 animationSpec = if (animationLevel == 2) snap<Float>() else tween<Float>(1000, easing = MotionTokens.Easing.emphasizedDecelerate),
                 label = "gradient_visibility"
             )
@@ -1257,9 +1307,9 @@ fun GamaUI(
                                         AnimatedElement(visible = isVisible, staggerIndex = 3, totalItems = 8) {
                                             Text(
                                                 text = strings["main.whats_next"].ifEmpty { "CHOOSE YOUR PATH." },
-                                                fontSize = ts.bodyLarge,
+                                                fontSize = ts.headlineSmall,
                                                 fontFamily = quicksandFontFamily,
-                                                color = colors.primaryAccent.copy(alpha = 0.7f),
+                                                color = colors.primaryAccent.copy(alpha = 0.88f),
                                                 fontWeight = FontWeight.Bold,
                                                 letterSpacing = 2.sp,
                                                 textAlign = TextAlign.Center
@@ -1327,7 +1377,7 @@ fun GamaUI(
                                                                 shizukuStatus.contains("⚠️") -> "permission"
                                                                 else -> ""
                                                             }
-                                                            showShizukuHelp = true
+                                                            openMainPanelExclusive { showShizukuHelp = true }
                                                         }
                                                     },
                                                     oledMode = oledMode,
@@ -1336,7 +1386,14 @@ fun GamaUI(
                                                 )
                                                 // Vulkan | OpenGL
                                                 Row(
-                                                    modifier = Modifier.fillMaxWidth(),
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .animateContentSize(
+                                                            animationSpec = spring(
+                                                                dampingRatio = MotionTokens.Springs.smooth.dampingRatio,
+                                                                stiffness = MotionTokens.Springs.smooth.stiffness
+                                                            )
+                                                        ),
                                                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                                                 ) {
                                                     BigRendererButton(
@@ -1345,7 +1402,7 @@ fun GamaUI(
                                                             performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                                                             if (!shizukuRunning || !shizukuPermissionGranted) {
                                                                 shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
-                                                                showShizukuHelp = true
+                                                                openMainPanelExclusive { showShizukuHelp = true }
                                                                 return@BigRendererButton
                                                             }
                                                             pendingRendererName = "Vulkan"
@@ -1355,13 +1412,14 @@ fun GamaUI(
                                                                 ShizukuHelper.runVulkan(
                                                                     context, scope, aggressiveMode,
                                                                     killLauncher,
+                                                                    killKeyboard,
                                                                     excludedAppsList.toSet(), emptySet(),
                                                                     { commandOutput = it },
                                                                     if (verboseMode) { output -> verboseOutput += output } else null
                                                                 )
                                                             }
                                                             successDialogMessage = strings["main.vulkan_applied"].ifEmpty { "Vulkan has been applied!" }
-                                                            showWarningDialog = true
+                                                            openMainPanelExclusive { showWarningDialog = true }
                                                         },
                                                         modifier = Modifier.weight(1f),
                                                         isSelected = currentRenderer == "Vulkan",
@@ -1377,7 +1435,7 @@ fun GamaUI(
                                                             performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                                                             if (!shizukuRunning || !shizukuPermissionGranted) {
                                                                 shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
-                                                                showShizukuHelp = true
+                                                                openMainPanelExclusive { showShizukuHelp = true }
                                                                 return@BigRendererButton
                                                             }
                                                             pendingRendererName = "OpenGL"
@@ -1387,13 +1445,14 @@ fun GamaUI(
                                                                 ShizukuHelper.runOpenGL(
                                                                     context, scope, aggressiveMode,
                                                                     killLauncher,
+                                                                    killKeyboard,
                                                                     excludedAppsList.toSet(), emptySet(),
                                                                     { commandOutput = it },
                                                                     if (verboseMode) { output -> verboseOutput += output } else null
                                                                 )
                                                             }
                                                             successDialogMessage = strings["main.opengl_applied"].ifEmpty { "OpenGL has been applied!" }
-                                                            showWarningDialog = true
+                                                            openMainPanelExclusive { showWarningDialog = true }
                                                         },
                                                         modifier = Modifier.weight(1f),
                                                         isSelected = false,
@@ -1405,27 +1464,61 @@ fun GamaUI(
                                                 }
                                                 // Resources | GPUWatch
                                                 Row(
-                                                    modifier = Modifier.fillMaxWidth(),
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .animateContentSize(
+                                                            animationSpec = spring(
+                                                                dampingRatio = MotionTokens.Springs.smooth.dampingRatio,
+                                                                stiffness = MotionTokens.Springs.smooth.stiffness
+                                                            )
+                                                        ),
                                                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                                                 ) {
                                                     IllustratedButton(
                                                         text = strings["integrations.widget_action"].ifEmpty { "Library" },
                                                         onClick = {
                                                             performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                                            showResourcesPanel = true
+                                                            openMainPanelExclusive { showResourcesPanel = true }
                                                         },
                                                         modifier = if (showGpuWatchButton) Modifier.weight(1f) else Modifier.fillMaxWidth(),
                                                         accent = false, enabled = true,
                                                         colors = colors, oledMode = oledMode, iconType = "resources"
                                                     )
-                                                    if (showGpuWatchButton) {
+                                                    AnimatedVisibility(
+                                                        modifier = Modifier.weight(1f),
+                                                        visible = showGpuWatchButton,
+                                                        enter = fadeIn(animationSpec = tween(220, easing = MotionTokens.Easing.enter)) +
+                                                                expandHorizontally(
+                                                                    animationSpec = spring(
+                                                                        dampingRatio = MotionTokens.Springs.smooth.dampingRatio,
+                                                                        stiffness = MotionTokens.Springs.smooth.stiffness
+                                                                    ),
+                                                                    expandFrom = Alignment.Start
+                                                                ) +
+                                                                scaleIn(
+                                                                    initialScale = 0.88f,
+                                                                    animationSpec = spring(
+                                                                        dampingRatio = MotionTokens.Springs.gentle.dampingRatio,
+                                                                        stiffness = MotionTokens.Springs.gentle.stiffness
+                                                                    )
+                                                                ),
+                                                        exit = fadeOut(animationSpec = tween(160, easing = MotionTokens.Easing.exit)) +
+                                                                shrinkHorizontally(
+                                                                    animationSpec = tween(180, easing = MotionTokens.Easing.exit),
+                                                                    shrinkTowards = Alignment.Start
+                                                                ) +
+                                                                scaleOut(
+                                                                    targetScale = 0.88f,
+                                                                    animationSpec = tween(160, easing = MotionTokens.Easing.exit)
+                                                                )
+                                                    ) {
                                                         IllustratedButton(
                                                             text = strings["renderer.show_gpuwatch"].ifEmpty { "Open GPUWatch" },
                                                             onClick = {
                                                                 performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                                                showGPUWatchConfirm = true
+                                                                openMainPanelExclusive { showGPUWatchConfirm = true }
                                                             },
-                                                            modifier = Modifier.weight(1f),
+                                                            modifier = Modifier.fillMaxWidth(),
                                                             accent = false, enabled = true,
                                                             colors = colors, oledMode = oledMode, iconType = "gpuwatch"
                                                         )
@@ -1585,9 +1678,9 @@ fun GamaUI(
                                     totalItems = 8) {
                                     Text(
                                         text = strings["main.whats_next"].ifEmpty { "CHOOSE YOUR PATH." },
-                                        fontSize = ts.bodyLarge,  // slightly bigger than before
+                                        fontSize = ts.headlineSmall,
                                         fontFamily = quicksandFontFamily,
-                                        color = colors.primaryAccent.copy(alpha = 0.7f),
+                                        color = colors.primaryAccent.copy(alpha = 0.88f),
                                         fontWeight = FontWeight.Bold,
                                         letterSpacing = 2.sp,
                                         textAlign = TextAlign.Center
@@ -1648,7 +1741,7 @@ fun GamaUI(
                                                             shizukuStatus.contains("⚠️") -> "permission"
                                                             else -> ""
                                                         }
-                                                        showShizukuHelp = true
+                                                        openMainPanelExclusive { showShizukuHelp = true }
                                                     }
                                                 },
                                                 oledMode = oledMode,
@@ -1658,7 +1751,14 @@ fun GamaUI(
 
                                             // Row 1: Vulkan | OpenGL — big square cards
                                             Row(
-                                                modifier = Modifier.fillMaxWidth(),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .animateContentSize(
+                                                        animationSpec = spring(
+                                                            dampingRatio = MotionTokens.Springs.smooth.dampingRatio,
+                                                            stiffness = MotionTokens.Springs.smooth.stiffness
+                                                        )
+                                                    ),
                                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                                             ) {
                                                 BigRendererButton(
@@ -1667,7 +1767,7 @@ fun GamaUI(
                                                         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                                                         if (!shizukuRunning || !shizukuPermissionGranted) {
                                                             shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
-                                                            showShizukuHelp = true
+                                                            openMainPanelExclusive { showShizukuHelp = true }
                                                             return@BigRendererButton
                                                         }
                                                         pendingRendererName = "Vulkan"
@@ -1677,13 +1777,14 @@ fun GamaUI(
                                                             ShizukuHelper.runVulkan(
                                                                 context, scope, aggressiveMode,
                                                                 killLauncher,
+                                                                killKeyboard,
                                                                 excludedAppsList.toSet(), emptySet(),
                                                                 { commandOutput = it },
                                                                 if (verboseMode) { output -> verboseOutput += output } else null
                                                             )
                                                         }
                                                         successDialogMessage = strings["main.vulkan_applied"].ifEmpty { "Vulkan has been applied!" }
-                                                        showWarningDialog = true
+                                                        openMainPanelExclusive { showWarningDialog = true }
                                                     },
                                                     modifier = Modifier.weight(1f).aspectRatio(1f),
                                                     isSelected = currentRenderer == "Vulkan",
@@ -1699,7 +1800,7 @@ fun GamaUI(
                                                         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                                                         if (!shizukuRunning || !shizukuPermissionGranted) {
                                                             shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
-                                                            showShizukuHelp = true
+                                                            openMainPanelExclusive { showShizukuHelp = true }
                                                             return@BigRendererButton
                                                         }
                                                         pendingRendererName = "OpenGL"
@@ -1709,13 +1810,14 @@ fun GamaUI(
                                                             ShizukuHelper.runOpenGL(
                                                                 context, scope, aggressiveMode,
                                                                 killLauncher,
+                                                                killKeyboard,
                                                                 excludedAppsList.toSet(), emptySet(),
                                                                 { commandOutput = it },
                                                                 if (verboseMode) { output -> verboseOutput += output } else null
                                                             )
                                                         }
                                                         successDialogMessage = strings["main.opengl_applied"].ifEmpty { "OpenGL has been applied!" }
-                                                        showWarningDialog = true
+                                                        openMainPanelExclusive { showWarningDialog = true }
                                                     },
                                                     modifier = Modifier.weight(1f).aspectRatio(1f),
                                                     isSelected = false,
@@ -1728,27 +1830,61 @@ fun GamaUI(
 
                                             // Row 2: Resources | GPUWatch
                                             Row(
-                                                modifier = Modifier.fillMaxWidth(),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .animateContentSize(
+                                                        animationSpec = spring(
+                                                            dampingRatio = MotionTokens.Springs.smooth.dampingRatio,
+                                                            stiffness = MotionTokens.Springs.smooth.stiffness
+                                                        )
+                                                    ),
                                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                                             ) {
                                                 IllustratedButton(
                                                     text = strings["integrations.widget_action"].ifEmpty { "Library" },
                                                     onClick = {
                                                         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                                        showResourcesPanel = true
+                                                        openMainPanelExclusive { showResourcesPanel = true }
                                                     },
                                                     modifier = if (showGpuWatchButton) Modifier.weight(1f) else Modifier.fillMaxWidth(),
                                                     accent = false, enabled = true,
                                                     colors = colors, oledMode = oledMode, iconType = "resources"
                                                 )
-                                                if (showGpuWatchButton) {
+                                                AnimatedVisibility(
+                                                    modifier = Modifier.weight(1f),
+                                                    visible = showGpuWatchButton,
+                                                    enter = fadeIn(animationSpec = tween(220, easing = MotionTokens.Easing.enter)) +
+                                                            expandHorizontally(
+                                                                animationSpec = spring(
+                                                                    dampingRatio = MotionTokens.Springs.smooth.dampingRatio,
+                                                                    stiffness = MotionTokens.Springs.smooth.stiffness
+                                                                ),
+                                                                expandFrom = Alignment.Start
+                                                            ) +
+                                                            scaleIn(
+                                                                initialScale = 0.88f,
+                                                                animationSpec = spring(
+                                                                    dampingRatio = MotionTokens.Springs.gentle.dampingRatio,
+                                                                    stiffness = MotionTokens.Springs.gentle.stiffness
+                                                                )
+                                                            ),
+                                                    exit = fadeOut(animationSpec = tween(160, easing = MotionTokens.Easing.exit)) +
+                                                            shrinkHorizontally(
+                                                                animationSpec = tween(180, easing = MotionTokens.Easing.exit),
+                                                                shrinkTowards = Alignment.Start
+                                                            ) +
+                                                            scaleOut(
+                                                                targetScale = 0.88f,
+                                                                animationSpec = tween(160, easing = MotionTokens.Easing.exit)
+                                                            )
+                                                ) {
                                                     IllustratedButton(
                                                         text = strings["renderer.show_gpuwatch"].ifEmpty { "Open GPUWatch" },
                                                         onClick = {
                                                             performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                                            showGPUWatchConfirm = true
+                                                            openMainPanelExclusive { showGPUWatchConfirm = true }
                                                         },
-                                                        modifier = Modifier.weight(1f),
+                                                        modifier = Modifier.fillMaxWidth(),
                                                         accent = false, enabled = true,
                                                         colors = colors, oledMode = oledMode, iconType = "gpuwatch"
                                                     )
@@ -1794,7 +1930,9 @@ fun GamaUI(
             else
                 Color.White.copy(alpha = 0.45f)
 
-            // Single float drives the whole transition. Sharp layer = 1-this, blurred = this.
+            // Main-screen background transition.
+            // When blur is enabled we crossfade into the blurred copy.
+            // When blur is disabled we keep the sharp copy and only fade in the fallback scrim.
             val blurAlpha by animateFloatAsState(
                 targetValue = if (blurShouldApply) 1f else 0f,
                 animationSpec = if (animationLevel != 2)
@@ -1805,6 +1943,16 @@ fun GamaUI(
                 else snap(),
                 label = "bg_blur_alpha"
             )
+            val fallbackScrimAlpha by animateFloatAsState(
+                targetValue = if ((anyFullPanelOpen && !blurEnabled) || showAggressiveWarning) 1f else 0f,
+                animationSpec = if (animationLevel != 2)
+                    tween(
+                        durationMillis = if ((anyFullPanelOpen && !blurEnabled) || showAggressiveWarning) 300 else 220,
+                        easing = if ((anyFullPanelOpen && !blurEnabled) || showAggressiveWarning) MotionTokens.Easing.emphasizedDecelerate else MotionTokens.Easing.emphasized
+                    )
+                else snap(),
+                label = "fallback_scrim_alpha"
+            )
 
             // ── Particles — rendered BEFORE mainContent so they are BEHIND the UI ──
             // Z-order in a Box = last child is on top. Placing particles here means:
@@ -1812,7 +1960,7 @@ fun GamaUI(
             //   • They cannot intercept touch events that belong to the UI ✓
             //   • When a panel opens the blur+scrim (below) covers particles too,
             //     which is intentional: the whole background dims together ✓
-            if (particlesEnabled && matrixMode) {
+            if (matrixMode) {
                 MatrixRainOverlay(
                     enabled          = particlesEnabled,
                     headColor        = matrixHeadColor,
@@ -1837,7 +1985,7 @@ fun GamaUI(
                 particleCountCustom = particleCountCustom.toIntOrNull() ?: 150,
                 parallaxSensitivity = animatedParallaxSensitivity,
                 starMode         = particleStarMode,
-                timeModeEnabled  = particleTimeMode && !matrixMode,
+                timeModeEnabled  = particleTimeMode,
                 timeOffsetHours  = timeOffsetHours,
                 anyPanelOpen     = anyPanelOpen,
                 isLandscape      = isLandscape,
@@ -1878,7 +2026,7 @@ fun GamaUI(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer(alpha = blurAlpha)
+                    .graphicsLayer(alpha = fallbackScrimAlpha)
                     .background(scrimColor)
             )
 
@@ -2080,10 +2228,14 @@ fun GamaUI(
 
 
             SettingsPanel(
-                visible = showSettings && !showAppearance && !showColorCustomization && !showGradient && !showSystem && !showEffects && !showParticles && !showNotifications && !showBackup && !showCrashLog && !showRendererPanel && !showLanguage,
+                visible = showSettings && !showSettingsSearch && !showAppearance && !showColorCustomization && !showGradient && !showSystem && !showEffects && !showParticles && !showNotifications && !showBackup && !showCrashLog && !showRendererPanel && !showLanguage,
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showSettings = false
+                },
+                onSearchClick = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showSettingsSearch = true
                 },
                 onAppearanceClick = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
@@ -2105,6 +2257,94 @@ fun GamaUI(
                 performHaptic = { performHaptic() },
                 oledMode = oledMode
             )
+
+            SettingsSearchPanel(
+                visible = showSettingsSearch,
+                onDismiss = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showSettingsSearch = false
+                },
+                // Visuals / Appearance
+                themePreference = themePreference,
+                onThemeChange = { themePreference = it; savePreferences() },
+                animationLevel = animationLevel,
+                onAnimationLevelChange = { animationLevel = it; savePreferences() },
+                uiScale = uiScale,
+                onUiScaleChange = { uiScale = it; savePreferences() },
+                staggerEnabled = staggerEnabled,
+                onStaggerEnabledChange = { staggerEnabled = it; savePreferences() },
+                shadowsEnabled = shadowsEnabled,
+                onShadowsEnabledChange = { shadowsEnabled = it; savePreferences() },
+                // Colors
+                oledMode = oledMode,
+                darkModeActive = isDarkTheme || oledMode,
+                onOledModeChange = { oledMode = it; savePreferences() },
+                useDynamicColor = useDynamicColor,
+                onDynamicColorChange = { useDynamicColor = it; savePreferences() },
+                advancedColorPicker = advancedColorPicker,
+                onAdvancedColorPickerChange = { advancedColorPicker = it; savePreferences() },
+                gradientEnabled = gradientEnabled,
+                onGradientChange = { gradientEnabled = it; savePreferences() },
+                // Effects
+                blurEnabled = blurEnabled,
+                onBlurChange = { blurEnabled = it; savePreferences() },
+                // Particles
+                particlesEnabled = particlesEnabled,
+                onParticlesChange = { particlesEnabled = it; savePreferences() },
+                matrixMode = matrixMode,
+                onMatrixModeChange = { matrixMode = it; savePreferences() },
+                particleStarMode = particleStarMode,
+                onParticleStarModeChange = { particleStarMode = it; savePreferences() },
+                particleTimeMode = particleTimeMode,
+                onParticleTimeModeChange = { particleTimeMode = it; savePreferences() },
+                particleParallaxEnabled = particleParallaxEnabled,
+                onParticleParallaxEnabledChange = { particleParallaxEnabled = it; savePreferences() },
+                particleParallaxSensitivity = particleParallaxSensitivity,
+                onParticleParallaxSensitivityChange = { particleParallaxSensitivity = it; savePreferences() },
+                particleCount = particleCount,
+                onParticleCountChange = { particleCount = it; savePreferences() },
+                particleSpeed = particleSpeed,
+                onParticleSpeedChange = { particleSpeed = it; savePreferences() },
+                nativeRefreshRate = particleNativeRefreshRate,
+                onNativeRefreshRateChange = { particleNativeRefreshRate = it; savePreferences() },
+                quarterRefreshRate = particleQuarterRefreshRate,
+                onQuarterRefreshRateChange = { particleQuarterRefreshRate = it; savePreferences() },
+                matrixSpeed = matrixSpeed,
+                onMatrixSpeedChange = { matrixSpeed = it; savePreferences() },
+                matrixDensity = matrixDensity,
+                onMatrixDensityChange = { matrixDensity = it; savePreferences() },
+                matrixFontSize = matrixFontSize,
+                onMatrixFontSizeChange = { matrixFontSize = it; savePreferences() },
+                matrixFadeLength = matrixFadeLength,
+                onMatrixFadeLengthChange = { matrixFadeLength = it; savePreferences() },
+                // Renderer
+                aggressiveMode = aggressiveMode,
+                onAggressiveModeChange = { aggressiveMode = it; savePreferences() },
+                killLauncher = killLauncher,
+                onKillLauncherChange = { killLauncher = it; savePreferences() },
+                killKeyboard = killKeyboard,
+                onKillKeyboardChange = { killKeyboard = it; savePreferences() },
+                dozeMode = dozeMode,
+                onDozeModeChange = { dozeMode = it; savePreferences() },
+                showGpuWatchButton = showGpuWatchButton,
+                onShowGpuWatchButtonChange = { showGpuWatchButton = it; savePreferences() },
+                // System / App
+                verboseMode = verboseMode,
+                onVerboseModeChange = { verboseMode = it; savePreferences() },
+                dismissOnClickOutside = dismissOnClickOutside,
+                onDismissOnClickOutsideChange = { dismissOnClickOutside = it; savePreferences() },
+                notificationsEnabled = notificationsEnabled,
+                onNotificationsEnabledChange = { notificationsEnabled = it; savePreferences() },
+                notifIntervalIndex = notifIntervalIndex,
+                onNotifIntervalChange = { notifIntervalIndex = it; savePreferences() },
+                // Common
+                isSmallScreen = isSmallScreen,
+                isLandscape = isLandscape,
+                colors = colors,
+                cardBackground = cardBackground,
+                performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) }
+            )
+
 
             // Blur wrapper for RendererPanel when Aggressive Warning is shown.
             Box(
@@ -2320,7 +2560,7 @@ fun GamaUI(
                                 staggerEnabled       = prefs.getBoolean("stagger_enabled", true)
                                 particleNativeRefreshRate  = prefs.getBoolean("particle_native_refresh_rate", false)
                                 particleQuarterRefreshRate = prefs.getBoolean("particle_quarter_refresh_rate", false)
-                                matrixMode       = prefs.getBoolean("matrix_mode", false)
+                                matrixMode       = prefs.getBoolean("matrix_mode", true)
                                 matrixSpeed      = prefs.getInt("matrix_speed", 1)
                                 matrixDensity    = prefs.getInt("matrix_density", 1)
                                 matrixFontSize   = prefs.getInt("matrix_font_size", 1)
@@ -2591,14 +2831,17 @@ fun GamaUI(
                 particlesEnabled = particlesEnabled,
                 onAppearanceClick = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showParticlesSettings = false
                     showParticlesAppearance = true
                 },
                 onMotionClick = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showParticlesSettings = false
                     showParticlesMotion = true
                 },
                 onPerformanceClick = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showParticlesSettings = false
                     showParticlesPerformance = true
                 },
                 isSmallScreen = isSmallScreen,
@@ -2828,6 +3071,7 @@ fun GamaUI(
                 useDynamicColor = useDynamicColor,
                 advancedColorPicker = advancedColorPicker,
                 oledMode = oledMode,
+                darkModeActive = isDarkTheme || oledMode,
                 isSmallScreen = isSmallScreen,
                 isLandscape = isLandscape,
                 isTablet = isTablet,
@@ -2947,7 +3191,7 @@ fun GamaUI(
 
                     // Settings button (bottom-end)
                     AnimatedElement(visible = isVisible, staggerIndex = 4,
-                        totalItems = 8, modifier = Modifier.align(Alignment.BottomEnd)) {
+                        totalItems = 8, modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = if (isSmallScreen) 18.dp else 24.dp).offset(x = 20.dp, y = if (isSmallScreen) 20.dp else 30.dp)) {
                         val btnSize = if (isSmallScreen) 48.dp else 52.dp
                         val iconSize = if (isSmallScreen) 24.dp else 28.dp
 
@@ -2969,7 +3213,15 @@ fun GamaUI(
                             )
                         }
                         val spp = settingsPressProgress.value
-                        val settingsPressScale  = 1f - spp * (1f - MotionTokens.Scale.subtle)
+                        val settingsAppearScale by animateFloatAsState(
+                            targetValue = if (isVisible) 1f else 0.82f,
+                            animationSpec = spring(
+                                dampingRatio = 0.58f,
+                                stiffness = 360f
+                            ),
+                            label = "settings_appear_scale"
+                        )
+                        val settingsPressScale  = (1f - spp * (1f - MotionTokens.Scale.subtle)) * settingsAppearScale
                         val settingsBorderAlpha = 0.4f + spp * 0.6f
                         val settingsBorderWidth = (1.5f + spp * 0.5f).dp
                         val glowSize = btnSize * 1.8f
@@ -3029,12 +3281,12 @@ fun GamaUI(
                                             detectTapGestures(
                                                 onPress = {
                                                     settingsPressed = true
-                                                    tryAwaitRelease()
+                                                    val released = tryAwaitRelease()
                                                     settingsPressed = false
-                                                },
-                                                onTap = {
-                                                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                                                    showSettings = true
+                                                    if (released) {
+                                                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                        openMainPanelExclusive { showSettings = true }
+                                                    }
                                                 }
                                             )
                                         },

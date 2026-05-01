@@ -515,7 +515,7 @@ fun ParticlesOverlay(
     var initialRotationY = 0f
     var calibrationSamples = 0
 
-    DisposableEffect(parallaxEnabled, enabled) {
+    DisposableEffect(parallaxEnabled, enabled, nativeRefreshRate, quarterRefreshRate) {
         if (!parallaxEnabled || !enabled) {
             // Reset rotation values when parallax is disabled or overlay is disabled
             rotationX = 0f
@@ -594,14 +594,24 @@ fun ParticlesOverlay(
             override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) { }
         }
 
-        // Register sensor with UI delay (~15 Hz) — cuts sensor wake-ups by ~70%
-        // compared to SENSOR_DELAY_GAME (~50 Hz) with no visible difference for
-        // a subtle parallax effect that only reacts to slow, deliberate tilts.
-        sensorManager?.registerListener(
-            listener,
-            rotationSensor,
-            android.hardware.SensorManager.SENSOR_DELAY_UI
-        )
+        val displayHz = try {
+            val display =
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    context.display
+                } else {
+                    @Suppress("DEPRECATION")
+                    (context.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager).defaultDisplay
+                }
+            display?.supportedModes?.maxOfOrNull { it.refreshRate } ?: display?.refreshRate ?: 60f
+        } catch (_: Exception) { 60f }.coerceAtLeast(1f)
+        val divisor = when {
+            nativeRefreshRate -> 1
+            quarterRefreshRate -> 4
+            else -> 2
+        }
+        val pollingHz = (displayHz / divisor).coerceIn(15f, 144f)
+        val samplingPeriodUs = (1_000_000f / pollingHz).roundToInt().coerceIn(6_900, 66_666)
+        sensorManager?.registerListener(listener, rotationSensor, samplingPeriodUs)
 
         onDispose {
             sensorManager?.unregisterListener(listener)
@@ -638,6 +648,7 @@ fun ParticlesOverlay(
     // thread each time we want the Canvas to redraw.  Canvas reads this value to
     // establish a Compose snapshot dependency; it redraws every time it changes.
     var frameCount by remember { mutableLongStateOf(0L) }
+
 
     // frameIsDaytime — updated by the render-trigger at most once per second.
     // Kept as Compose state so Canvas reads it correctly via snapshot.
@@ -717,10 +728,9 @@ fun ParticlesOverlay(
     //   90Hz  display, quarter  → 22Hz  physics, 44.4ms render interval
     //   60Hz  display, quarter  → 15Hz  physics, 66.7ms render interval
     val vsyncDivisor: Int = when {
-        nativeRefreshRate        -> 1
-        quarterRefreshRate       -> 4   // 1/4 native rate — lightest option
-        deviceParticleCap <= 100 -> 3   // very weak: 1/3 native rate
-        else                     -> 2   // standard: half rate
+        nativeRefreshRate  -> 1
+        quarterRefreshRate -> 4
+        else               -> 2
     }
 
     // Physics target Hz: display rate divided by divisor.
@@ -818,7 +828,7 @@ fun ParticlesOverlay(
     // Animated alpha for celestial objects (sun/moon) with smooth ease-in-out fade
     val celestialAlpha by animateFloatAsState(
         targetValue = if (timeModeEnabled) 1f else 0f,
-        animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
         label = "celestial_alpha"
     )
 
@@ -1482,11 +1492,29 @@ fun MatrixRainOverlay(
         animationSpec  = tween(durationMillis = 700, easing = FastOutSlowInEasing),
         label          = "matrix_alpha"
     )
+    val motionFactor by animateFloatAsState(
+        targetValue    = if (enabled) 1f else 0f,
+        animationSpec  = tween(durationMillis = 850, easing = FastOutSlowInEasing),
+        label          = "matrix_motion_factor"
+    )
 
     // ── Frame counter — establishes Compose snapshot dependency on Canvas ─────
     // IMPORTANT: declared before the early-return so the render loop can start
     // on the very first composition and drive the alpha animation forward.
     var frameCount by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(enabled, columns, screenHeightPx, fontSizePx) {
+        if (enabled) {
+            val rng = kotlin.random.Random
+            val rowsOnScreen = (screenHeightPx / fontSizePx).toInt() + 2
+            for (col in columns) {
+                col.headRow = -(rng.nextFloat() * rowsOnScreen * 1.5f).toInt()
+                col.tickAccum = rng.nextInt(col.ticksPerStep.coerceAtLeast(1))
+                col.charAge = 0
+                for (k in col.chars.indices) col.chars[k] = randomMatrixChar()
+            }
+        }
+    }
 
     // ── Physics tick rate ─────────────────────────────────────────────────────
     // The physics loop runs at a fixed ~60 Hz regardless of display refresh rate.
@@ -1503,38 +1531,39 @@ fun MatrixRainOverlay(
     // Zero allocations inside the loop — only integer arithmetic.
     // IMPORTANT: this LaunchedEffect must live before the early-return so that
     // the physics loop is already running when the alpha animation completes.
-    LaunchedEffect(columns, enabled, physicsHz) {
-        if (!enabled) return@LaunchedEffect
+    LaunchedEffect(columns, enabled, physicsHz, motionFactor) {
+        if (!enabled && overlayAlpha < 0.005f && motionFactor < 0.005f) return@LaunchedEffect
         withContext(Dispatchers.Default) {
             val targetNs = physicsTargetNs
             var lastTick = System.nanoTime()
-            while (isActive) {
-                val now     = System.nanoTime()
+            while (isActive && (enabled || overlayAlpha > 0.005f || motionFactor > 0.005f)) {
+                val now = System.nanoTime()
                 val elapsed = now - lastTick
                 if (elapsed >= targetNs) {
                     lastTick = now
+                    val rowsOnScreen = (screenHeightPx / fontSizePx).toInt() + 1
+                    val speedDivisor = 1f + (1f - motionFactor) * 10f
                     for (col in columns) {
                         col.tickAccum++
-                        if (col.tickAccum >= col.ticksPerStep) {
+                        val effectiveTicksPerStep = (col.ticksPerStep * speedDivisor).toInt().coerceAtLeast(1)
+                        if (col.tickAccum >= effectiveTicksPerStep) {
                             col.tickAccum = 0
                             col.headRow++
-                            // Recycle: once entire trail has scrolled off-screen,
-                            // reset head to a random position above the top
-                            if (col.headRow - col.trailSlots > (screenHeightPx / fontSizePx).toInt() + 1) {
-                                col.headRow = -(kotlin.random.Random.nextFloat() *
-                                    (screenHeightPx / fontSizePx) * 0.7f).toInt()
-                                // Fresh character set for the recycled column
+                            if (col.headRow - col.trailSlots > rowsOnScreen) {
+                                col.headRow = -(kotlin.random.Random.nextFloat() * rowsOnScreen * 0.7f).toInt()
                                 for (k in col.chars.indices) col.chars[k] = randomMatrixChar()
                             }
                         }
-                        // Periodic character shuffle — gives the rain its "live data" feel
-                        col.charAge++
-                        if (col.charAge >= col.shuffleEvery) {
-                            col.charAge = 0
-                            val sz = col.chars.size
-                            col.chars[kotlin.random.Random.nextInt(sz)] = randomMatrixChar()
-                            if (sz > 4) {
+                        if (motionFactor > 0.02f) {
+                            col.charAge++
+                            val effectiveShuffleEvery = (col.shuffleEvery * speedDivisor).toInt().coerceAtLeast(1)
+                            if (col.charAge >= effectiveShuffleEvery) {
+                                col.charAge = 0
+                                val sz = col.chars.size
                                 col.chars[kotlin.random.Random.nextInt(sz)] = randomMatrixChar()
+                                if (sz > 4) {
+                                    col.chars[kotlin.random.Random.nextInt(sz)] = randomMatrixChar()
+                                }
                             }
                         }
                     }
@@ -1551,10 +1580,10 @@ fun MatrixRainOverlay(
     // withFrameNanos gates us to vsync boundaries; the elapsed check skips
     // frames where nothing has changed (i.e. most frames at high refresh rates).
     // IMPORTANT: also before the early-return for the same reason as the physics loop.
-    LaunchedEffect(enabled, physicsTargetNs) {
-        if (!enabled) return@LaunchedEffect
+    LaunchedEffect(enabled, physicsTargetNs, overlayAlpha, motionFactor) {
+        if (!enabled && overlayAlpha < 0.005f && motionFactor < 0.005f) return@LaunchedEffect
         var lastRender = 0L
-        while (isActive) {
+        while (isActive && (enabled || overlayAlpha > 0.005f || motionFactor > 0.005f)) {
             withFrameNanos { ns ->
                 if (ns - lastRender >= physicsTargetNs) {
                     lastRender = ns

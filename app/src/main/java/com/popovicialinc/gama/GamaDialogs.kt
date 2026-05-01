@@ -126,7 +126,7 @@ fun ShizukuHelpDialog(
         modifier = Modifier
             .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
             .widthIn(max = 500.dp)
-            .directionalShadow(cornerRadius = 40.dp)
+            .directionalShadow(cornerRadius = 28.dp)
             .border(
                 width = dialogBorderWidth,
                 color = colors.primaryAccent.copy(alpha = dialogBorderAlpha),
@@ -142,9 +142,9 @@ fun ShizukuHelpDialog(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(if (isSmallScreen) 24.dp else 32.dp),
+                .padding(if (isSmallScreen) 22.dp else 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 20.dp else 24.dp)
+            verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 18.dp else 22.dp)
         ) {
             // Title — accent-coloured, matches ExternalLinkConfirmDialog
             Box(
@@ -213,23 +213,23 @@ fun WarningDialog(
             modifier = Modifier
                 .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
                 .widthIn(max = 500.dp)
-                .directionalShadow(cornerRadius = 40.dp)
+                .directionalShadow(cornerRadius = 28.dp)
                 .border(
                     width = 1.dp,
                     color = colors.primaryAccent.copy(alpha = 0.55f),
-                    shape = RoundedCornerShape(40.dp)
+                    shape = RoundedCornerShape(28.dp)
                 )
                 .pointerInput(Unit) {
                     detectTapGestures { /* Block taps on card from dismissing dialog */ }
                 },
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(40.dp),
+            shape = RoundedCornerShape(28.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(if (isSmallScreen) 24.dp else 32.dp),
+                    .padding(if (isSmallScreen) 22.dp else 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 20.dp else 24.dp)
             ) {
@@ -327,17 +327,17 @@ fun ClearRecentsDialog(
             modifier = Modifier
                 .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
                 .widthIn(max = 500.dp)
-                .directionalShadow(cornerRadius = 40.dp)
-                .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(40.dp))
+                .directionalShadow(cornerRadius = 28.dp)
+                .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))
                 .pointerInput(Unit) { detectTapGestures { } },
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(40.dp),
+            shape = RoundedCornerShape(28.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(if (isSmallScreen) 24.dp else 32.dp),
+                    .padding(if (isSmallScreen) 22.dp else 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 20.dp else 24.dp)
             ) {
@@ -476,11 +476,11 @@ fun SuccessDialog(
             modifier = Modifier
                 .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
                 .widthIn(max = 500.dp)
-                .directionalShadow(cornerRadius = 40.dp)
+                .directionalShadow(cornerRadius = 28.dp)
                 .border(
                     width = 1.dp,
                     color = colors.primaryAccent.copy(alpha = 0.55f),
-                    shape = RoundedCornerShape(40.dp)
+                    shape = RoundedCornerShape(28.dp)
                 )
                 .pointerInput(Unit) {
                     detectTapGestures { /* Block taps on card from dismissing */ }
@@ -492,7 +492,7 @@ fun SuccessDialog(
             Column(
                 modifier            = Modifier
                     .fillMaxWidth()
-                    .padding(if (isSmallScreen) 24.dp else 32.dp),
+                    .padding(if (isSmallScreen) 22.dp else 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 20.dp else 24.dp)
             ) {
@@ -621,23 +621,23 @@ fun DeveloperMenuDialog(
             modifier = Modifier
                 .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
                 .widthIn(max = 500.dp)
-                .directionalShadow(cornerRadius = 40.dp)
+                .directionalShadow(cornerRadius = 28.dp)
                 .border(
                     width = 1.dp,
                     color = colors.primaryAccent.copy(alpha = 0.55f),
-                    shape = RoundedCornerShape(40.dp)
+                    shape = RoundedCornerShape(28.dp)
                 )
                 .pointerInput(Unit) {
                     detectTapGestures { /* Block taps on card from dismissing dialog */ }
                 },
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(40.dp),
+            shape = RoundedCornerShape(28.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(if (isSmallScreen) 24.dp else 32.dp),
+                    .padding(if (isSmallScreen) 22.dp else 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 20.dp else 24.dp)
             ) {
@@ -703,23 +703,23 @@ fun GitHubDialog(
             modifier = Modifier
                 .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
                 .widthIn(max = 500.dp)
-                .directionalShadow(cornerRadius = 40.dp)
+                .directionalShadow(cornerRadius = 28.dp)
                 .border(
                     width = 1.dp,
                     color = colors.primaryAccent.copy(alpha = 0.55f),
-                    shape = RoundedCornerShape(40.dp)
+                    shape = RoundedCornerShape(28.dp)
                 )
                 .pointerInput(Unit) {
                     detectTapGestures { /* Block taps on card from dismissing dialog */ }
                 },
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(40.dp),
+            shape = RoundedCornerShape(28.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(if (isSmallScreen) 24.dp else 32.dp),
+                    .padding(if (isSmallScreen) 22.dp else 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 20.dp else 24.dp)
             ) {
@@ -827,17 +827,17 @@ fun ExternalLinkConfirmDialog(
             modifier = Modifier
                 .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
                 .widthIn(max = 500.dp)
-                .directionalShadow(cornerRadius = 40.dp)
-                .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(40.dp))
+                .directionalShadow(cornerRadius = 28.dp)
+                .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))
                 .pointerInput(Unit) { detectTapGestures { } },
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(40.dp),
+            shape = RoundedCornerShape(28.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(if (isSmallScreen) 24.dp else 32.dp),
+                    .padding(if (isSmallScreen) 22.dp else 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 20.dp else 24.dp)
             ) {
@@ -938,7 +938,7 @@ fun EasterEggDialog(
                     .widthIn(max = 460.dp)
                     .pointerInput(Unit) { detectTapGestures { } },
                 colors = CardDefaults.cardColors(containerColor = cardBackground),
-                shape = RoundedCornerShape(40.dp),
+                shape = RoundedCornerShape(28.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Box(
@@ -1164,11 +1164,11 @@ fun AggressiveWarningDialog(
                 modifier = Modifier
                     .fillMaxWidth(0.9f)
                     .widthIn(max = 500.dp)
-                    .directionalShadow(cornerRadius = 40.dp)
+                    .directionalShadow(cornerRadius = 28.dp)
                     .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(40.dp))
                     .pointerInput(Unit) { /* Consume taps */ },
                 colors = CardDefaults.cardColors(containerColor = cardBackground),
-                shape = RoundedCornerShape(40.dp),
+                shape = RoundedCornerShape(28.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(
@@ -1352,7 +1352,7 @@ fun GPUWatchConfirmDialog(
                 .widthIn(max = 450.dp)
                 .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(40.dp)),
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(40.dp),
+            shape = RoundedCornerShape(28.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(

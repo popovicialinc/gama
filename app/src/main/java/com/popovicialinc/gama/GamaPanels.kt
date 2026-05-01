@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,17 +28,29 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared panel scaffold — full-screen BouncyDialog with scroll + back button
@@ -52,42 +65,37 @@ private fun PanelScaffold(
     isBlurred: Boolean = false,
     oledMode: Boolean = false,
     colors: ThemeColors,
+    leadingFloatingButton: (@Composable (Modifier) -> Unit)? = null,
     content: @Composable ColumnScope.(scrollState: ScrollState) -> Unit
 ) {
     val dismissOnClickOutside = LocalDismissOnClickOutside.current
     val scrollState = rememberScrollState()
+    LaunchedEffect(visible) { if (visible) scrollState.scrollTo(0) }
+    val animLevel = LocalAnimationLevel.current
 
-    // Back button slide-in — graphicsLayer translationY keeps this in the draw phase,
-    // zero layout recompositions.
-    val backButtonTranslationY by animateFloatAsState(
-        targetValue = if (visible) 0f else 300f,  // 300f = off-screen below
-        animationSpec = tween(420, easing = MotionTokens.Easing.emphasizedDecelerate),
+    // Back button slide-in. Use offset instead of graphicsLayer translation so the
+    // visual position and the touch hitbox always move together.
+    val backButtonOffsetY by animateDpAsState(
+        targetValue = if (visible) 0.dp else 420.dp,
+        animationSpec = if (animLevel == 2) snap() else spring(
+            dampingRatio = 0.62f,
+            stiffness = 430f
+        ),
         label = "panel_back_ty"
     )
 
-    // Animated bottom padding — springs open with a gentle bounce so the scroll
-    // column "makes space" for the back button rather than letting it float over
-    // the last card.  Spring spec: low damping for the bounce, high enough stiffness
-    // to feel snappy but not jarring.  This drives a layout pass, but it only runs
-    // once on panel entry (visible becomes true) and once on exit — not per-frame.
-    val bottomPaddingTarget = if (visible) {
-        if (isSmallScreen) 96f else 112f   // dp: button height + gap + comfortable clearance
-    } else {
-        0f
-    }
-    val bottomPaddingDp by animateFloatAsState(
-        targetValue = bottomPaddingTarget,
-        animationSpec = spring(
-            dampingRatio = 0.52f,   // underdamped — produces the single pleasant overshoot
-            stiffness    = 280f     // responsive but not harsh; keeps the bounce visible
-        ),
-        label = "panel_bottom_pad"
-    )
+    // Static bottom padding — reserves space for the floating back button so the
+    // last card is never obscured.  Previously this was an animated spring, but
+    // animating a .padding() value triggers a full layout pass every frame during
+    // the ~300 ms panel-enter transition, causing the visible stutter/freeze.
+    // The back button already animates in via graphicsLayer translationY (draw-only,
+    // zero layout cost), so the padding just needs to be the correct resting size
+    // from the first frame — no animation required.
+    val bottomPaddingDp = if (isSmallScreen) 120f else 132f  // dp: button height + gap + clearance
     // When a sub-dialog opens (isBlurred = true) the panel dims so the dialog feels
     // on a higher layer. The blur itself snaps on/off (no animated radius — see below).
     //
     // panelAlpha  — 1→0.35 dims the whole panel as the sub-dialog arrives
-    val animLevel = LocalAnimationLevel.current
     val panelAlpha by animateFloatAsState(
         targetValue = if (isBlurred) 0.38f else 1f,
         animationSpec = if (animLevel == 2) snap() else tween(
@@ -132,42 +140,113 @@ private fun PanelScaffold(
                 )
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(dismissOnClickOutside) {
-                        if (dismissOnClickOutside) detectTapGestures { onDismiss() }
-                        else detectTapGestures { }
-                    },
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Column(
+                // Background tap layer. It sits behind the cards/back button, so it
+                // keeps outside-tap dismissal without stealing child clicks.
+                Box(
                     modifier = Modifier
-                        .widthIn(max = if (isLandscape) 800.dp else 500.dp)
-                        .verticalScroll(scrollState)
-                        .padding(horizontal = if (isLandscape) 32.dp else 24.dp)
-                        .padding(bottom = bottomPaddingDp.dp)
-                        .pointerInput(Unit) { detectTapGestures { } },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 16.dp else 20.dp)
+                        .fillMaxSize()
+                        .pointerInput(dismissOnClickOutside) {
+                            if (dismissOnClickOutside) detectTapGestures { onDismiss() }
+                            else detectTapGestures { }
+                        }
+                )
+
+                val backButtonSize = if (isSmallScreen) 48.dp else 52.dp
+                val horizontalPadding = if (isLandscape) 32.dp else 24.dp
+
+                CompositionLocalProvider(
+                    LocalFloatingBackButtonAvoidance provides FloatingBackButtonAvoidance(
+                        enabled = visible && !isLandscape,
+                        endPadding = backButtonSize + 32.dp,
+                        bottomPadding = if (isSmallScreen) 44.dp else 52.dp,
+                        buttonSize = backButtonSize
+                    )
                 ) {
-                    Spacer(modifier = Modifier.height(if (isLandscape) 24.dp else 40.dp))
-                    content(scrollState)
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Column(
+                        modifier = Modifier
+                            .widthIn(max = if (isLandscape) 800.dp else 500.dp)
+                            .verticalScroll(scrollState)
+                            .padding(horizontal = horizontalPadding)
+                            .padding(
+                                top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                                bottom = bottomPaddingDp.dp
+                            )
+                            .pointerInput(Unit) { detectTapGestures { } },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 16.dp else 20.dp)
+                    ) {
+                        Spacer(modifier = Modifier.height(if (isLandscape) 24.dp else 40.dp))
+                        content(scrollState)
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                 }
+
+                leadingFloatingButton?.invoke(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 16.dp, bottom = if (isSmallScreen) 18.dp else 24.dp)
+                        .offset(y = backButtonOffsetY)
+                )
 
                 PanelBackButton(
                     onClick = onDismiss,
                     colors = colors,
                     oledMode = oledMode,
                     isSmallScreen = isSmallScreen,
+                    enabled = visible,
                     scrollState = scrollState,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 20.dp, bottom = 28.dp)
-                        .graphicsLayer { translationY = backButtonTranslationY }
+                        .padding(end = 16.dp, bottom = if (isSmallScreen) 18.dp else 24.dp)
+                        .offset(y = backButtonOffsetY)
                 )
             }
         }
+    }
+}
+
+
+
+@Composable
+private fun PanelCaption(
+    text: String,
+    colors: ThemeColors,
+    modifier: Modifier = Modifier,
+    accent: Boolean = false
+) {
+    val ts = LocalTypeScale.current
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 0.dp, bottom = 8.dp)
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        colors.background.copy(alpha = 0.18f),
+                        colors.background.copy(alpha = 0.26f),
+                        colors.background.copy(alpha = 0.18f),
+                        Color.Transparent
+                    )
+                )
+            )
+            .padding(horizontal = 30.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            fontSize = ts.bodySmall,
+            color = if (accent) colors.primaryAccent.copy(alpha = 0.70f)
+                    else colors.textPrimary.copy(alpha = 0.62f),
+            fontFamily = quicksandFontFamily,
+            textAlign = TextAlign.Center,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.fillMaxWidth(),
+            lineHeight = 19.sp
+        )
     }
 }
 
@@ -180,6 +259,7 @@ private fun PanelScaffold(
 fun SettingsPanel(
     visible: Boolean,
     onDismiss: () -> Unit,
+    onSearchClick: () -> Unit,
     onAppearanceClick: () -> Unit,
     onRendererClick: () -> Unit,
     onSystemClick: () -> Unit,
@@ -193,16 +273,30 @@ fun SettingsPanel(
 ) {
     val ts = LocalTypeScale.current
     val strings = LocalStrings.current
-
     PanelScaffold(
         visible = visible, onDismiss = onDismiss,
         isLandscape = isLandscape, isSmallScreen = isSmallScreen,
-        oledMode = oledMode, colors = colors
+        oledMode = oledMode, colors = colors,
+        leadingFloatingButton = { floatingModifier ->
+            PanelSearchButton(
+                onClick = { performHaptic(); onSearchClick() },
+                colors = colors,
+                oledMode = oledMode,
+                isSmallScreen = isSmallScreen,
+                enabled = visible,
+                modifier = floatingModifier
+            )
+        }
     ) { scrollState ->
         CleanTitle(
             text = strings["settings.title"].ifEmpty { "SETTINGS" },
             fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
             colors = colors, scrollOffset = scrollState.value
+        )
+
+        PanelCaption(
+            text = "Core app sections. Use search to jump directly to toggles, sliders, and selectors.",
+            colors = colors
         )
 
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3) {
@@ -214,6 +308,7 @@ fun SettingsPanel(
                 cardBackground = cardBackground, oledMode = oledMode
             )
         }
+
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 3) {
             SettingsNavigationCard(
                 title = strings["settings.renderer"].ifEmpty { "RENDERER" },
@@ -223,6 +318,7 @@ fun SettingsPanel(
                 cardBackground = cardBackground, oledMode = oledMode
             )
         }
+
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 3) {
             SettingsNavigationCard(
                 title = strings["settings.system"].ifEmpty { "APP" },
@@ -235,6 +331,874 @@ fun SettingsPanel(
     }
 }
 
+
+
+private class SettingsSearchItem(
+    val id: String,
+    val title: String,
+    val keywords: List<String>,
+    val path: String,         // breadcrumb path shown above the card, outside the shadow
+    val render: @Composable () -> Unit
+) {
+    // Pre-computed once at construction — never rebuilt during scoring.
+    val haystack: String = (listOf(id, title) + keywords).joinToString(" ").lowercase()
+    val words: List<String> = haystack.split(nonAlphaNumRegex).filter { it.isNotBlank() }
+
+    companion object {
+        private val nonAlphaNumRegex = Regex("[^a-z0-9]+")
+    }
+}
+
+private fun levenshteinDistance(a: String, b: String): Int {
+    if (a == b) return 0
+    if (a.isEmpty()) return b.length
+    if (b.isEmpty()) return a.length
+
+    val previous = IntArray(b.length + 1) { it }
+    val current = IntArray(b.length + 1)
+
+    for (i in a.indices) {
+        current[0] = i + 1
+        for (j in b.indices) {
+            val cost = if (a[i] == b[j]) 0 else 1
+            current[j + 1] = minOf(
+                current[j] + 1,
+                previous[j + 1] + 1,
+                previous[j] + cost
+            )
+        }
+        for (j in previous.indices) previous[j] = current[j]
+    }
+
+    return previous[b.length]
+}
+
+// queryTokens split is done once per query in the caller, not per-item here.
+private fun settingsSearchScore(q: String, queryTokens: List<String>, item: SettingsSearchItem): Int {
+    if (q.isBlank()) return 0
+
+    if (item.haystack.contains(q)) return 120
+
+    var best = 0
+    for (token in queryTokens) {
+        for (word in item.words) {
+            if (word == token) { best = maxOf(best, 115); continue }
+            if (word.startsWith(token)) best = maxOf(best, 96)
+            else if (word.contains(token)) best = maxOf(best, 82)
+
+            if (token.length >= 3 && word.length >= 3 && word[0] == token[0] && word[1] == token[1] && word[2] == token[2]) {
+                best = maxOf(best, 72)
+            } else if (token.length >= 2 && word.length >= 2 && word[0] == token[0] && word[1] == token[1]) {
+                best = maxOf(best, 54)
+            }
+
+            val distance = levenshteinDistance(token, word)
+            val maxLen = maxOf(token.length, word.length).coerceAtLeast(1)
+            best = maxOf(best, ((1f - distance.toFloat() / maxLen) * 82).toInt())
+        }
+    }
+
+    return best
+}
+
+@Composable
+private fun SearchInputCard(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    colors: ThemeColors,
+    cardBackground: Color,
+    isSmallScreen: Boolean
+) {
+    val ts = LocalTypeScale.current
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(28.dp))
+            .background(cardBackground)
+            .padding(horizontal = if (isSmallScreen) 18.dp else 22.dp, vertical = if (isSmallScreen) 14.dp else 16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Canvas(modifier = Modifier.size(if (isSmallScreen) 21.dp else 24.dp)) {
+                val strokeWidth = 2.2.dp.toPx()
+                val radius = size.minDimension * 0.29f
+                val center = Offset(size.width * 0.43f, size.height * 0.43f)
+                drawCircle(
+                    color = colors.primaryAccent.copy(alpha = 0.85f),
+                    radius = radius,
+                    center = center,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                )
+                drawLine(
+                    color = colors.primaryAccent.copy(alpha = 0.85f),
+                    start = Offset(center.x + radius * 0.70f, center.y + radius * 0.70f),
+                    end = Offset(size.width * 0.80f, size.height * 0.80f),
+                    strokeWidth = strokeWidth,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+            }
+
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                textStyle = TextStyle(
+                    color = colors.textPrimary,
+                    fontSize = ts.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily
+                ),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                cursorBrush = SolidColor(colors.primaryAccent),
+                decorationBox = { innerTextField ->
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        if (query.isBlank()) {
+                            Text(
+                                text = "Search settings, toggles, sliders...",
+                                color = colors.textSecondary.copy(alpha = 0.68f),
+                                fontSize = ts.bodyLarge,
+                                fontFamily = quicksandFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
+                        }
+                        innerTextField()
+                    }
+                },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchSelectorCard(
+    title: String,
+    description: String,
+    colors: ThemeColors,
+    cardBackground: Color,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val ts = LocalTypeScale.current
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(28.dp))
+            .background(cardBackground)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+            shape = RoundedCornerShape(28.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .width(3.dp)
+                        .fillMaxHeight()
+                        .background(colors.primaryAccent)
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = title,
+                        fontSize = ts.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp,
+                        fontFamily = quicksandFontFamily,
+                        color = colors.primaryAccent.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = description,
+                        fontSize = ts.bodySmall,
+                        color = colors.textSecondary,
+                        fontFamily = quicksandFontFamily,
+                        fontWeight = FontWeight.Bold
+                    )
+                    content()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SettingsSearchPanel(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    // ── VISUALS / Appearance ──────────────────────────────────────────────────
+    themePreference: Int,
+    onThemeChange: (Int) -> Unit,
+    animationLevel: Int,
+    onAnimationLevelChange: (Int) -> Unit,
+    uiScale: Int,
+    onUiScaleChange: (Int) -> Unit,
+    staggerEnabled: Boolean,
+    onStaggerEnabledChange: (Boolean) -> Unit,
+    shadowsEnabled: Boolean,
+    onShadowsEnabledChange: (Boolean) -> Unit,
+    // ── Colors ────────────────────────────────────────────────────────────────
+    oledMode: Boolean,
+    darkModeActive: Boolean,
+    onOledModeChange: (Boolean) -> Unit,
+    useDynamicColor: Boolean,
+    onDynamicColorChange: (Boolean) -> Unit,
+    advancedColorPicker: Boolean,
+    onAdvancedColorPickerChange: (Boolean) -> Unit,
+    gradientEnabled: Boolean,
+    onGradientChange: (Boolean) -> Unit,
+    // ── Effects ───────────────────────────────────────────────────────────────
+    blurEnabled: Boolean,
+    onBlurChange: (Boolean) -> Unit,
+    // ── Particles ─────────────────────────────────────────────────────────────
+    particlesEnabled: Boolean,
+    onParticlesChange: (Boolean) -> Unit,
+    matrixMode: Boolean,
+    onMatrixModeChange: (Boolean) -> Unit,
+    particleStarMode: Boolean,
+    onParticleStarModeChange: (Boolean) -> Unit,
+    particleTimeMode: Boolean,
+    onParticleTimeModeChange: (Boolean) -> Unit,
+    particleParallaxEnabled: Boolean,
+    onParticleParallaxEnabledChange: (Boolean) -> Unit,
+    particleParallaxSensitivity: Int,
+    onParticleParallaxSensitivityChange: (Int) -> Unit,
+    particleCount: Int,
+    onParticleCountChange: (Int) -> Unit,
+    particleSpeed: Int,
+    onParticleSpeedChange: (Int) -> Unit,
+    nativeRefreshRate: Boolean,
+    onNativeRefreshRateChange: (Boolean) -> Unit,
+    quarterRefreshRate: Boolean,
+    onQuarterRefreshRateChange: (Boolean) -> Unit,
+    matrixSpeed: Int,
+    onMatrixSpeedChange: (Int) -> Unit,
+    matrixDensity: Int,
+    onMatrixDensityChange: (Int) -> Unit,
+    matrixFontSize: Int,
+    onMatrixFontSizeChange: (Int) -> Unit,
+    matrixFadeLength: Int,
+    onMatrixFadeLengthChange: (Int) -> Unit,
+    // ── Renderer ──────────────────────────────────────────────────────────────
+    aggressiveMode: Boolean,
+    onAggressiveModeChange: (Boolean) -> Unit,
+    killLauncher: Boolean,
+    onKillLauncherChange: (Boolean) -> Unit,
+    killKeyboard: Boolean,
+    onKillKeyboardChange: (Boolean) -> Unit,
+    dozeMode: Boolean,
+    onDozeModeChange: (Boolean) -> Unit,
+    showGpuWatchButton: Boolean,
+    onShowGpuWatchButtonChange: (Boolean) -> Unit,
+    // ── System / App ──────────────────────────────────────────────────────────
+    verboseMode: Boolean,
+    onVerboseModeChange: (Boolean) -> Unit,
+    dismissOnClickOutside: Boolean,
+    onDismissOnClickOutsideChange: (Boolean) -> Unit,
+    notificationsEnabled: Boolean,
+    onNotificationsEnabledChange: (Boolean) -> Unit,
+    notifIntervalIndex: Int,
+    onNotifIntervalChange: (Int) -> Unit,
+    // ── Common ────────────────────────────────────────────────────────────────
+    oledModeLocked: Boolean = false,
+    isSmallScreen: Boolean,
+    isLandscape: Boolean,
+    colors: ThemeColors,
+    cardBackground: Color,
+    performHaptic: () -> Unit
+) {
+    val ts = LocalTypeScale.current
+    var query by remember { mutableStateOf("") }
+    val dynamicColorAvailable = Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+    val gradientAvailable = !darkModeActive
+
+    // ── Helper: a breadcrumb pill shown above each result ─────────────────────
+    @Composable
+    fun PathLabel(path: String) {
+        val segments = path.split("→").map { it.trim() }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
+            modifier = Modifier
+                .padding(start = 2.dp, bottom = 6.dp)
+                .clip(RoundedCornerShape(50))
+                .border(1.dp, colors.primaryAccent.copy(alpha = 0.28f), RoundedCornerShape(50))
+                .background(colors.primaryAccent.copy(alpha = 0.08f))
+                .padding(horizontal = 12.dp, vertical = 5.dp)
+        ) {
+            segments.forEachIndexed { index, segment ->
+                Text(
+                    text = segment,
+                    fontSize = ts.bodySmall,
+                    color = colors.primaryAccent.copy(alpha = if (index == segments.lastIndex) 0.85f else 0.5f),
+                    fontFamily = quicksandFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                if (index < segments.lastIndex) {
+                    Text(
+                        text = "  ›  ",
+                        fontSize = ts.bodySmall,
+                        color = colors.primaryAccent.copy(alpha = 0.35f),
+                        fontFamily = quicksandFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.sp
+                    )
+                }
+            }
+        }
+    }
+
+    // The render lambdas capture state by closure reference — they always see
+    // fresh values at composition time without being in the remember key.
+    // Only id/title/keywords need to be stable for scoring, and those are constants.
+    // Wrapping in remember{} prevents ~35 lambda allocations on every recomposition.
+    val items = remember {
+    listOf(
+        // ── VISUALS ───────────────────────────────────────────────────────────
+        SettingsSearchItem(
+            id = "theme",
+            title = "THEME",
+            keywords = listOf("theme", "mode", "auto", "dark", "light", "appearance", "visuals", "oled", "color mode", "them", "thme", "teme", "night"),
+            path = "VISUALS"
+        ) {
+            Column {
+            SearchSelectorCard(title = "THEME", description = if (oledMode) "Forced to Dark while OLED mode is on." else "Choose how GAMA follows light, dark, or system appearance.", colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf("Auto", "Dark", "Light"), selectedIndex = if (oledMode) 1 else themePreference,
+                    onOptionSelected = { if (!oledMode) { performHaptic(); onThemeChange(it) } }, colors = colors, modifier = Modifier.fillMaxWidth(), enabled = !oledMode)
+            } }
+        },
+        SettingsSearchItem(
+            id = "animations",
+            title = "ANIMATIONS",
+            keywords = listOf("animations", "animation", "motion", "movement", "reduce motion", "off", "full", "anim", "smooth", "transition", "reduced"),
+            path = "VISUALS"
+        ) {
+            Column {
+            SearchSelectorCard(title = "ANIMATIONS", description = "Control how much motion the interface uses.", colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf("Full", "Reduced", "Off"), selectedIndex = animationLevel,
+                    onOptionSelected = { performHaptic(); onAnimationLevelChange(it) }, colors = colors, modifier = Modifier.fillMaxWidth())
+            } }
+        },
+        SettingsSearchItem(
+            id = "ui_scale",
+            title = "UI SCALE",
+            keywords = listOf("ui", "scale", "size", "interface size", "zoom", "75", "100", "125", "text size", "font size", "big", "small", "large"),
+            path = "VISUALS"
+        ) {
+            Column {
+            SearchSelectorCard(title = "UI SCALE", description = "Adjust the size of the interface.", colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf("75%", "100%", "125%"), selectedIndex = uiScale,
+                    onOptionSelected = { performHaptic(); onUiScaleChange(it) }, colors = colors, modifier = Modifier.fillMaxWidth())
+            } }
+        },
+        SettingsSearchItem(
+            id = "stagger_animations",
+            title = "STAGGER ANIMATIONS",
+            keywords = listOf("stagger", "stag", "stager", "staggered", "cards", "cascade", "panel cards", "entrance", "animations", "motion", "one by one", "instant"),
+            path = "VISUALS"
+        ) {
+            Column {
+            ToggleCard(title = "STAGGER ANIMATIONS", description = "Panel cards animate in one by one — turn off for instant panel opens.",
+                checked = staggerEnabled, onCheckedChange = { performHaptic(); onStaggerEnabledChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
+        },
+        SettingsSearchItem(
+            id = "card_shadows",
+            title = "CARD SHADOWS",
+            keywords = listOf("card", "cards", "shadow", "shadows", "drop shadow", "gpu", "performance", "visual", "depth", "elevation"),
+            path = "VISUALS"
+        ) {
+            Column {
+            ToggleCard(title = "CARD SHADOWS", description = "Drop shadows under cards — disable to reduce GPU load or fix visual glitches during animations.",
+                checked = shadowsEnabled, onCheckedChange = { performHaptic(); onShadowsEnabledChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
+        },
+        // ── COLORS ────────────────────────────────────────────────────────────
+        SettingsSearchItem(
+            id = "oled_mode",
+            title = "OLED MODE",
+            keywords = listOf("oled", "amoled", "black", "battery", "pure black", "true black", "power", "screen", "dark"),
+            path = "VISUALS → COLORS"
+        ) {
+            Column {
+            ToggleCard(title = "OLED MODE", description = if (oledMode) "Active — all backgrounds are pure black" else "Off — using your regular theme background color",
+                checked = oledMode, onCheckedChange = { performHaptic(); onOledModeChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
+        },
+        SettingsSearchItem(
+            id = "dynamic_color",
+            title = "DYNAMIC COLOR",
+            keywords = listOf("dynamic", "material you", "wallpaper", "accent", "monet", "android 12", "auto color", "system color", "automatic"),
+            path = "VISUALS → COLORS"
+        ) {
+            Column {
+            ToggleCard(title = "DYNAMIC COLOR",
+                description = if (dynamicColorAvailable) "Picks accent colors from your wallpaper automatically via Material You" else "Requires Android 12 or newer",
+                checked = useDynamicColor && dynamicColorAvailable,
+                onCheckedChange = { performHaptic(); onDynamicColorChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
+                oledMode = oledMode, enabled = dynamicColorAvailable) }
+        },
+        SettingsSearchItem(
+            id = "advanced_color_picker",
+            title = "ADVANCED COLOR PICKER",
+            keywords = listOf("advanced", "hex", "color picker", "hex input", "custom color", "type color", "#", "picker", "colour"),
+            path = "VISUALS → COLORS"
+        ) {
+            Column {
+            ToggleCard(title = "ADVANCED COLOR PICKER",
+                description = "Adds a hex input field to the color pickers — type any color directly, e.g. #4895EF",
+                checked = advancedColorPicker,
+                onCheckedChange = { performHaptic(); onAdvancedColorPickerChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
+                oledMode = oledMode, enabled = !useDynamicColor || !dynamicColorAvailable) }
+        },
+        SettingsSearchItem(
+            id = "gradient_background",
+            title = "GRADIENT BACKGROUND",
+            keywords = listOf("gradient", "background", "gradient background", "color shift", "wallpaper color", "shifting", "background color", "fade"),
+            path = "VISUALS → COLORS → BACKGROUND GRADIENT"
+        ) {
+            Column {
+            val gradientCardScale by animateFloatAsState(
+                targetValue = if (gradientAvailable) 1f else 0.92f,
+                animationSpec = spring(
+                    dampingRatio = MotionTokens.Springs.smooth.dampingRatio,
+                    stiffness = MotionTokens.Springs.smooth.stiffness
+                ),
+                label = "search_gradient_card_dark_scale"
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer(
+                        scaleX = gradientCardScale,
+                        scaleY = gradientCardScale,
+                        alpha = if (gradientAvailable) 1f else 0.42f
+                    )
+            ) {
+                ToggleCard(title = "GRADIENT BACKGROUND",
+                    description = when {
+                        oledMode -> "Unavailable in OLED mode — background is pure black"
+                        darkModeActive -> "Unavailable in Dark mode — background is pure black"
+                        else -> "A slow-shifting color gradient behind your home screen"
+                    },
+                    checked = gradientEnabled && gradientAvailable,
+                    onCheckedChange = { if (gradientAvailable) { performHaptic(); onGradientChange(it) } },
+                    colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
+                    oledMode = oledMode, enabled = gradientAvailable)
+            } }
+        },
+        // ── EFFECTS ───────────────────────────────────────────────────────────
+        SettingsSearchItem(
+            id = "blur",
+            title = "BLUR",
+            keywords = listOf("blur", "frosted", "glass", "frosted glass", "panel blur", "backdrop", "depth", "premium", "translucent", "blured"),
+            path = "VISUALS → EFFECTS"
+        ) {
+            Column {
+            ToggleCard(title = "BLUR",
+                description = "Frosted glass behind panels and dialogs — subtle depth that makes the UI feel premium",
+                checked = blurEnabled, onCheckedChange = { performHaptic(); onBlurChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
+        },
+        // ── PARTICLES ─────────────────────────────────────────────────────────
+        SettingsSearchItem(
+            id = "particles",
+            title = "PARTICLES",
+            keywords = listOf("particles", "stars", "floating", "dots", "particle", "animation", "background animation", "star", "sparkle", "living", "feel"),
+            path = "VISUALS → EFFECTS → PARTICLES"
+        ) {
+            Column {
+            ToggleCard(title = "PARTICLES",
+                description = "Animates the background with floating particles or Matrix rain",
+                checked = particlesEnabled, onCheckedChange = { performHaptic(); onParticlesChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
+        },
+        SettingsSearchItem(
+            id = "particle_style",
+            title = "PARTICLE STYLE",
+            keywords = listOf("style", "stars", "matrix", "rain", "matrix rain", "digital rain", "glyphs", "particle style", "mode"),
+            path = "VISUALS → EFFECTS → PARTICLES"
+        ) {
+            Column {
+            SearchSelectorCard(title = "PARTICLE STYLE",
+                description = if (matrixMode) "Cascading columns of glyphs — the classic Matrix digital rain effect" else "Twinkling stars that float and shift with device tilt via parallax",
+                colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf("Stars", "Matrix"), selectedIndex = if (matrixMode) 1 else 0,
+                    onOptionSelected = { performHaptic(); if (particlesEnabled) onMatrixModeChange(it == 1) },
+                    colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled)
+            } }
+        },
+        SettingsSearchItem(
+            id = "star_mode",
+            title = "STAR MODE",
+            keywords = listOf("star", "star mode", "stars", "shape", "look", "glow", "twinkle", "sparkle", "star shape"),
+            path = "VISUALS → EFFECTS → PARTICLES → SHAPE & LOOK"
+        ) {
+            Column {
+            ToggleCard(title = "STAR MODE",
+                description = "Renders particles as glowing 5-pointed stars instead of soft dots",
+                checked = particleStarMode, onCheckedChange = { performHaptic(); onParticleStarModeChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
+                oledMode = oledMode, enabled = particlesEnabled && !matrixMode) }
+        },
+        SettingsSearchItem(
+            id = "time_mode",
+            title = "TIME MODE",
+            keywords = listOf("time", "time mode", "sun", "moon", "day", "night", "sky", "real time", "clock", "daytime", "sunrise", "sunset"),
+            path = "VISUALS → EFFECTS → PARTICLES → SHAPE & LOOK"
+        ) {
+            Column {
+            ToggleCard(title = "TIME MODE",
+                description = "A sun and moon travel across the sky in sync with the real time of day",
+                checked = particleTimeMode, onCheckedChange = { performHaptic(); onParticleTimeModeChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
+                oledMode = oledMode, enabled = particlesEnabled && !matrixMode) }
+        },
+        SettingsSearchItem(
+            id = "parallax",
+            title = "PARALLAX",
+            keywords = listOf("parallax", "tilt", "gyro", "gyroscope", "motion", "sensor", "depth", "3d", "perspective"),
+            path = "VISUALS → EFFECTS → PARTICLES → MOTION"
+        ) {
+            Column {
+            ToggleCard(title = "PARALLAX",
+                description = "Particles shift with device tilt via the gyroscope for a depth effect",
+                checked = particleParallaxEnabled, onCheckedChange = { performHaptic(); onParticleParallaxEnabledChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
+                oledMode = oledMode, enabled = particlesEnabled && !matrixMode) }
+        },
+        SettingsSearchItem(
+            id = "parallax_sensitivity",
+            title = "PARALLAX SENSITIVITY",
+            keywords = listOf("parallax", "sensitivity", "tilt", "gyro", "strength", "intensity", "low", "medium", "high", "motion"),
+            path = "VISUALS → EFFECTS → PARTICLES → MOTION"
+        ) {
+            Column {
+            SearchSelectorCard(title = "PARALLAX SENSITIVITY", description = "How strongly the particles react to device tilt.", colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf("Low", "Medium", "High"), selectedIndex = particleParallaxSensitivity.coerceIn(0, 2),
+                    onOptionSelected = { performHaptic(); onParticleParallaxSensitivityChange(it) },
+                    colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && particleParallaxEnabled && !matrixMode)
+            } }
+        },
+        SettingsSearchItem(
+            id = "particle_speed",
+            title = "PARTICLE SPEED",
+            keywords = listOf("speed", "fast", "slow", "velocity", "float speed", "particle speed", "drift"),
+            path = "VISUALS → EFFECTS → PARTICLES → MOTION"
+        ) {
+            Column {
+            SearchSelectorCard(title = "PARTICLE SPEED", description = "How fast particles drift across the screen.", colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf("Low", "Medium", "High"), selectedIndex = particleSpeed.coerceIn(0, 2),
+                    onOptionSelected = { performHaptic(); onParticleSpeedChange(it) },
+                    colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && !matrixMode)
+            } }
+        },
+        SettingsSearchItem(
+            id = "particle_count",
+            title = "PARTICLE COUNT",
+            keywords = listOf("count", "number", "amount", "density", "particles", "how many", "more", "less", "performance", "75", "150", "300"),
+            path = "VISUALS → EFFECTS → PARTICLES → PERFORMANCE"
+        ) {
+            Column {
+            SearchSelectorCard(title = "PARTICLE COUNT", description = "Low = 75 · Medium = 150 · High = 300", colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf("Low", "Medium", "High"), selectedIndex = particleCount.coerceIn(0, 2),
+                    onOptionSelected = { performHaptic(); onParticleCountChange(it) },
+                    colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && !matrixMode)
+            } }
+        },
+        SettingsSearchItem(
+            id = "particle_refresh_rate",
+            title = "PARTICLE REFRESH RATE",
+            keywords = listOf("refresh", "refresh rate", "fps", "frame", "native", "performance", "battery", "poll", "sensor"),
+            path = "VISUALS → EFFECTS → PARTICLES → PERFORMANCE"
+        ) {
+            Column {
+            val refreshOption = when { nativeRefreshRate -> 0; quarterRefreshRate -> 2; else -> 1 }
+            SearchSelectorCard(title = "PARTICLE REFRESH RATE", description = "Controls how often particles update. Native = every frame, 1/2 = every other, 1/4 = every fourth.", colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf("Native", "1/2", "1/4"), selectedIndex = refreshOption,
+                    onOptionSelected = { opt -> performHaptic()
+                        when (opt) { 0 -> { onNativeRefreshRateChange(true); onQuarterRefreshRateChange(false) }
+                                     2 -> { onNativeRefreshRateChange(false); onQuarterRefreshRateChange(true) }
+                                     else -> { onNativeRefreshRateChange(false); onQuarterRefreshRateChange(false) } } },
+                    colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && !matrixMode)
+            } }
+        },
+        SettingsSearchItem(
+            id = "matrix_speed",
+            title = "MATRIX SPEED",
+            keywords = listOf("matrix", "speed", "rain", "fall speed", "cascade", "slow", "fast", "velocity"),
+            path = "VISUALS → EFFECTS → PARTICLES → MATRIX SETTINGS"
+        ) {
+            Column {
+            SearchSelectorCard(title = "MATRIX SPEED", description = "How fast glyphs fall down the screen.", colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf("Slow", "Medium", "Fast"), selectedIndex = matrixSpeed.coerceIn(0, 2),
+                    onOptionSelected = { performHaptic(); onMatrixSpeedChange(it) },
+                    colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && matrixMode)
+            } }
+        },
+        SettingsSearchItem(
+            id = "matrix_density",
+            title = "MATRIX DENSITY",
+            keywords = listOf("matrix", "density", "rain", "columns", "sparse", "dense", "column density", "coverage"),
+            path = "VISUALS → EFFECTS → PARTICLES → MATRIX SETTINGS"
+        ) {
+            Column {
+            SearchSelectorCard(title = "MATRIX DENSITY", description = "How many columns of glyphs appear on screen.", colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf("Sparse", "Medium", "Dense"), selectedIndex = matrixDensity.coerceIn(0, 2),
+                    onOptionSelected = { performHaptic(); onMatrixDensityChange(it) },
+                    colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && matrixMode)
+            } }
+        },
+        SettingsSearchItem(
+            id = "matrix_font_size",
+            title = "MATRIX FONT SIZE",
+            keywords = listOf("matrix", "font", "size", "glyph", "text size", "characters", "small", "large", "big"),
+            path = "VISUALS → EFFECTS → PARTICLES → MATRIX SETTINGS"
+        ) {
+            Column {
+            SearchSelectorCard(title = "MATRIX FONT SIZE", description = "The size of individual glyphs in the rain.", colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf("Small", "Medium", "Large"), selectedIndex = matrixFontSize.coerceIn(0, 2),
+                    onOptionSelected = { performHaptic(); onMatrixFontSizeChange(it) },
+                    colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && matrixMode)
+            } }
+        },
+        SettingsSearchItem(
+            id = "matrix_fade",
+            title = "MATRIX TRAIL LENGTH",
+            keywords = listOf("matrix", "fade", "trail", "length", "tail", "ghost", "streak", "short", "long", "full"),
+            path = "VISUALS → EFFECTS → PARTICLES → MATRIX SETTINGS"
+        ) {
+            Column {
+            SearchSelectorCard(title = "MATRIX TRAIL LENGTH", description = "How long the glowing trail behind each glyph is.", colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf("Short", "Medium", "Full"), selectedIndex = matrixFadeLength.coerceIn(0, 2),
+                    onOptionSelected = { performHaptic(); onMatrixFadeLengthChange(it) },
+                    colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && matrixMode)
+            } }
+        },
+        // ── RENDERER ──────────────────────────────────────────────────────────
+        SettingsSearchItem(
+            id = "aggressive_mode",
+            title = "AGGRESSIVE MODE",
+            keywords = listOf("aggressive", "mode", "renderer", "all packages", "coverage", "broad", "every app", "all apps", "force", "global"),
+            path = "RENDERER"
+        ) {
+            Column {
+            ToggleCard(title = "AGGRESSIVE MODE",
+                description = "Applies the renderer to every installed package — broader coverage, but read the warning before enabling",
+                checked = aggressiveMode, onCheckedChange = { performHaptic(); onAggressiveModeChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode, accentBorder = true) }
+        },
+        SettingsSearchItem(
+            id = "restart_launcher",
+            title = "RESTART LAUNCHER ON SWITCH",
+            keywords = listOf("restart", "launcher", "switch", "kill", "force stop", "miui", "xiaomi", "immediately", "reload"),
+            path = "RENDERER"
+        ) {
+            Column {
+            ToggleCard(title = "RESTART LAUNCHER ON SWITCH",
+                description = "Force-stops the launcher after switching so it picks up the new renderer immediately — leave off on Xiaomi / MIUI",
+                checked = killLauncher, onCheckedChange = { performHaptic(); onKillLauncherChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode, accentBorder = true) }
+        },
+        SettingsSearchItem(
+            id = "restart_keyboard",
+            title = "RESTART KEYBOARD ON SWITCH",
+            keywords = listOf("keyboard", "input method", "ime", "restart", "kill", "force stop", "gboard", "samsung keyboard", "after applying api", "renderer"),
+            path = "RENDERER"
+        ) {
+            Column {
+            ToggleCard(title = "RESTART KEYBOARD ON SWITCH",
+                description = "Force-stops the currently selected keyboard after applying the renderer, so it reloads with the new graphics API",
+                checked = killKeyboard, onCheckedChange = { performHaptic(); onKillKeyboardChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode, accentBorder = true) }
+        },
+        SettingsSearchItem(
+            id = "doze",
+            title = "DOZE",
+            keywords = listOf("doze", "sleep", "deep sleep", "battery", "power", "idle", "standby", "aggressive doze"),
+            path = "RENDERER"
+        ) {
+            Column {
+            ToggleCard(title = "DOZE",
+                description = "Puts the device into deep sleep immediately — squeezes extra battery life when you're not using it",
+                checked = dozeMode, onCheckedChange = { performHaptic(); onDozeModeChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode, accentBorder = true) }
+        },
+        SettingsSearchItem(
+            id = "gpuwatch_shortcut",
+            title = "GPUWATCH SHORTCUT",
+            keywords = listOf("gpuwatch", "gpu watch", "samsung", "shortcut", "gpu", "button", "monitor", "overlay"),
+            path = "RENDERER"
+        ) {
+            Column {
+            ToggleCard(title = "GPUWATCH SHORTCUT",
+                description = "Adds an Open GPUWatch button on the main screen. Samsung devices only.",
+                checked = showGpuWatchButton, onCheckedChange = { performHaptic(); onShowGpuWatchButtonChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode, accentBorder = true) }
+        },
+        // ── APP / SYSTEM ──────────────────────────────────────────────────────
+        SettingsSearchItem(
+            id = "verbose_output",
+            title = "VERBOSE OUTPUT",
+            keywords = listOf("verbose", "output", "log", "shell", "command", "debug", "terminal", "output", "show output"),
+            path = "APP"
+        ) {
+            Column {
+            ToggleCard(title = "VERBOSE OUTPUT",
+                description = "Shows the full shell command output when switching renderers",
+                checked = verboseMode, onCheckedChange = { performHaptic(); onVerboseModeChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
+        },
+        SettingsSearchItem(
+            id = "tap_outside_to_close",
+            title = "TAP OUTSIDE TO CLOSE",
+            keywords = listOf("tap", "outside", "close", "dismiss", "panel", "back button", "click outside", "touch outside", "gesture"),
+            path = "APP"
+        ) {
+            Column {
+            ToggleCard(title = "TAP OUTSIDE TO CLOSE",
+                description = "Tap anywhere outside an open panel to dismiss it — turn off to require the back button instead",
+                checked = dismissOnClickOutside, onCheckedChange = { performHaptic(); onDismissOnClickOutsideChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
+        },
+        SettingsSearchItem(
+            id = "notifications_reminders",
+            title = "NOTIFICATIONS / REMINDERS",
+            keywords = listOf("notifications", "reminders", "alert", "notify", "opengl", "reminder", "ping", "notification", "notif"),
+            path = "APP → NOTIFICATIONS"
+        ) {
+            Column {
+            ToggleCard(title = "REMINDERS",
+                description = "Sends an alert if you switch to OpenGL and forget to switch back",
+                checked = notificationsEnabled, onCheckedChange = { performHaptic(); onNotificationsEnabledChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
+        },
+        SettingsSearchItem(
+            id = "reminder_interval",
+            title = "REMINDER INTERVAL",
+            keywords = listOf("interval", "reminder", "frequency", "how often", "notification", "2h", "4h", "6h", "12h", "24h", "hours"),
+            path = "APP → NOTIFICATIONS"
+        ) {
+            Column {
+            SearchSelectorCard(title = "REMINDER INTERVAL", description = "How often GAMA reminds you that you're on OpenGL.", colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf("2 h", "4 h", "6 h", "12 h", "24 h"), selectedIndex = notifIntervalIndex.coerceIn(0, 4),
+                    onOptionSelected = { performHaptic(); onNotifIntervalChange(it) },
+                    colors = colors, modifier = Modifier.fillMaxWidth(), enabled = notificationsEnabled)
+            } }
+        }
+    ) } // end remember { listOf(... }
+
+    // ── Debounced async search — scoring runs off the UI thread ───────────────
+    // Previously: remember(query, …30 state keys…) recomputed Levenshtein for
+    // every keystroke synchronously on the composition thread, blocking the frame.
+    // Also: the 30-key remember invalidated on ANY state change (e.g. a particle
+    // slider moving in another panel), re-running scoring even with no query change.
+    //
+    // Now:
+    //  • Scoring runs in a background coroutine (Dispatchers.Default) — the UI
+    //    thread is never blocked by string distance math.
+    //  • 80 ms debounce absorbs fast typing so scoring fires once per "pause",
+    //    not once per character.
+    //  • The only dependency is `query`; the rendered state (toggles, sliders)
+    //    does not affect which items are returned, only how they look when rendered.
+    var results by remember { mutableStateOf(items) }
+    val searchScope = rememberCoroutineScope()
+    var debounceJob by remember { mutableStateOf<Job?>(null) }
+    LaunchedEffect(query) {
+        debounceJob?.cancel()
+        debounceJob = searchScope.launch {
+            val q = query.trim()
+            if (q.isBlank()) {
+                results = items
+                return@launch
+            }
+            delay(80L) // debounce: don't score on every single keystroke
+            val qLower = q.lowercase()
+            val queryTokens = qLower.split(Regex("\\s+")).filter { it.isNotBlank() }
+            val scored = withContext(Dispatchers.Default) {
+                items
+                    .map { it to settingsSearchScore(qLower, queryTokens, it) }
+                    .filter { (_, score) -> score >= 45 }
+                    .sortedByDescending { (_, score) -> score }
+                    .map { it.first }
+            }
+            results = scored
+        }
+    }
+
+    PanelScaffold(
+        visible = visible,
+        onDismiss = onDismiss,
+        isLandscape = isLandscape,
+        isSmallScreen = isSmallScreen,
+        oledMode = oledMode,
+        colors = colors
+    ) { scrollState ->
+        CleanTitle(
+            text = "SEARCH",
+            fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
+            colors = colors,
+            scrollOffset = scrollState.value
+        )
+
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = results.size + 2) {
+            SearchInputCard(
+                query = query,
+                onQueryChange = { query = it },
+                colors = colors,
+                cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen
+            )
+        }
+
+        if (results.isEmpty() && query.isNotBlank()) {
+            AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 2) {
+                SettingsNavigationCard(
+                    title = "NO RESULTS",
+                    description = "Try: blur, theme, dark, matrix, particles, doze, aggressive, notifications, gradient…",
+                    onClick = {},
+                    isSmallScreen = isSmallScreen,
+                    colors = colors,
+                    cardBackground = cardBackground,
+                    oledMode = oledMode
+                )
+            }
+        } else {
+            results.forEachIndexed { index, item ->
+                // PathLabel renders OUTSIDE AnimatedElement so the shadow only
+                // covers the card below it, not the breadcrumb pill above.
+                PathLabel(item.path)
+                AnimatedElement(
+                    visible = visible,
+                    cardShadow = true,
+                    staggerIndex = index + 2,
+                    totalItems = results.size + 2
+                ) {
+                    item.render()
+                }
+            }
+        }
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VisualEffectsPanel
@@ -551,10 +1515,9 @@ fun OLEDPanel(
         oledMode = oledMode, colors = colors
     ) { _ ->
         CleanTitle(text = LocalStrings.current["oled_panel.title"].ifEmpty { "OLED MODE" }, fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
-        Text(
+        PanelCaption(
             text = LocalStrings.current["oled_panel.subtitle"].ifEmpty { "On OLED and AMOLED screens, true black pixels draw zero power — enabling this can meaningfully extend battery life" },
-            fontSize = ts.bodyMedium, color = colors.textSecondary,
-            fontFamily = quicksandFontFamily, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold
+            colors = colors
         )
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 1) {
             ToggleCard(
@@ -656,7 +1619,7 @@ fun ParticlesPanel(
         )
 
         // ── Master enable toggle ───────────────────────────────────────────────
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 5) {
             ToggleCard(
                 title       = LocalStrings.current["particles.toggle"].ifEmpty { "PARTICLES" },
                 description = LocalStrings.current["particles.toggle_desc"].ifEmpty {
@@ -1177,33 +2140,70 @@ fun ParticlesPerformancePanel(
             }
         }
 
-        // Native refresh rate toggle
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 3, enabled = particlesEnabled) {
-            ToggleCard(
-                title = LocalStrings.current["particles.native_refresh_rate"].ifEmpty { "NATIVE REFRESH RATE" },
-                description = LocalStrings.current["particles.native_refresh_rate_desc"].ifEmpty { "Runs particles at your display's full refresh rate — fluid on 120Hz, but uses more battery. Turn off on older devices." },
-                checked = nativeRefreshRate,
-                onCheckedChange = { performHaptic(); onNativeRefreshRateChange(it) },
-                colors = colors, cardBackground = cardBackground,
-                isSmallScreen = isSmallScreen, oledMode = oledMode,
-                enabled = particlesEnabled
-            )
-        }
-
-        // Quarter refresh rate toggle
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 3, enabled = particlesEnabled) {
-            ToggleCard(
-                title = LocalStrings.current["particles.quarter_refresh_rate"].ifEmpty { "QUARTER REFRESH RATE" },
-                description = LocalStrings.current["particles.quarter_refresh_rate_desc"].ifEmpty { "Caps render rate to ¼ of the display (e.g. 30fps on 120Hz) — saves battery on lower-end devices. Overrides native refresh rate." },
-                checked = quarterRefreshRate,
-                onCheckedChange = { performHaptic(); onQuarterRefreshRateChange(it) },
-                colors = colors, cardBackground = cardBackground,
-                isSmallScreen = isSmallScreen, oledMode = oledMode,
-                enabled = particlesEnabled
-            )
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 2, enabled = particlesEnabled) {
+            val refreshOption = when {
+                nativeRefreshRate -> 0
+                quarterRefreshRate -> 2
+                else -> 1
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(cardBackground)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "PARTICLE REFRESH RATE",
+                        fontSize = ts.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp,
+                        fontFamily = quicksandFontFamily,
+                        color = colors.primaryAccent.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = "Controls how often particles update and how often the rotation sensor is polled. Native = every frame, 1/2 = every other frame, 1/4 = every fourth frame.",
+                        fontSize = ts.bodySmall,
+                        color = colors.textSecondary,
+                        fontFamily = quicksandFontFamily,
+                        fontWeight = FontWeight.Bold
+                    )
+                    GlideOptionSelector(
+                        options = listOf("Native", "1/2", "1/4"),
+                        selectedIndex = refreshOption,
+                        onOptionSelected = { option ->
+                            performHaptic()
+                            when (option) {
+                                0 -> {
+                                    onNativeRefreshRateChange(true)
+                                    onQuarterRefreshRateChange(false)
+                                }
+                                1 -> {
+                                    onNativeRefreshRateChange(false)
+                                    onQuarterRefreshRateChange(false)
+                                }
+                                else -> {
+                                    onNativeRefreshRateChange(false)
+                                    onQuarterRefreshRateChange(true)
+                                }
+                            }
+                        },
+                        colors = colors,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = particlesEnabled
+                    )
+                }
+            }
         }
     }
 }
+
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1233,6 +2233,7 @@ fun ColorCustomizationPanel(
 ) {
     val ts = LocalTypeScale.current
     val dynamicColorAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val gradientAvailable = !oledMode && !isDarkTheme
 
     PanelScaffold(
         visible = visible, onDismiss = onDismiss,
@@ -1274,14 +2275,37 @@ fun ColorCustomizationPanel(
                 enabled = !useDynamicColor || !dynamicColorAvailable, oledMode = oledMode
             )
         }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 4, totalItems = 4) {
-            SettingsNavigationCard(
-                title = LocalStrings.current["colors.gradient_background"].ifEmpty { "BACKGROUND GRADIENT" },
-                description = if (oledMode) LocalStrings.current["colors.gradient_background_oled_desc"].ifEmpty { "Disabled in OLED mode — background is pure black" } else LocalStrings.current["colors.gradient_background_desc"].ifEmpty { "Toggle the gradient and customize its start and end colors" },
-                onClick = { performHaptic(); onGradientClick() },
-                isSmallScreen = isSmallScreen, colors = colors,
-                cardBackground = cardBackground, oledMode = oledMode
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 4, totalItems = 4, enabled = gradientAvailable) {
+            val gradientNavScale by animateFloatAsState(
+                targetValue = if (gradientAvailable) 1f else 0.92f,
+                animationSpec = spring(
+                    dampingRatio = MotionTokens.Springs.smooth.dampingRatio,
+                    stiffness = MotionTokens.Springs.smooth.stiffness
+                ),
+                label = "gradient_nav_dark_scale"
             )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer(
+                        scaleX = gradientNavScale,
+                        scaleY = gradientNavScale,
+                        alpha = if (gradientAvailable) 1f else 0.42f
+                    )
+            ) {
+                SettingsNavigationCard(
+                    title = LocalStrings.current["colors.gradient_background"].ifEmpty { "BACKGROUND GRADIENT" },
+                    description = when {
+                        oledMode -> LocalStrings.current["colors.gradient_background_oled_desc"].ifEmpty { "Unavailable in OLED mode — background is pure black" }
+                        isDarkTheme -> "Unavailable in Dark mode — background is pure black"
+                        else -> LocalStrings.current["colors.gradient_background_desc"].ifEmpty { "Toggle the gradient and customize its start and end colors" }
+                    },
+                    onClick = { if (gradientAvailable) { performHaptic(); onGradientClick() } },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
         }
     }
 }
@@ -1304,6 +2328,7 @@ fun GradientPanel(
     useDynamicColor: Boolean,
     advancedColorPicker: Boolean,
     oledMode: Boolean,
+    darkModeActive: Boolean,
     isSmallScreen: Boolean,
     isLandscape: Boolean,
     isTablet: Boolean,
@@ -1313,7 +2338,8 @@ fun GradientPanel(
 ) {
     val ts = LocalTypeScale.current
     val dynamicColorAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    val pickersEnabled = (!useDynamicColor || !dynamicColorAvailable) && !oledMode
+    val gradientAvailable = !darkModeActive
+    val pickersEnabled = (!useDynamicColor || !dynamicColorAvailable) && gradientAvailable
 
     PanelScaffold(
         visible = visible, onDismiss = onDismiss,
@@ -1327,19 +2353,39 @@ fun GradientPanel(
         )
 
         // ── Enable toggle ─────────────────────────────────────────────────────
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3) {
-            ToggleCard(
-                title = LocalStrings.current["effects.gradient_background"].ifEmpty { "GRADIENT BACKGROUND" },
-                description = if (oledMode)
-                    LocalStrings.current["effects.gradient_background_oled_desc"].ifEmpty { "Disabled in OLED mode — background is pure black" }
-                else
-                    LocalStrings.current["effects.gradient_background_on_desc"].ifEmpty { "A slow-shifting color gradient behind your home screen" },
-                checked = gradientEnabled && !oledMode,
-                onCheckedChange = { if (!oledMode) { performHaptic(); onGradientChange(it) } },
-                colors = colors, cardBackground = cardBackground,
-                isSmallScreen = isSmallScreen, oledMode = oledMode,
-                enabled = !oledMode
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3, enabled = gradientAvailable) {
+            val gradientCardScale by animateFloatAsState(
+                targetValue = if (gradientAvailable) 1f else 0.92f,
+                animationSpec = spring(
+                    dampingRatio = MotionTokens.Springs.smooth.dampingRatio,
+                    stiffness = MotionTokens.Springs.smooth.stiffness
+                ),
+                label = "gradient_card_dark_scale"
             )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer(
+                        scaleX = gradientCardScale,
+                        scaleY = gradientCardScale,
+                        alpha = if (gradientAvailable) 1f else 0.42f
+                    )
+            ) {
+                ToggleCard(
+                    title = LocalStrings.current["effects.gradient_background"].ifEmpty { "GRADIENT BACKGROUND" },
+                    description = when {
+                        oledMode -> LocalStrings.current["effects.gradient_background_oled_desc"].ifEmpty { "Unavailable in OLED mode — background is pure black" }
+                        darkModeActive -> "Unavailable in Dark mode — background is pure black"
+                        else -> LocalStrings.current["effects.gradient_background_on_desc"].ifEmpty { "A slow-shifting color gradient behind your home screen" }
+                    },
+                    checked = gradientEnabled && gradientAvailable,
+                    onCheckedChange = { if (gradientAvailable) { performHaptic(); onGradientChange(it) } },
+                    colors = colors, cardBackground = cardBackground,
+                    isSmallScreen = isSmallScreen, oledMode = oledMode,
+                    enabled = gradientAvailable
+                )
+            }
         }
 
         // ── Gradient start color ───────────────────────────────────────────────
@@ -1347,12 +2393,12 @@ fun GradientPanel(
             enabled = pickersEnabled) {
             CompactColorPickerCard(
                 title = LocalStrings.current["colors.gradient_start"].ifEmpty { "GRADIENT START" },
-                description = if (oledMode)
-                    LocalStrings.current["colors.gradient_start_oled_desc"].ifEmpty { "Disabled in OLED mode" }
-                else if (useDynamicColor && dynamicColorAvailable)
-                    LocalStrings.current["colors.gradient_start_dynamic_desc"].ifEmpty { "Controlled by Dynamic Color — disable it to set a custom color" }
-                else
-                    LocalStrings.current["colors.gradient_start_desc"].ifEmpty { "The color the background gradient fades from at the top of the screen" },
+                description = when {
+                    oledMode -> LocalStrings.current["colors.gradient_start_oled_desc"].ifEmpty { "Disabled in OLED mode" }
+                    darkModeActive -> "Disabled in Dark mode"
+                    useDynamicColor && dynamicColorAvailable -> LocalStrings.current["colors.gradient_start_dynamic_desc"].ifEmpty { "Controlled by Dynamic Color — disable it to set a custom color" }
+                    else -> LocalStrings.current["colors.gradient_start_desc"].ifEmpty { "The color the background gradient fades from at the top of the screen" }
+                },
                 currentColor = customGradientStart,
                 onColorChange = onGradientStartChange,
                 colors = colors, cardBackground = cardBackground,
@@ -1367,12 +2413,12 @@ fun GradientPanel(
             enabled = pickersEnabled) {
             CompactColorPickerCard(
                 title = LocalStrings.current["colors.gradient_end"].ifEmpty { "GRADIENT END" },
-                description = if (oledMode)
-                    LocalStrings.current["colors.gradient_end_oled_desc"].ifEmpty { "Disabled in OLED mode" }
-                else if (useDynamicColor && dynamicColorAvailable)
-                    LocalStrings.current["colors.gradient_end_dynamic_desc"].ifEmpty { "Controlled by Dynamic Color — disable it to set a custom color" }
-                else
-                    LocalStrings.current["colors.gradient_end_desc"].ifEmpty { "The color the background gradient fades into at the bottom of the screen" },
+                description = when {
+                    oledMode -> LocalStrings.current["colors.gradient_end_oled_desc"].ifEmpty { "Disabled in OLED mode" }
+                    darkModeActive -> "Disabled in Dark mode"
+                    useDynamicColor && dynamicColorAvailable -> LocalStrings.current["colors.gradient_end_dynamic_desc"].ifEmpty { "Controlled by Dynamic Color — disable it to set a custom color" }
+                    else -> LocalStrings.current["colors.gradient_end_desc"].ifEmpty { "The color the background gradient fades into at the bottom of the screen" }
+                },
                 currentColor = customGradientEnd,
                 onColorChange = onGradientEndChange,
                 colors = colors, cardBackground = cardBackground,
@@ -1479,6 +2525,8 @@ fun RendererPanel(
     onAggressiveModeChange: (Boolean) -> Unit,
     killLauncher: Boolean,
     onKillLauncherChange: (Boolean) -> Unit,
+    killKeyboard: Boolean,
+    onKillKeyboardChange: (Boolean) -> Unit,
     dozeMode: Boolean,
     onDozeModeChange: (Boolean) -> Unit,
     showGpuWatchButton: Boolean,
@@ -1504,7 +2552,7 @@ fun RendererPanel(
             colors = colors
         )
 
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 5) {
             ToggleCard(
                 title = LocalStrings.current["renderer.aggressive_mode"].ifEmpty { "AGGRESSIVE MODE" },
                 description = LocalStrings.current["renderer.aggressive_mode_desc"].ifEmpty { "Applies the renderer to every installed package — broader coverage, but read the warning before enabling" },
@@ -1515,7 +2563,7 @@ fun RendererPanel(
                 accentBorder = true
             )
         }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 4) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 5) {
             ToggleCard(
                 title = LocalStrings.current["renderer.kill_launcher"].ifEmpty { "RESTART LAUNCHER ON SWITCH" },
                 description = LocalStrings.current["renderer.kill_launcher_desc"].ifEmpty { "Force-stops the launcher after switching so it picks up the new renderer immediately — leave off on Xiaomi / MIUI" },
@@ -1526,7 +2574,18 @@ fun RendererPanel(
                 accentBorder = true
             )
         }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 4) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 5) {
+            ToggleCard(
+                title = LocalStrings.current["renderer.kill_keyboard"].ifEmpty { "RESTART KEYBOARD ON SWITCH" },
+                description = LocalStrings.current["renderer.kill_keyboard_desc"].ifEmpty { "Force-stops the currently selected keyboard after applying the renderer, so it reloads with the new graphics API" },
+                checked = killKeyboard,
+                onCheckedChange = { performHaptic(); onKillKeyboardChange(it) },
+                colors = colors, cardBackground = cardBackground,
+                isSmallScreen = isSmallScreen, oledMode = oledMode,
+                accentBorder = true
+            )
+        }
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 4, totalItems = 5) {
             ToggleCard(
                 title = LocalStrings.current["renderer.doze_mode"].ifEmpty { "DOZE" },
                 description = LocalStrings.current["renderer.doze_mode_desc"].ifEmpty { "Puts the device into deep sleep immediately — squeezes extra battery life when you're not using it" },
@@ -1537,7 +2596,7 @@ fun RendererPanel(
                 accentBorder = true
             )
         }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 4, totalItems = 4) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 5, totalItems = 5) {
             ToggleCard(
                 title = LocalStrings.current["renderer.show_gpuwatch_toggle"].ifEmpty { "GPUWATCH SHORTCUT" },
                 description = LocalStrings.current["renderer.show_gpuwatch_desc"].ifEmpty { "Adds an Open GPUWatch button on the main screen. Samsung devices only." },
@@ -1684,7 +2743,7 @@ fun BehaviorPanel(
             colors = colors
         )
 
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 5) {
             ToggleCard(
                 title = LocalStrings.current["renderer.verbose_mode"].ifEmpty { "VERBOSE OUTPUT" },
                 description = LocalStrings.current["renderer.verbose_mode_desc"].ifEmpty { "Shows the full shell command output when switching renderers" },
@@ -1694,7 +2753,7 @@ fun BehaviorPanel(
                 isSmallScreen = isSmallScreen, oledMode = oledMode
             )
         }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 4) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 5) {
             ToggleCard(
                 title = LocalStrings.current["renderer.tap_outside_to_close"].ifEmpty { "TAP OUTSIDE TO CLOSE" },
                 description = LocalStrings.current["renderer.tap_outside_to_close_desc"].ifEmpty { "Tap anywhere outside an open panel to dismiss it — turn off to require the back button instead" },
@@ -1704,7 +2763,7 @@ fun BehaviorPanel(
                 isSmallScreen = isSmallScreen, oledMode = oledMode
             )
         }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 4) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 4, totalItems = 5) {
             ToggleCard(
                 title = LocalStrings.current["renderer.doze_mode"].ifEmpty { "DOZE" },
                 description = LocalStrings.current["renderer.doze_mode_desc"].ifEmpty { "Puts the device into deep sleep immediately — squeezes extra battery life when you're not using it" },
@@ -1715,7 +2774,7 @@ fun BehaviorPanel(
                 accentBorder = true
             )
         }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 4, totalItems = 4) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 5, totalItems = 5) {
             ToggleCard(
                 title = LocalStrings.current["renderer.show_gpuwatch_toggle"].ifEmpty { "GPUWATCH SHORTCUT" },
                 description = LocalStrings.current["renderer.show_gpuwatch_desc"].ifEmpty { "Adds an Open GPUWatch button on the main screen. Samsung devices only." },
@@ -1764,14 +2823,13 @@ fun NotificationsPanel(
     ) { _ ->
         CleanTitle(text = LocalStrings.current["notifications.title"].ifEmpty { "NOTIFICATIONS" }, fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
 
-        Text(
+        PanelCaption(
             text = LocalStrings.current["notifications.subtitle"].ifEmpty { "GAMA can ping you if you've left OpenGL running and haven't switched back to Vulkan" },
-            fontSize = ts.bodyMedium, color = colors.textSecondary,
-            fontFamily = quicksandFontFamily, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold
+            colors = colors
         )
 
         if (!hasPermission) {
-            AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4) {
+            AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 5) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1918,10 +2976,9 @@ fun BackupPanel(
     ) { _ ->
         CleanTitle(text = LocalStrings.current["backup.title"].ifEmpty { "BACKUP" }, fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
 
-        Text(
+        PanelCaption(
             text = LocalStrings.current["backup.subtitle"].ifEmpty { "Save all your GAMA settings to a file, or load them back from a previous backup — useful before reinstalling or switching devices" },
-            fontSize = ts.bodyMedium, color = colors.textSecondary,
-            fontFamily = quicksandFontFamily, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold
+            colors = colors
         )
 
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 2) {
@@ -2026,7 +3083,7 @@ fun CrashLogPanel(
         openedEntryKey = null
 
         // GAMA file log — read & parse on IO
-        val rawText = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val rawText = withContext(Dispatchers.IO) {
             try {
                 val f = java.io.File(context.filesDir, "crash_log.txt")
                 if (f.exists() && f.length() > 0) f.readText() else ""
@@ -2038,7 +3095,7 @@ fun CrashLogPanel(
         // System dropbox crashes — only attempt if Shizuku is available
         if (ShizukuHelper.checkBinder() && ShizukuHelper.checkPermission()) {
             systemCrashesLoading = true
-            systemCrashes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            systemCrashes = withContext(Dispatchers.IO) {
                 ShizukuHelper.fetchCrashLogs()
             }
             systemCrashesLoading = false
@@ -2318,15 +3375,11 @@ private fun CrashDetailPanel(
         )
 
         // Subtitle: thread or formatted time
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3) {
-            Text(
+        AnimatedElement(visible = visible, cardShadow = false, staggerIndex = 1, totalItems = 3) {
+            PanelCaption(
                 text = subtitle,
-                fontSize = ts.bodyMedium,
-                fontFamily = quicksandFontFamily,
-                fontWeight = FontWeight.Bold,
-                color = if (isSystemUI) colors.primaryAccent.copy(alpha = 0.85f)
-                        else colors.textSecondary,
-                textAlign = TextAlign.Center
+                colors = colors,
+                accent = isSystemUI
             )
         }
 
@@ -2399,10 +3452,9 @@ fun DeveloperPanel(
     ) { _ ->
         CleanTitle(text = "DEVELOPER", fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
 
-        Text(
+        PanelCaption(
             text = LocalStrings.current["renderer.verbose_mode_desc"].ifEmpty { "A little playground for testing things" },
-            fontSize = ts.bodyMedium, color = colors.textSecondary,
-            fontFamily = quicksandFontFamily, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold
+            colors = colors
         )
 
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3) {
@@ -2490,7 +3542,7 @@ fun ResourcesPanel(
         isBlurred = isBlurred, oledMode = oledMode, colors = colors
     ) { scrollState ->
         CleanTitle(
-            text = LocalStrings.current["integrations.title"].ifEmpty { "LIBRARY" },
+            text = LocalStrings.current["resources.title"].ifEmpty { "RESOURCES" },
             fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
             colors = colors, scrollOffset = scrollState.value
         )
@@ -2698,26 +3750,26 @@ fun LanguagePanel(
                             colors.primaryAccent.copy(alpha = 0.7f)
                         else
                             colors.border.copy(alpha = if (oledMode) 0.4f else 0.25f),
-                        shape = RoundedCornerShape(14.dp)
+                        shape = RoundedCornerShape(28.dp)
                     )
             ) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors   = CardDefaults.cardColors(containerColor = cardBackground),
-                    shape    = RoundedCornerShape(14.dp),
+                    shape    = RoundedCornerShape(28.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
                         verticalAlignment     = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
                             text       = "⌕",
-                            fontSize   = 18.sp,
-                            color      = colors.textSecondary.copy(alpha = 0.5f),
+                            fontSize   = 24.sp,
+                            color      = colors.textSecondary.copy(alpha = 0.58f),
                             fontFamily = quicksandFontFamily
                         )
                         Box(modifier = Modifier.weight(1f)) {
