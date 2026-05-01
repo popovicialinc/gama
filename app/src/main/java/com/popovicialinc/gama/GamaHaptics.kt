@@ -147,12 +147,12 @@ object GamaHaptics {
         if (heldForMs < HOLD_RELEASE_THRESHOLD_MS) return
 
         lastSurfaceHapticAtMs = SystemClock.uptimeMillis()
-        val a1 = scaled(context, PREF_HOLD_STRENGTH, 228, 128, 255, DEFAULT_HOLD_STRENGTH, strengthOverride)
-        val a2 = scaled(context, PREF_HOLD_STRENGTH, 174, 88, 240, DEFAULT_HOLD_STRENGTH, strengthOverride)
-        val a3 = scaled(context, PREF_HOLD_STRENGTH, 108, 48, 188, DEFAULT_HOLD_STRENGTH, strengthOverride)
+        val a1 = scaled(context, PREF_HOLD_STRENGTH, 255, 150, 255, DEFAULT_HOLD_STRENGTH, strengthOverride)
+        val a2 = scaled(context, PREF_HOLD_STRENGTH, 218, 112, 255, DEFAULT_HOLD_STRENGTH, strengthOverride)
+        val a3 = scaled(context, PREF_HOLD_STRENGTH, 128, 56, 208, DEFAULT_HOLD_STRENGTH, strengthOverride)
         if (!vibratePattern(
                 context,
-                longArrayOf(0L, 34L, 30L, 26L, 42L, 18L),
+                longArrayOf(0L, 38L, 26L, 30L, 38L, 18L),
                 intArrayOf(0, a1, 0, a2, 0, a3)
             )
         ) {

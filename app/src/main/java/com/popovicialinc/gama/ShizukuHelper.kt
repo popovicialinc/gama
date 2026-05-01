@@ -86,7 +86,9 @@ object ShizukuHelper {
                     Triple(out, err, true)
                 }
 
-                val exitCode = if (finished) process.exitValue() else -1
+                val exitCode = if (finished) {
+                    try { process.exitValue() } catch (_: IllegalThreadStateException) { -1 }
+                } else -1
                 when {
                     !finished -> "Error: command timed out"
                     output.isNotEmpty() -> output.trim()
@@ -470,16 +472,6 @@ object ShizukuHelper {
         onStatusUpdate: (String) -> Unit, onVerboseOutput: ((String) -> Unit)? = null
     ) = guardedLaunch(context, scope) {
         applyCustomRenderersSuspend(context, customRendererApps, onStatusUpdate, onVerboseOutput)
-    }
-
-    suspend fun clearBackgroundApps(): String = withContext(Dispatchers.IO) {
-        if (!checkBinder() || !checkPermission()) return@withContext "Error: Shizuku permission is not available"
-
-        // This is the real Android ActivityManager path for killing cached
-        // background processes. It does NOT remove cards from the Recents UI and
-        // it does NOT force-stop foreground/system/protected apps, which is good:
-        // removing those would be unsafe and very ROM-dependent.
-        runCommand("am kill-all")
     }
 
     /**

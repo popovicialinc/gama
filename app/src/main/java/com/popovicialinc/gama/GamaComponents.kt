@@ -143,6 +143,8 @@ fun GlideOptionSelector(
     val ts = LocalTypeScale.current
     val animLevel = LocalAnimationLevel.current
     val viewConfiguration = LocalViewConfiguration.current
+    val density = LocalDensity.current
+    var dragIndicatorCenterPx by remember { mutableStateOf<Float?>(null) }
 
     val currentOnOptionSelected by rememberUpdatedState(onOptionSelected)
     val currentSelectedIndex by rememberUpdatedState(selectedIndex)
@@ -175,26 +177,27 @@ fun GlideOptionSelector(
         val maxWidth = maxWidth
         val itemWidth = maxWidth / options.size
 
-        // Animated indicator — spring with a gentle overshoot so the pill
-        // feels physical: it accelerates toward the target then softly overshoots
-        // before snapping to rest. Level-1 uses a more subdued but still springy spec.
-        val indicatorOffset by animateDpAsState(
-            targetValue = itemWidth * selectedIndex,
+        val itemWidthPxForIndicator = with(density) { itemWidth.toPx() }
+        val selectedOffsetPx = itemWidthPxForIndicator * selectedIndex
+        val liveOffsetPx = dragIndicatorCenterPx
+            ?.let { (it - itemWidthPxForIndicator / 2f).coerceIn(0f, itemWidthPxForIndicator * (options.size - 1)) }
+            ?: selectedOffsetPx
+
+        // Smart live indicator: while dragging it follows the finger continuously,
+        // then eases to the nearest stop. This avoids jitter when the user skips
+        // several stops quickly.
+        val animatedIndicatorPx by animateFloatAsState(
+            targetValue = liveOffsetPx,
             animationSpec = if (animLevel == 2) {
                 snap()
-            } else if (animLevel == 0) {
-                spring<Dp>(
-                    dampingRatio = 0.60f,
-                    stiffness = Spring.StiffnessMediumLow  // ~240 — slow, expressive
-                )
+            } else if (dragIndicatorCenterPx != null) {
+                tween(durationMillis = 42, easing = CubicBezierEasing(0.22f, 0.0f, 0.2f, 1.0f))
             } else {
-                spring<Dp>(
-                    dampingRatio = 0.72f,
-                    stiffness = Spring.StiffnessMedium     // ~400 — snappier, still settles cleanly
-                )
+                tween(durationMillis = if (animLevel == 0) 170 else 120, easing = CubicBezierEasing(0.18f, 0.85f, 0.32f, 1.0f))
             },
             label = "indicator"
         )
+        val indicatorOffset = with(density) { animatedIndicatorPx.toDp() }
 
         Box(
             modifier = Modifier
@@ -250,6 +253,7 @@ fun GlideOptionSelector(
                         val itemWidthPx = size.width.toFloat() / options.size
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
+                            dragIndicatorCenterPx = down.position.x
                             var lastIndex = (down.position.x / itemWidthPx)
                                 .toInt().coerceIn(0, options.size - 1)
                             var isDrag = false
@@ -259,6 +263,7 @@ fun GlideOptionSelector(
                                 val ptr = event.changes.firstOrNull() ?: break
                                 if (!ptr.pressed) break // finger lifted
 
+                                dragIndicatorCenterPx = ptr.position.x
                                 val newIndex = (ptr.position.x / itemWidthPx)
                                     .toInt().coerceIn(0, options.size - 1)
 
@@ -283,6 +288,7 @@ fun GlideOptionSelector(
                                     currentOnOptionSelected(tapIndex)
                                 }
                             }
+                            dragIndicatorCenterPx = null
                         }
                     }
             )
@@ -639,6 +645,7 @@ fun AnimatedElement(
     val view = LocalView.current
     val context = LocalContext.current
     val backButtonAvoidance = LocalFloatingBackButtonAvoidance.current
+    val backButtonInversed = LocalBackButtonInversed.current
     var overlapsFloatingBackButton by remember { mutableStateOf(false) }
     var lastAvoidanceHapticAtMs by remember { mutableStateOf(0L) }
     val avoidEndPadding by animateDpAsState(
@@ -756,7 +763,10 @@ fun AnimatedElement(
         val safeAvoidEndPadding = avoidEndPadding.coerceAtLeast(0.dp)
         val cardModifier = modifier
             .then(avoidanceModifier)
-            .padding(end = safeAvoidEndPadding)
+            .padding(
+                start = if (backButtonInversed) safeAvoidEndPadding else 0.dp,
+                end = if (backButtonInversed) 0.dp else safeAvoidEndPadding
+            )
 
         Box(
             modifier = (if (cardShadow) cardModifier.directionalShadow() else cardModifier)
@@ -1160,7 +1170,7 @@ fun FlatButton(
                         detectTapGestures(
                             onPress = {
                                 val hapticStartedAt = GamaHaptics.pressStart(context, view)
-                                if (animLevel != 2) isPressed = true
+                                isPressed = true
                                 val released = tryAwaitRelease()
                                 isPressed = false
                                 GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
@@ -1345,7 +1355,7 @@ fun IllustratedButton(
                                     } else {
                                         GamaHaptics.pressStart(context, view)
                                     }
-                                    if (animLevel != 2) isPressed = true
+                                    isPressed = true
                                     val released = tryAwaitRelease()
                                     isPressed = false
                                     GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
@@ -1545,6 +1555,7 @@ fun BigRendererButton(
     val pp         = pressProgress.value
     val pressScale = 1f - pp * (1f - MotionTokens.Scale.moderate)
     val contentTY  = pp * with(density) { 2.dp.toPx() }
+    val rendererBorderWidth = (1f + pp * 1.2f).dp
     // Shape and icon size are derived at layout time via BoxWithConstraints so they
     // scale correctly across all screen sizes, densities, and orientations.
 
@@ -1623,7 +1634,7 @@ fun BigRendererButton(
                 modifier = Modifier
                     .matchParentSize()
                     .blur(glowBlurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                    .border(1.dp, colors.primaryAccent.copy(alpha = buttonGlowAlpha), shape)
+                    .border(rendererBorderWidth, colors.primaryAccent.copy(alpha = buttonGlowAlpha), shape)
             )
         }
 
@@ -1649,12 +1660,12 @@ fun BigRendererButton(
                         1.0f to colors.primaryAccent.copy(alpha = if (enabled) 0.075f else 0.0f)
                     )
                 )
-                .border(1.dp, borderColor, shape)
+                .border(rendererBorderWidth, borderColor, shape)
                 .then(if (enabled) Modifier.pointerInput(enabled) {
                     detectTapGestures(
                         onPress = {
                             val hapticStartedAt = GamaHaptics.rendererPressStart(context, view)
-                            if (animLevel != 2) isPressed = true
+                            isPressed = true
                             val released = tryAwaitRelease()
                             isPressed = false
                             GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
@@ -3396,7 +3407,7 @@ fun PanelBackButton(
                     detectTapGestures(
                         onPress = {
                             val hapticStartedAt = GamaHaptics.pressStart(context, view)
-                            if (animLevel != 2) isPressed = true
+                            isPressed = true
                             val released = tryAwaitRelease()
                             isPressed = false
                             GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
@@ -3538,7 +3549,7 @@ fun PanelSearchButton(
                     detectTapGestures(
                         onPress = {
                             val hapticStartedAt = GamaHaptics.pressStart(context, view)
-                            if (animLevel != 2) isPressed = true
+                            isPressed = true
                             val released = tryAwaitRelease()
                             isPressed = false
                             GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
@@ -3682,7 +3693,7 @@ fun PanelGlobalButton(
                     detectTapGestures(
                         onPress = {
                             val hapticStartedAt = GamaHaptics.pressStart(context, view)
-                            if (animLevel != 2) isPressed = true
+                            isPressed = true
                             val released = tryAwaitRelease()
                             isPressed = false
                             GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
@@ -3845,7 +3856,7 @@ fun DialogButton(
                     detectTapGestures(
                         onPress = {
                             val hapticStartedAt = GamaHaptics.pressStart(context, view)
-                            if (animLevel != 2) isPressed = true
+                            isPressed = true
                             val released = tryAwaitRelease()
                             isPressed = false
                             GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)

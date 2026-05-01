@@ -376,6 +376,7 @@ val LocalUIScale = compositionLocalOf { 1 } // 0=75%, 1=100%, 2=125%
 val LocalDismissOnClickOutside = compositionLocalOf { true } // New global setting for back behavior
 val LocalStaggerEnabled = compositionLocalOf { true } // true = cascading stagger, false = simultaneous fade+scale
 val LocalBackButtonAvoidanceEnabled = compositionLocalOf { true } // true = cards duck away from floating back button
+val LocalBackButtonInversed = compositionLocalOf { false } // false = back button on right, true = back button on left
 val LocalShadowsEnabled = compositionLocalOf { true } // true = card elevation shadows, false = flat (no shadow blur pass)
 val LocalCardSettled   = compositionLocalOf { true }  // false while AnimatedElement is mid-stagger, true once it lands
 val LocalCardProgress  = compositionLocalOf { 1f }    // mirrors AnimatedElement's progress [0,1]; drives directional shadow intensity

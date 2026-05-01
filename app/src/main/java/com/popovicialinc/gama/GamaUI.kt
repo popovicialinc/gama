@@ -195,7 +195,6 @@ fun GamaUI(
 
     // Dialog States
     var showSuccessDialog by remember { mutableStateOf(false) }
-    var showClearRecentsDialog by remember { mutableStateOf(false) }
     var successDialogMessage by remember { mutableStateOf("") }
     // True from the moment the user taps Continue until commandOutput arrives,
     // which is the real completion signal from ShizukuHelper. During this window
@@ -284,11 +283,6 @@ fun GamaUI(
             performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
             showSuccessDialog = false
         }
-    }
-
-    BackHandler(enabled = showClearRecentsDialog) {
-        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-        showClearRecentsDialog = false
     }
 
     // (DeveloperMenuDialog BackHandler removed — showDeveloperMenu was dead state)
@@ -491,6 +485,7 @@ fun GamaUI(
     var showGpuWatchButton by remember { mutableStateOf(prefs.getBoolean("show_gpuwatch_button", false)) }
     var staggerEnabled by remember { mutableStateOf(prefs.getBoolean("stagger_enabled", true)) }
     var backButtonAvoidanceEnabled by remember { mutableStateOf(prefs.getBoolean("back_button_avoidance_enabled", true)) }
+    var backButtonInversed by remember { mutableStateOf(prefs.getBoolean("back_button_inversed", false)) }
     var shadowsEnabled by remember { mutableStateOf(prefs.getBoolean("shadows_enabled", true)) }
     var hapticsEnabled by remember { mutableStateOf(prefs.getBoolean(GamaHaptics.PREF_ENABLED, GamaHaptics.DEFAULT_ENABLED)) }
     var hapticsRegularEnabled by remember { mutableStateOf(prefs.getBoolean(GamaHaptics.PREF_REGULAR_ENABLED, GamaHaptics.DEFAULT_REGULAR_ENABLED)) }
@@ -778,6 +773,7 @@ fun GamaUI(
         val snapShowGpuWatch     = showGpuWatchButton
         val snapStagger          = staggerEnabled
         val snapBackButtonAvoidance = backButtonAvoidanceEnabled
+        val snapBackButtonInversed = backButtonInversed
         val snapShadows          = shadowsEnabled
         val snapHapticsEnabled   = hapticsEnabled
         val snapHapticsRegularEnabled = hapticsRegularEnabled
@@ -837,6 +833,7 @@ fun GamaUI(
                 putBoolean("show_gpuwatch_button",      snapShowGpuWatch)
                 putBoolean("stagger_enabled",           snapStagger)
                 putBoolean("back_button_avoidance_enabled", snapBackButtonAvoidance)
+                putBoolean("back_button_inversed",      snapBackButtonInversed)
                 putBoolean("shadows_enabled",           snapShadows)
                 putBoolean(GamaHaptics.PREF_ENABLED,     snapHapticsEnabled)
                 putBoolean(GamaHaptics.PREF_REGULAR_ENABLED,  snapHapticsRegularEnabled)
@@ -941,7 +938,7 @@ fun GamaUI(
             showWarningDialog || showGitHubDialog || showResourcesPanel || showExternalLinkConfirm ||
             showSettings || showSettingsSearch || showHapticsPanel || showAppearance || showColorCustomization || showGradient ||
             showSystem || showRendererPanel ||
-            showShizukuHelp || showSuccessDialog || showClearRecentsDialog ||
+            showShizukuHelp || showSuccessDialog ||
             showVerbosePanel || showAggressiveWarning || showGPUWatchConfirm ||
             showDeveloper || showEasterEgg || showNotifications || showBackup || showCrashLog ||
             showEffects || showParticles || showParticlesAppearance ||
@@ -955,7 +952,7 @@ fun GamaUI(
             showWarningDialog || showGitHubDialog || showResourcesPanel ||
             showSettings || showSettingsSearch || showHapticsPanel || showAppearance || showColorCustomization || showGradient ||
             showSystem || showRendererPanel ||
-            showShizukuHelp || showSuccessDialog || showClearRecentsDialog ||
+            showShizukuHelp || showSuccessDialog ||
             showVerbosePanel || showAggressiveWarning || showGPUWatchConfirm ||
             showDeveloper || showEasterEgg || showNotifications || showBackup || showCrashLog ||
             showEffects || showParticles || showParticlesAppearance ||
@@ -1159,6 +1156,7 @@ fun GamaUI(
         LocalDismissOnClickOutside provides dismissOnClickOutside,
         LocalStaggerEnabled provides staggerEnabled,
         LocalBackButtonAvoidanceEnabled provides backButtonAvoidanceEnabled,
+        LocalBackButtonInversed provides backButtonInversed,
         LocalShadowsEnabled provides (shadowsEnabled && !effectiveOledMode),
         LocalTypeScale provides typeScale,
         LocalDensity provides Density(
@@ -1505,7 +1503,7 @@ fun GamaUI(
                                                             pendingRendererName = "Vulkan"
                                                             pendingRendererSwitch = {
                                                                 verboseOutput = ""
-                                                                if (verboseMode) showVerbosePanel = true
+                                                                // Verbose output is shown after the success dialog is dismissed, so panels never overlap.
                                                                 ShizukuHelper.runVulkan(
                                                                     context, scope, aggressiveMode,
                                                                     killLauncher,
@@ -1538,7 +1536,7 @@ fun GamaUI(
                                                             pendingRendererName = "OpenGL"
                                                             pendingRendererSwitch = {
                                                                 verboseOutput = ""
-                                                                if (verboseMode) showVerbosePanel = true
+                                                                // Verbose output is shown after the success dialog is dismissed, so panels never overlap.
                                                                 ShizukuHelper.runOpenGL(
                                                                     context, scope, aggressiveMode,
                                                                     killLauncher,
@@ -1870,7 +1868,7 @@ fun GamaUI(
                                                         pendingRendererName = "Vulkan"
                                                         pendingRendererSwitch = {
                                                             verboseOutput = ""
-                                                            if (verboseMode) showVerbosePanel = true
+                                                            // Verbose output is shown after the success dialog is dismissed, so panels never overlap.
                                                             ShizukuHelper.runVulkan(
                                                                 context, scope, aggressiveMode,
                                                                 killLauncher,
@@ -1903,7 +1901,7 @@ fun GamaUI(
                                                         pendingRendererName = "OpenGL"
                                                         pendingRendererSwitch = {
                                                             verboseOutput = ""
-                                                            if (verboseMode) showVerbosePanel = true
+                                                            // Verbose output is shown after the success dialog is dismissed, so panels never overlap.
                                                             ShizukuHelper.runOpenGL(
                                                                 context, scope, aggressiveMode,
                                                                 killLauncher,
@@ -2224,37 +2222,10 @@ fun GamaUI(
                 isSwitching = rendererSwitching,
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    val shouldShowVerbose = verboseMode && verboseOutput.isNotBlank()
                     showSuccessDialog = false
                     rendererSwitching = false
-                    // Ask about clearing recents now that the switch is done and GAMA is alive
-                    showClearRecentsDialog = true
-                },
-                isSmallScreen = isSmallScreen,
-                isLandscape = isLandscape,
-                isTablet = isTablet,
-                colors = colors,
-                cardBackground = cardBackground
-            )
-
-            ClearRecentsDialog(
-                visible = showClearRecentsDialog,
-                onDismiss = {
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showClearRecentsDialog = false
-                },
-                onConfirm = {
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showClearRecentsDialog = false
-                    scope.launch {
-                        val result = ShizukuHelper.clearBackgroundApps()
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(
-                                context,
-                                if (result.startsWith("Error", ignoreCase = true)) "Could not clear background apps" else "Background apps cleared",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
+                    if (shouldShowVerbose) showVerbosePanel = true
                 },
                 isSmallScreen = isSmallScreen,
                 isLandscape = isLandscape,
@@ -2400,6 +2371,8 @@ fun GamaUI(
                 onStaggerEnabledChange = { staggerEnabled = it; savePreferences() },
                 backButtonAvoidanceEnabled = backButtonAvoidanceEnabled,
                 onBackButtonAvoidanceEnabledChange = { backButtonAvoidanceEnabled = it; savePreferences() },
+                backButtonInversed = backButtonInversed,
+                onBackButtonInversedChange = { backButtonInversed = it; savePreferences() },
                 shadowsEnabled = shadowsEnabled,
                 onShadowsEnabledChange = { shadowsEnabled = it; savePreferences() },
                 // Colors
@@ -2632,6 +2605,12 @@ fun GamaUI(
                 onDismissOnClickOutsideChange = { enabled ->
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     dismissOnClickOutside = enabled
+                    savePreferences()
+                },
+                backButtonInversed = backButtonInversed,
+                onBackButtonInversedChange = { enabled ->
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    backButtonInversed = enabled
                     savePreferences()
                 },
                 onNotificationsClick = {
