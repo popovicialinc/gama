@@ -65,24 +65,36 @@ object ShizukuHelper {
             val remoteProcess = method.invoke(null, arrayOf("sh", "-c", cmd), null, null)
             val process = remoteProcess as? Process ?: return@withContext "Error: Could not cast to Process"
 
-            // Read stdout and stderr sequentially on the calling thread.
-            // Previously this spawned two raw Thread objects per command — with
-            // aggressive mode force-stopping 200+ packages that meant hundreds of
-            // short-lived threads.  Sequential reads are safe here because:
-            //   (a) runCommand always runs on Dispatchers.IO so blocking is fine
-            //   (b) the shell command has already finished (or timed out) before we
-            //       read — there is no deadlock risk since we don't write to stdin.
-            val finished = process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)
-            val output = process.inputStream.bufferedReader().readText()
-            val error  = process.errorStream.bufferedReader().readText()
-            process.destroy()
+            try {
+                val (output, error, finished) = coroutineScope {
+                    val outputDeferred = async(Dispatchers.IO) {
+                        process.inputStream.bufferedReader().readText()
+                    }
+                    val errorDeferred = async(Dispatchers.IO) {
+                        process.errorStream.bufferedReader().readText()
+                    }
 
-            val exitCode = if (finished) process.exitValue() else -1
-            when {
-                !finished               -> "Error: command timed out"
-                output.isNotEmpty()     -> output.trim()  // stdout wins even if stderr has warnings
-                exitCode != 0 && error.isNotEmpty() -> "Error: $error"
-                else                    -> "Success"      // empty stdout, clean exit = prop not set
+                    val didFinish = process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)
+                    if (!didFinish) {
+                        outputDeferred.cancel()
+                        errorDeferred.cancel()
+                        return@coroutineScope Triple("", "", false)
+                    }
+
+                    val out = try { outputDeferred.await() } catch (_: Exception) { "" }
+                    val err = try { errorDeferred.await() } catch (_: Exception) { "" }
+                    Triple(out, err, true)
+                }
+
+                val exitCode = if (finished) process.exitValue() else -1
+                when {
+                    !finished -> "Error: command timed out"
+                    output.isNotEmpty() -> output.trim()
+                    exitCode != 0 && error.isNotEmpty() -> "Error: ${error.trim()}"
+                    else -> "Success"
+                }
+            } finally {
+                process.destroy()
             }
         } catch (e: Exception) {
             "Error: ${e.message}"
@@ -181,6 +193,11 @@ object ShizukuHelper {
         }
     }
 
+    private val safePackageNameRegex = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$")
+    private fun isSafePackageName(pkg: String): Boolean {
+        return pkg.isNotBlank() && pkg.length <= 255 && safePackageNameRegex.matches(pkg)
+    }
+
     private fun shellQuote(value: String): String {
         return "'" + value.replace("'", "'\\''") + "'"
     }
@@ -263,7 +280,7 @@ object ShizukuHelper {
         }
 
         fun canForceStopPackage(pkg: String): Boolean {
-            if (pkg.isBlank()) return false
+            if (!isSafePackageName(pkg)) return false
             if (pkg in protectedPackages) return false
             if (pkg.startsWith("com.android.inputmethod") && !killKeyboard) return false
             if (pkg in launcherPackages && (!killLauncher || xiaomiFamilyDevice || pkg == "com.miui.home")) return false
@@ -292,10 +309,7 @@ object ShizukuHelper {
         runCommand("setprop debug.hwui.renderer $propValue").also { onVerboseOutput?.invoke("Output: $it\n\n") }
 
         if (aggressiveMode) {
-            val packages = runCommand("pm list packages").split("\n")
-                .filter { it.startsWith("package:") }
-                .map { it.substring(8).trim() }
-                .filter { it.isNotBlank() }
+            val packages = getAllPackageNames()
                 .filter { pkg -> canForceStopPackage(pkg) }
 
             packages.forEach { pkg ->
@@ -385,18 +399,27 @@ object ShizukuHelper {
         onVerboseOutput: ((String) -> Unit)? = null
     ) = withContext(Dispatchers.IO) {
         withContext(Dispatchers.Main) { onStatusUpdate("Applying custom renderer settings...") }
+        var appliedCount = 0
         customRendererApps.forEach { (pkg, renderer) ->
+            if (!isSafePackageName(pkg)) {
+                onVerboseOutput?.invoke("Skipping invalid package name: $pkg\n")
+                return@forEach
+            }
+
             val value = when (renderer.lowercase()) {
                 "vulkan" -> "skiavk"
                 "opengl" -> "opengl"
                 else     -> return@forEach
             }
+
+            val quotedPkg = shellQuote(pkg)
             runCommand("setprop debug.hwui.renderer.$pkg $value").also { onVerboseOutput?.invoke("Output: $it\n") }
-            runCommand("am force-stop $pkg")
+            runCommand("am force-stop $quotedPkg").also { onVerboseOutput?.invoke("Force-stop output: $it\n") }
+            appliedCount++
         }
         withContext(Dispatchers.Main) {
             onStatusUpdate("Custom renderers applied!")
-            Toast.makeText(context, "Applied ${customRendererApps.size} custom renderers", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Applied $appliedCount custom renderers", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -447,6 +470,16 @@ object ShizukuHelper {
         onStatusUpdate: (String) -> Unit, onVerboseOutput: ((String) -> Unit)? = null
     ) = guardedLaunch(context, scope) {
         applyCustomRenderersSuspend(context, customRendererApps, onStatusUpdate, onVerboseOutput)
+    }
+
+    suspend fun clearBackgroundApps(): String = withContext(Dispatchers.IO) {
+        if (!checkBinder() || !checkPermission()) return@withContext "Error: Shizuku permission is not available"
+
+        // This is the real Android ActivityManager path for killing cached
+        // background processes. It does NOT remove cards from the Recents UI and
+        // it does NOT force-stop foreground/system/protected apps, which is good:
+        // removing those would be unsafe and very ROM-dependent.
+        runCommand("am kill-all")
     }
 
     /**
@@ -649,7 +682,7 @@ object ShizukuHelper {
                 Notification.Builder(context, "gama_test")
                     // Android notification small icons must be an app-provided monochrome drawable.
                     // Framework icons can render as a blank white square on some ROMs.
-                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setSmallIcon(R.drawable.ic_notification)
                     .setColor(0xFF5A63A8.toInt())
                     .setColorized(false)
                     .setContentTitle(if (userName.isNotEmpty()) "Hey $userName! 👋" else "Test Notification")

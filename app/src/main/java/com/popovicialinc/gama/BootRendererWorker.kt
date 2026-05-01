@@ -167,7 +167,7 @@ class BootRendererWorker(
         nm.notify(
             3001,
             android.app.Notification.Builder(context, "gama_boot")
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(android.app.Notification.BigTextStyle().bigText(body))

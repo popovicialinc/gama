@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import android.provider.Settings
 import android.graphics.Bitmap
 import android.graphics.BlurMaskFilter
@@ -636,8 +637,10 @@ fun AnimatedElement(
     val staggerEnabled = LocalStaggerEnabled.current
     val density = LocalDensity.current
     val view = LocalView.current
+    val context = LocalContext.current
     val backButtonAvoidance = LocalFloatingBackButtonAvoidance.current
     var overlapsFloatingBackButton by remember { mutableStateOf(false) }
+    var lastAvoidanceHapticAtMs by remember { mutableStateOf(0L) }
     val avoidEndPadding by animateDpAsState(
         targetValue = if (cardShadow && backButtonAvoidance.enabled && overlapsFloatingBackButton)
             backButtonAvoidance.endPadding
@@ -735,7 +738,18 @@ fun AnimatedElement(
                 }
 
                 val overlaps = itemBottom > avoidZoneTop && itemTop < screenHeight
-                if (overlapsFloatingBackButton != overlaps) overlapsFloatingBackButton = overlaps
+                if (overlapsFloatingBackButton != overlaps) {
+                    overlapsFloatingBackButton = overlaps
+                    val now = SystemClock.uptimeMillis()
+                    if (now - lastAvoidanceHapticAtMs > 140L) {
+                        lastAvoidanceHapticAtMs = now
+                        if (overlaps) {
+                            GamaHaptics.avoidanceDodge(context, view)
+                        } else {
+                            GamaHaptics.avoidanceReturn(context, view)
+                        }
+                    }
+                }
             }
         } else Modifier
 
@@ -872,6 +886,8 @@ fun SettingsNavigationCard(
     modifier: Modifier = Modifier
 ) {
     val ts = LocalTypeScale.current
+    val context = LocalContext.current
+    val view = LocalView.current
     // --- disabled-state animations (unchanged) ---
     val disabledScale by animateFloatAsState(
         targetValue = if (enabled) 1f else 0.88f,
@@ -962,9 +978,11 @@ fun SettingsNavigationCard(
                     if (!enabled) return@pointerInput
                     detectTapGestures(
                         onPress = {
+                            val hapticStartedAt = GamaHaptics.pressStart(context, view)
                             isPressed = true
                             val released = tryAwaitRelease()
                             isPressed = false
+                            GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
                             if (released) onClick()
                         }
                     )
@@ -1058,6 +1076,8 @@ fun FlatButton(
 ) {
     val animLevel = LocalAnimationLevel.current
     var isPressed by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val view = LocalView.current
     val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val density = LocalDensity.current
 
@@ -1139,9 +1159,11 @@ fun FlatButton(
                     if (enabled) Modifier.pointerInput(enabled) {
                         detectTapGestures(
                             onPress = {
+                                val hapticStartedAt = GamaHaptics.pressStart(context, view)
                                 if (animLevel != 2) isPressed = true
-                                tryAwaitRelease()
+                                val released = tryAwaitRelease()
                                 isPressed = false
+                                GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
                             },
                             onTap = { onClick() }
                         )
@@ -1179,6 +1201,8 @@ fun IllustratedButton(
 ) {
     val animLevel = LocalAnimationLevel.current
     var isPressed by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val view = LocalView.current
     val configuration = LocalConfiguration.current
     val isSmallScreen = configuration.screenWidthDp.dp < 360.dp
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
@@ -1221,8 +1245,9 @@ fun IllustratedButton(
     val textScale       = 1f - pp * 0.07f
     val textTranslateY  = pp * nudgePx
 
-    // All buttons use the same border spec as the container box: 1.dp, primaryAccent at 0.55f alpha.
-    val borderWidthDp = 1.dp
+    // Same physical reaction language as settings cards: slight zoom-in, thicker outline.
+    val restBorderWidth = if (oledMode) 0.75f else 1f
+    val borderWidthDp = (restBorderWidth + pp * restBorderWidth).dp
     val animatedButtonColor = if (!enabled) colors.cardBackground
     else if (iconType == "vulkan" || iconType == "opengl") Color.Transparent
     else colors.cardBackground
@@ -1230,10 +1255,11 @@ fun IllustratedButton(
     val contentColor = colors.textPrimary
     val animatedTextColor = if (!enabled) colors.textSecondary.copy(alpha = 0.3f) else contentColor
 
-    // All buttons match container border alpha (0.55f).
+    // Outline brightens on press, matching SettingsNavigationCard.
     val borderColor = when {
-        !enabled -> colors.primaryAccent.copy(alpha = 0.25f)
-        else     -> colors.primaryAccent.copy(alpha = 0.55f)
+        !enabled  -> colors.primaryAccent.copy(alpha = 0.25f)
+        isPressed -> colors.primaryAccent
+        else      -> colors.primaryAccent.copy(alpha = 0.55f)
     }
 
     // The icon colour: vulkan bolt always neon accent; accent buttons get full accent;
@@ -1314,9 +1340,15 @@ fun IllustratedButton(
                         if (enabled) Modifier.pointerInput(enabled) {
                             detectTapGestures(
                                 onPress = {
+                                    val hapticStartedAt = if (iconType == "vulkan" || iconType == "opengl") {
+                                        GamaHaptics.rendererPressStart(context, view)
+                                    } else {
+                                        GamaHaptics.pressStart(context, view)
+                                    }
                                     if (animLevel != 2) isPressed = true
                                     val released = tryAwaitRelease()
                                     isPressed = false
+                                    GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
                                     if (released) onClick()
                                 }
                             )
@@ -1480,6 +1512,9 @@ fun BigRendererButton(
     iconType: String
 ) {
     val animLevel = LocalAnimationLevel.current
+    val strings = LocalStrings.current
+    val context = LocalContext.current
+    val view = LocalView.current
     val density   = LocalDensity.current
     val ts        = LocalTypeScale.current
     val configuration = LocalConfiguration.current
@@ -1618,9 +1653,11 @@ fun BigRendererButton(
                 .then(if (enabled) Modifier.pointerInput(enabled) {
                     detectTapGestures(
                         onPress = {
+                            val hapticStartedAt = GamaHaptics.rendererPressStart(context, view)
                             if (animLevel != 2) isPressed = true
                             val released = tryAwaitRelease()
                             isPressed = false
+                            GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
                             if (released) onClick()
                         }
                     )
@@ -2027,6 +2064,8 @@ fun RendererCard(
     val ts = LocalTypeScale.current
     val animLevel = LocalAnimationLevel.current
     val density = LocalDensity.current
+    val context = LocalContext.current
+    val view = LocalView.current
     val strings = LocalStrings.current
     val configuration = LocalConfiguration.current
     val isLandscape   = configuration.screenWidthDp > configuration.screenHeightDp
@@ -2250,9 +2289,11 @@ fun RendererCard(
                     .pointerInput(shizukuReady) {
                         detectTapGestures(
                             onPress = {
+                                val hapticStartedAt = GamaHaptics.pressStart(context, view)
                                 isPressed = true
-                                tryAwaitRelease()
+                                val released = tryAwaitRelease()
                                 isPressed = false
+                                GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
                             },
                             onTap = {
                                 if (!shizukuReady) onShizukuErrorClick()
@@ -2931,7 +2972,7 @@ fun ToggleCard(
     val targetBorderAlpha = when {
         !enabled            -> 0.24f
         checked             -> 0.82f
-        accentBorder        -> 0.34f
+        accentBorder        -> 0.55f
         oledMode            -> 0.30f
         else                -> 0.20f
     }
@@ -3110,6 +3151,8 @@ fun BackArrowButton(
     colors: ThemeColors,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val view = LocalView.current
     val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val buttonSize = if (isSmallScreen) 48.dp else 56.dp
     val iconSize = if (isSmallScreen) 22.dp else 26.dp
@@ -3195,9 +3238,11 @@ fun BackArrowButton(
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onPress = {
+                            val hapticStartedAt = GamaHaptics.pressStart(context, view)
                             isPressed = true
-                            tryAwaitRelease()
+                            val released = tryAwaitRelease()
                             isPressed = false
+                            GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
                         },
                         onTap = { onClick() }
                     )
@@ -3250,6 +3295,8 @@ fun PanelBackButton(
     // on larger displays or when panel content was short.
 
     val animLevel = LocalAnimationLevel.current
+    val context = LocalContext.current
+    val view = LocalView.current
     val currentOnClick by rememberUpdatedState(onClick)
     val btnSize  = if (isSmallScreen) 48.dp else 52.dp
     val iconSize = if (isSmallScreen) 22.dp else 26.dp
@@ -3348,9 +3395,11 @@ fun PanelBackButton(
                     if (!enabled) return@pointerInput
                     detectTapGestures(
                         onPress = {
+                            val hapticStartedAt = GamaHaptics.pressStart(context, view)
                             if (animLevel != 2) isPressed = true
                             val released = tryAwaitRelease()
                             isPressed = false
+                            GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
                             if (released) currentOnClick()
                         }
                     )
@@ -3392,6 +3441,9 @@ fun PanelSearchButton(
     modifier: Modifier = Modifier
 ) {
     val animLevel = LocalAnimationLevel.current
+    val strings = LocalStrings.current
+    val context = LocalContext.current
+    val view = LocalView.current
     val currentOnClick by rememberUpdatedState(onClick)
     val btnSize  = if (isSmallScreen) 48.dp else 52.dp
     val iconSize = if (isSmallScreen) 23.dp else 27.dp
@@ -3480,14 +3532,16 @@ fun PanelSearchButton(
                     colors.primaryAccent.copy(alpha = borderAlphaVal),
                     RoundedCornerShape(28.dp)
                 )
-                .semantics { contentDescription = "Search settings" }
+                .semantics { contentDescription = strings["search.content_description"].ifEmpty { "Search settings" } }
                 .pointerInput(enabled) {
                     if (!enabled) return@pointerInput
                     detectTapGestures(
                         onPress = {
+                            val hapticStartedAt = GamaHaptics.pressStart(context, view)
                             if (animLevel != 2) isPressed = true
                             val released = tryAwaitRelease()
                             isPressed = false
+                            GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
                             if (released) currentOnClick()
                         }
                     )
@@ -3520,6 +3574,195 @@ fun PanelSearchButton(
     }
 }
 
+
+@Composable
+fun PanelGlobalButton(
+    onClick: () -> Unit,
+    colors: ThemeColors,
+    oledMode: Boolean = false,
+    isSmallScreen: Boolean = false,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier
+) {
+    val animLevel = LocalAnimationLevel.current
+    val strings = LocalStrings.current
+    val context = LocalContext.current
+    val view = LocalView.current
+    val currentOnClick by rememberUpdatedState(onClick)
+    val btnSize  = if (isSmallScreen) 48.dp else 52.dp
+    val iconSize = if (isSmallScreen) 24.dp else 28.dp
+    val glowAlpha = 0.26f
+
+    var isPressed by remember { mutableStateOf(false) }
+    val pressProgress = remember { Animatable(0f) }
+    LaunchedEffect(isPressed) {
+        pressProgress.animateTo(
+            targetValue = if (isPressed) 1f else 0f,
+            animationSpec = when (animLevel) {
+                2 -> snap()
+                1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasized)
+                else -> spring(
+                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                    stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+                )
+            }
+        )
+    }
+
+    val pp = pressProgress.value
+    val density = LocalDensity.current
+    val appearScale by animateFloatAsState(
+        targetValue = if (enabled) 1f else 0.82f,
+        animationSpec = spring(dampingRatio = 0.58f, stiffness = 360f),
+        label = "panel_global_appear_scale"
+    )
+    val pressScale = (1f - pp * (1f - MotionTokens.Scale.subtle)) * appearScale
+    val iconTY = pp * with(density) { 1.5.dp.toPx() }
+    val borderWidthDp = (1.5f + pp * 0.5f).dp
+    val borderAlphaVal = 0.4f + pp * 0.6f
+    val glowSize = btnSize * 1.8f
+
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Box(
+                modifier = Modifier
+                    .size(glowSize)
+                    .blur(radius = 20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                colors.primaryAccent.copy(alpha = glowAlpha),
+                                colors.primaryAccent.copy(alpha = glowAlpha * 0.4f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(glowSize)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                colors.primaryAccent.copy(alpha = glowAlpha * 0.45f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .size(btnSize)
+                .graphicsLayer(scaleX = pressScale, scaleY = pressScale)
+                .clip(RoundedCornerShape(28.dp))
+                .background(
+                    Brush.radialGradient(
+                        listOf(
+                            colors.primaryAccent.copy(alpha = 0.22f),
+                            colors.primaryAccent.copy(alpha = 0.08f)
+                        )
+                    )
+                )
+                .border(
+                    borderWidthDp,
+                    colors.primaryAccent.copy(alpha = borderAlphaVal),
+                    RoundedCornerShape(28.dp)
+                )
+                .semantics { contentDescription = strings["search.global_shortcut_content_description"].ifEmpty { "Open global settings list" } }
+                .pointerInput(enabled) {
+                    if (!enabled) return@pointerInput
+                    detectTapGestures(
+                        onPress = {
+                            val hapticStartedAt = GamaHaptics.pressStart(context, view)
+                            if (animLevel != 2) isPressed = true
+                            val released = tryAwaitRelease()
+                            isPressed = false
+                            GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
+                            if (released) currentOnClick()
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .size(iconSize)
+                    .graphicsLayer(translationY = iconTY)
+            ) {
+                val strokeWidth = 2.1.dp.toPx()
+                val globeColor = colors.primaryAccent.copy(alpha = 0.92f)
+                val center = Offset(size.width / 2f, size.height / 2f)
+                val radius = size.minDimension * 0.39f
+                val meridianSize = Size(radius * 1.05f, radius * 2.0f)
+                val meridianTopLeft = Offset(center.x - meridianSize.width / 2f, center.y - meridianSize.height / 2f)
+
+                drawCircle(
+                    color = globeColor,
+                    radius = radius,
+                    center = center,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+                drawLine(
+                    color = globeColor,
+                    start = Offset(center.x - radius * 0.88f, center.y),
+                    end = Offset(center.x + radius * 0.88f, center.y),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+                drawArc(
+                    color = globeColor,
+                    startAngle = 90f,
+                    sweepAngle = 180f,
+                    useCenter = false,
+                    topLeft = meridianTopLeft,
+                    size = meridianSize,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+                drawArc(
+                    color = globeColor,
+                    startAngle = 270f,
+                    sweepAngle = 180f,
+                    useCenter = false,
+                    topLeft = meridianTopLeft,
+                    size = meridianSize,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+
+                val latitudeSize = Size(radius * 1.65f, radius * 0.82f)
+                val latitudeTopLeft = Offset(center.x - latitudeSize.width / 2f, center.y - latitudeSize.height / 2f)
+
+                drawArc(
+                    color = globeColor.copy(alpha = 0.78f),
+                    startAngle = 20f,
+                    sweepAngle = 140f,
+                    useCenter = false,
+                    topLeft = latitudeTopLeft.copy(y = latitudeTopLeft.y - radius * 0.33f),
+                    size = latitudeSize,
+                    style = Stroke(width = strokeWidth * 0.75f, cap = StrokeCap.Round)
+                )
+                drawArc(
+                    color = globeColor.copy(alpha = 0.78f),
+                    startAngle = 200f,
+                    sweepAngle = 140f,
+                    useCenter = false,
+                    topLeft = latitudeTopLeft.copy(y = latitudeTopLeft.y + radius * 0.33f),
+                    size = latitudeSize,
+                    style = Stroke(width = strokeWidth * 0.75f, cap = StrokeCap.Round)
+                )
+            }
+        }
+    }
+}
+
+
 @Composable
 fun DialogButton(
     text: String,
@@ -3534,6 +3777,8 @@ fun DialogButton(
     val ts = LocalTypeScale.current
     val animLevel = LocalAnimationLevel.current
     var isPressed by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val view = LocalView.current
     val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val density = LocalDensity.current
     val shape = RoundedCornerShape(28.dp)
@@ -3599,9 +3844,11 @@ fun DialogButton(
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onPress = {
+                            val hapticStartedAt = GamaHaptics.pressStart(context, view)
                             if (animLevel != 2) isPressed = true
-                            tryAwaitRelease()
+                            val released = tryAwaitRelease()
                             isPressed = false
+                            GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
                         },
                         onTap = { onClick() }
                     )

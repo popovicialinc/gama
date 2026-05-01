@@ -158,7 +158,7 @@ fun sendBootNotification(
     )
 
     val builder = android.app.Notification.Builder(context, channelId)
-        .setSmallIcon(R.mipmap.ic_launcher)
+        .setSmallIcon(R.drawable.ic_notification)
         .setContentTitle(title)
         .setContentText(bootBody)
         .setContentIntent(pendingIntent)
@@ -207,7 +207,7 @@ fun sendOpenGLReminderNotification(context: Context, userName: String = ""): Boo
         nm.notify(
             2001,
             android.app.Notification.Builder(context, channelId)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(messages.random())
                 .setContentIntent(pendingIntent)

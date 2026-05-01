@@ -2,6 +2,7 @@ package com.popovicialinc.gama
 
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -54,6 +55,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared panel scaffold — full-screen BouncyDialog with scroll + back button
@@ -71,6 +73,7 @@ private fun PanelScaffold(
     leadingFloatingButton: (@Composable (Modifier) -> Unit)? = null,
     reserveBackButtonSpace: Boolean = true,
     contentAvoidsBackButton: Boolean = true,
+    contentScrollable: Boolean = true,
     content: @Composable ColumnScope.(scrollState: ScrollState) -> Unit
 ) {
     val dismissOnClickOutside = LocalDismissOnClickOutside.current
@@ -173,7 +176,10 @@ private fun PanelScaffold(
                     Column(
                         modifier = Modifier
                             .widthIn(max = if (isLandscape) 800.dp else 500.dp)
-                            .verticalScroll(scrollState)
+                            .then(
+                                if (contentScrollable) Modifier.verticalScroll(scrollState)
+                                else Modifier.fillMaxHeight()
+                            )
                             .padding(horizontal = horizontalPadding)
                             .padding(
                                 top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
@@ -268,6 +274,7 @@ fun SettingsPanel(
     onAppearanceClick: () -> Unit,
     onRendererClick: () -> Unit,
     onSystemClick: () -> Unit,
+    onHapticsClick: () -> Unit,
     isSmallScreen: Boolean,
     isLandscape: Boolean,
     isTablet: Boolean,
@@ -304,7 +311,7 @@ fun SettingsPanel(
             colors = colors
         )
 
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4) {
             SettingsNavigationCard(
                 title = strings["settings.appearance"].ifEmpty { "VISUALS" },
                 description = strings["settings.appearance_desc"].ifEmpty { "Colors, theme, effects, animations, and interface scale" },
@@ -314,7 +321,7 @@ fun SettingsPanel(
             )
         }
 
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 3) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 4) {
             SettingsNavigationCard(
                 title = strings["settings.renderer"].ifEmpty { "RENDERER" },
                 description = strings["settings.renderer_desc"].ifEmpty { "Switching engine, aggressive mode, doze, and launcher behavior" },
@@ -324,7 +331,17 @@ fun SettingsPanel(
             )
         }
 
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 3) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 4) {
+            SettingsNavigationCard(
+                title = "HAPTICS",
+                description = "Touch feedback, hold-release strength, renderer pulses, language pattern, and bounce ticks",
+                onClick = { performHaptic(); onHapticsClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
+
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 4, totalItems = 4) {
             SettingsNavigationCard(
                 title = strings["settings.system"].ifEmpty { "APP" },
                 description = strings["settings.system_desc"].ifEmpty { "Notifications, backup, language, integrations, and logs" },
@@ -415,6 +432,7 @@ private fun SearchInputCard(
     isSmallScreen: Boolean
 ) {
     val ts = LocalTypeScale.current
+    val strings = LocalStrings.current
 
     Box(
         modifier = Modifier
@@ -464,7 +482,7 @@ private fun SearchInputCard(
                     Box(modifier = Modifier.fillMaxWidth()) {
                         if (query.isBlank()) {
                             Text(
-                                text = "Search settings, toggles, sliders...",
+                                text = strings["search.placeholder"].ifEmpty { "Search settings, toggles, sliders..." },
                                 color = colors.textSecondary.copy(alpha = 0.68f),
                                 fontSize = ts.bodyLarge,
                                 fontFamily = quicksandFontFamily,
@@ -547,6 +565,18 @@ private fun SearchSelectorCard(
 fun SettingsSearchPanel(
     visible: Boolean,
     onDismiss: () -> Unit,
+    onAppearanceClick: () -> Unit,
+    onColorCustomizationClick: () -> Unit,
+    onGradientClick: () -> Unit,
+    onEffectsClick: () -> Unit,
+    onParticlesClick: () -> Unit,
+    onRendererClick: () -> Unit,
+    onSystemClick: () -> Unit,
+    onNotificationsClick: () -> Unit,
+    onBackupClick: () -> Unit,
+    onCrashLogClick: () -> Unit,
+    onLanguageClick: () -> Unit,
+    onHapticsClick: () -> Unit,
     // ── VISUALS / Appearance ──────────────────────────────────────────────────
     themePreference: Int,
     onThemeChange: (Int) -> Unit,
@@ -570,6 +600,12 @@ fun SettingsSearchPanel(
     onAdvancedColorPickerChange: (Boolean) -> Unit,
     gradientEnabled: Boolean,
     onGradientChange: (Boolean) -> Unit,
+    customAccentColor: Color,
+    onAccentColorChange: (Color) -> Unit,
+    customGradientStart: Color,
+    onGradientStartChange: (Color) -> Unit,
+    customGradientEnd: Color,
+    onGradientEndChange: (Color) -> Unit,
     // ── Effects ───────────────────────────────────────────────────────────────
     blurEnabled: Boolean,
     onBlurChange: (Boolean) -> Unit,
@@ -631,9 +667,40 @@ fun SettingsSearchPanel(
     performHaptic: () -> Unit
 ) {
     val ts = LocalTypeScale.current
+    val strings = LocalStrings.current
     var query by remember { mutableStateOf("") }
+    var committedQuery by remember { mutableStateOf("") }
+    var showAllSettings by remember { mutableStateOf(false) }
+
+    LaunchedEffect(visible) {
+        if (visible) {
+            query = ""
+            committedQuery = ""
+            showAllSettings = false
+        }
+    }
+
+    // Keep text input instant, but delay expensive result composition very slightly.
+    // This prevents the first keystroke from scoring + composing result cards in
+    // the same frame as keyboard/input work, which caused the search-panel hitch.
+    LaunchedEffect(query) {
+        val nextQuery = query.trim()
+        if (nextQuery.isBlank()) {
+            committedQuery = ""
+        } else {
+            delay(90)
+            committedQuery = nextQuery
+        }
+    }
     val dynamicColorAvailable = Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
     val gradientAvailable = !darkModeActive
+    val customColorControlsEnabled = !useDynamicColor || !dynamicColorAvailable
+    val gradientPickersEnabled = customColorControlsEnabled && gradientAvailable
+
+    fun openSearchDestination(action: () -> Unit) {
+        action()
+        onDismiss()
+    }
 
     // ── Helper: a breadcrumb pill shown above each result ─────────────────────
     // It uses the same floating-back-button avoidance as cards, so long PATH pills
@@ -718,11 +785,189 @@ fun SettingsSearchPanel(
     // if a ToggleCard or GlideOptionSelector changes a setting, the result card
     // needs to recompose with the new checked/selected value immediately.
     val items = listOf(
+        // ── PANEL SHORTCUTS ───────────────────────────────────────────────────
+        SettingsSearchItem(
+            id = "appearance_panel",
+            title = "APPEARANCE",
+            keywords = listOf("appearance", "visuals", "theme", "ui", "colors", "effects", "particles", "look", "settings section"),
+            path = "SETTINGS"
+        ) {
+            Column {
+                SettingsNavigationCard(
+                    title = "APPEARANCE",
+                    description = "Theme, color, effects, particles, and visual behavior.",
+                    onClick = { openSearchDestination(onAppearanceClick) },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
+        },
+        SettingsSearchItem(
+            id = "colors_panel",
+            title = "COLORS",
+            keywords = listOf("colors", "colour", "accent", "dynamic color", "color picker", "palette", "custom color"),
+            path = "SETTINGS → APPEARANCE"
+        ) {
+            Column {
+                SettingsNavigationCard(
+                    title = "COLORS",
+                    description = "Dynamic color, accent color, and background gradient controls.",
+                    onClick = { openSearchDestination(onColorCustomizationClick) },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
+        },
+        SettingsSearchItem(
+            id = "effects_panel",
+            title = "EFFECTS",
+            keywords = listOf("effects", "blur", "shadows", "visual effects", "glass", "cards"),
+            path = "SETTINGS → APPEARANCE"
+        ) {
+            Column {
+                SettingsNavigationCard(
+                    title = "EFFECTS",
+                    description = "Blur and card-shadow controls.",
+                    onClick = { openSearchDestination(onEffectsClick) },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
+        },
+        SettingsSearchItem(
+            id = "particles_panel",
+            title = "PARTICLES",
+            keywords = listOf("particles", "stars", "matrix", "background", "rain", "parallax", "motion"),
+            path = "SETTINGS → APPEARANCE"
+        ) {
+            Column {
+                SettingsNavigationCard(
+                    title = "PARTICLES",
+                    description = "Particle style, motion, appearance, and performance controls.",
+                    onClick = { openSearchDestination(onParticlesClick) },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
+        },
+        SettingsSearchItem(
+            id = "renderer_panel",
+            title = "RENDERER",
+            keywords = listOf("renderer", "opengl", "vulkan", "switch", "aggressive", "launcher", "keyboard", "gpuwatch"),
+            path = "SETTINGS"
+        ) {
+            Column {
+                SettingsNavigationCard(
+                    title = "RENDERER",
+                    description = "Renderer-switch behavior and advanced switching options.",
+                    onClick = { openSearchDestination(onRendererClick) },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
+        },
+        SettingsSearchItem(
+            id = "system_panel",
+            title = "APP",
+            keywords = listOf("app", "system", "notifications", "backup", "language", "logs", "verbose", "tap outside"),
+            path = "SETTINGS"
+        ) {
+            Column {
+                SettingsNavigationCard(
+                    title = "APP",
+                    description = "Notifications, backups, language, logs, and app behavior.",
+                    onClick = { openSearchDestination(onSystemClick) },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
+        },
+        SettingsSearchItem(
+            id = "haptics_panel",
+            title = "HAPTICS",
+            keywords = listOf("haptics", "vibration", "vibrate", "buzz", "click", "hold", "release", "renderer haptic", "language haptic", "bounce", "dodge", "return", "reset haptics", "strength", "mechanical", "engine"),
+            path = "SETTINGS"
+        ) {
+            Column {
+                SettingsNavigationCard(
+                    title = "HAPTICS",
+                    description = "Customize regular taps, hold release, renderer pulses, language patterns, and bounce feedback.",
+                    onClick = { openSearchDestination(onHapticsClick) },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
+        },
+        SettingsSearchItem(
+            id = "notifications_panel",
+            title = "NOTIFICATIONS",
+            keywords = listOf("notifications", "reminders", "alerts", "open gl reminder", "opengl reminder"),
+            path = "SETTINGS → APP"
+        ) {
+            Column {
+                SettingsNavigationCard(
+                    title = "NOTIFICATIONS",
+                    description = "Reminder alerts if OpenGL is left enabled.",
+                    onClick = { openSearchDestination(onNotificationsClick) },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
+        },
+        SettingsSearchItem(
+            id = "backup_panel",
+            title = "BACKUP & RESTORE",
+            keywords = listOf("backup", "restore", "export", "import", "settings backup", "save settings"),
+            path = "SETTINGS → APP"
+        ) {
+            Column {
+                SettingsNavigationCard(
+                    title = "BACKUP & RESTORE",
+                    description = "Export settings or restore them from a backup file.",
+                    onClick = { openSearchDestination(onBackupClick) },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
+        },
+        SettingsSearchItem(
+            id = "language_panel",
+            title = "LANGUAGE",
+            keywords = listOf("language", "translation", "locale", "english", "romanian", "romana", "limba"),
+            path = "SETTINGS → APP"
+        ) {
+            Column {
+                SettingsNavigationCard(
+                    title = "LANGUAGE",
+                    description = "Change the display language used throughout GAMA.",
+                    onClick = { openSearchDestination(onLanguageClick) },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
+        },
+        SettingsSearchItem(
+            id = "logs_panel",
+            title = "LOGS",
+            keywords = listOf("logs", "log", "crash", "crashes", "crash log", "debug", "reports", "system crash"),
+            path = "SETTINGS → APP"
+        ) {
+            Column {
+                SettingsNavigationCard(
+                    title = "LOGS",
+                    description = "View recent reports and copy details for troubleshooting.",
+                    onClick = { openSearchDestination(onCrashLogClick) },
+                    isSmallScreen = isSmallScreen, colors = colors,
+                    cardBackground = cardBackground, oledMode = oledMode
+                )
+            }
+        },
+
         // ── VISUALS ───────────────────────────────────────────────────────────
         SettingsSearchItem(
             id = "theme",
             title = "THEME",
-            keywords = listOf("theme", "mode", "auto", "dark", "light", "appearance", "visuals", "oled", "color mode", "them", "thme", "teme", "night"),
+            keywords = listOf("theme", "mode", "auto", "dark", "light", "appearance", "visuals", "color mode", "them", "thme", "teme", "night"),
             path = "VISUALS"
         ) {
             Column {
@@ -790,17 +1035,6 @@ fun SettingsSearchPanel(
         },
         // ── COLORS ────────────────────────────────────────────────────────────
         SettingsSearchItem(
-            id = "oled_mode",
-            title = "OLED MODE",
-            keywords = listOf("oled", "amoled", "black", "battery", "pure black", "true black", "power", "screen", "dark"),
-            path = "VISUALS → COLORS"
-        ) {
-            Column {
-            ToggleCard(title = "OLED MODE", description = if (oledMode) "Active — all backgrounds are pure black" else "Off — using your regular theme background color",
-                checked = oledMode, onCheckedChange = { performHaptic(); onOledModeChange(it) },
-                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
-        },
-        SettingsSearchItem(
             id = "dynamic_color",
             title = "DYNAMIC COLOR",
             keywords = listOf("dynamic", "material you", "wallpaper", "accent", "monet", "android 12", "auto color", "system color", "automatic"),
@@ -827,6 +1061,51 @@ fun SettingsSearchPanel(
                 onCheckedChange = { performHaptic(); onAdvancedColorPickerChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
                 oledMode = oledMode, enabled = !useDynamicColor || !dynamicColorAvailable) }
+        },
+        SettingsSearchItem(
+            id = "accent_color",
+            title = "ACCENT COLOR",
+            keywords = listOf("accent", "accent color", "custom accent", "color", "colour", "highlight", "buttons", "borders", "picker", "hex", "primary color"),
+            path = "VISUALS → COLORS"
+        ) {
+            Column {
+                CompactColorPickerCard(
+                    title = "ACCENT COLOR",
+                    description = if (customColorControlsEnabled) "The highlight color used on buttons, borders, and interactive elements" else "Controlled by Dynamic Color — disable it to set a custom accent",
+                    currentColor = customAccentColor,
+                    onColorChange = { color -> performHaptic(); onAccentColorChange(color) },
+                    colors = colors,
+                    cardBackground = cardBackground,
+                    isSmallScreen = isSmallScreen,
+                    isLandscape = isLandscape,
+                    advancedPicker = advancedColorPicker,
+                    enabled = customColorControlsEnabled,
+                    oledMode = oledMode
+                )
+            }
+        },
+        SettingsSearchItem(
+            id = "background_gradient_panel",
+            title = "BACKGROUND GRADIENT",
+            keywords = listOf("background gradient", "gradient background", "gradient panel", "gradient colors", "gradient start", "gradient end", "background colors"),
+            path = "VISUALS → COLORS"
+        ) {
+            Column {
+                SettingsNavigationCard(
+                    title = "BACKGROUND GRADIENT",
+                    description = when {
+                        oledMode -> "Unavailable in OLED mode — background is pure black"
+                        darkModeActive -> "Unavailable in Dark mode — background is pure black"
+                        else -> "Toggle the gradient and customize its start and end colors"
+                    },
+                    onClick = { if (gradientAvailable) openSearchDestination(onGradientClick) },
+                    isSmallScreen = isSmallScreen,
+                    colors = colors,
+                    cardBackground = cardBackground,
+                    enabled = gradientAvailable,
+                    oledMode = oledMode
+                )
+            }
         },
         SettingsSearchItem(
             id = "gradient_background",
@@ -864,6 +1143,61 @@ fun SettingsSearchPanel(
                     oledMode = oledMode, enabled = gradientAvailable)
             } }
         },
+        SettingsSearchItem(
+            id = "gradient_start",
+            title = "GRADIENT START",
+            keywords = listOf("gradient start", "start color", "top gradient", "background gradient start", "gradient first color", "gradient color"),
+            path = "VISUALS → COLORS → BACKGROUND GRADIENT"
+        ) {
+            Column {
+                CompactColorPickerCard(
+                    title = "GRADIENT START",
+                    description = when {
+                        oledMode -> "Disabled in OLED mode"
+                        darkModeActive -> "Disabled in Dark mode"
+                        useDynamicColor && dynamicColorAvailable -> "Controlled by Dynamic Color — disable it to set a custom color"
+                        else -> "The color the background gradient fades from at the top of the screen"
+                    },
+                    currentColor = customGradientStart,
+                    onColorChange = { color -> performHaptic(); onGradientStartChange(color) },
+                    colors = colors,
+                    cardBackground = cardBackground,
+                    isSmallScreen = isSmallScreen,
+                    isLandscape = isLandscape,
+                    advancedPicker = advancedColorPicker,
+                    enabled = gradientPickersEnabled,
+                    oledMode = oledMode
+                )
+            }
+        },
+        SettingsSearchItem(
+            id = "gradient_end",
+            title = "GRADIENT END",
+            keywords = listOf("gradient end", "end color", "bottom gradient", "background gradient end", "gradient second color", "gradient color"),
+            path = "VISUALS → COLORS → BACKGROUND GRADIENT"
+        ) {
+            Column {
+                CompactColorPickerCard(
+                    title = "GRADIENT END",
+                    description = when {
+                        oledMode -> "Disabled in OLED mode"
+                        darkModeActive -> "Disabled in Dark mode"
+                        useDynamicColor && dynamicColorAvailable -> "Controlled by Dynamic Color — disable it to set a custom color"
+                        else -> "The color the background gradient fades into at the bottom of the screen"
+                    },
+                    currentColor = customGradientEnd,
+                    onColorChange = { color -> performHaptic(); onGradientEndChange(color) },
+                    colors = colors,
+                    cardBackground = cardBackground,
+                    isSmallScreen = isSmallScreen,
+                    isLandscape = isLandscape,
+                    advancedPicker = advancedColorPicker,
+                    enabled = gradientPickersEnabled,
+                    oledMode = oledMode
+                )
+            }
+        },
+
         // ── EFFECTS ───────────────────────────────────────────────────────────
         SettingsSearchItem(
             id = "blur",
@@ -1168,10 +1502,12 @@ fun SettingsSearchPanel(
     // Search scoring is intentionally cheap and synchronous now. The previous
     // debounced remembered result list kept old render lambdas alive, so controls
     // inside search results could update the real setting but stay visually stale.
-    val results = run {
-        val q = query.trim()
+    val results = if (showAllSettings) {
+        items
+    } else {
+        val q = committedQuery
         if (q.isBlank()) {
-            items
+            emptyList()
         } else {
             val qLower = q.lowercase()
             val queryTokens = qLower.split(Regex("\\s+")).filter { it.isNotBlank() }
@@ -1179,40 +1515,77 @@ fun SettingsSearchPanel(
                 .map { it to settingsSearchScore(qLower, queryTokens, it) }
                 .filter { (_, score) -> score >= 45 }
                 .sortedByDescending { (_, score) -> score }
+                .take(8) // Compose only the most relevant cards. Keeps search instant on slower phones.
                 .map { it.first }
         }
     }
-
     PanelScaffold(
         visible = visible,
-        onDismiss = onDismiss,
+        onDismiss = {
+            if (showAllSettings) showAllSettings = false else onDismiss()
+        },
         isLandscape = isLandscape,
         isSmallScreen = isSmallScreen,
         oledMode = oledMode,
-        colors = colors
+        colors = colors,
+        leadingFloatingButton = if (!showAllSettings) {
+            { floatingModifier: Modifier ->
+                PanelGlobalButton(
+                    onClick = {
+                        performHaptic()
+                        query = ""
+                        committedQuery = ""
+                        showAllSettings = true
+                    },
+                    colors = colors,
+                    oledMode = oledMode,
+                    isSmallScreen = isSmallScreen,
+                    enabled = visible,
+                    modifier = floatingModifier
+                )
+            }
+        } else null
     ) { scrollState ->
         CleanTitle(
-            text = "SEARCH",
+            text = if (showAllSettings)
+                strings["global.title"].ifEmpty { "GLOBAL" }
+            else
+                strings["search.title"].ifEmpty { "SEARCH" },
             fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
             colors = colors,
             scrollOffset = scrollState.value
         )
 
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = results.size + 2) {
-            SearchInputCard(
-                query = query,
-                onQueryChange = { query = it },
-                colors = colors,
-                cardBackground = cardBackground,
-                isSmallScreen = isSmallScreen
+        if (!showAllSettings) {
+            AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = results.size + 3) {
+                SearchInputCard(
+                    query = query,
+                    onQueryChange = { query = it },
+                    colors = colors,
+                    cardBackground = cardBackground,
+                    isSmallScreen = isSmallScreen
+                )
+            }
+
+
+        } else {
+            PanelCaption(
+                text = strings["global.caption"].ifEmpty { "Every setting in one flattened list. Browse everything without guessing the name." },
+                colors = colors
             )
         }
 
-        if (results.isEmpty() && query.isNotBlank()) {
+        if (!showAllSettings && query.isBlank()) {
+            // Intentional: blank search shows only the title, search field, and the floating GLOBAL shortcut.
+            // Results appear after the user starts typing.
+        } else if (!showAllSettings && committedQuery.isBlank()) {
+            // Query is being debounced for a few milliseconds. Keep the panel calm
+            // instead of composing cards while the user is still typing.
+        } else if (results.isEmpty()) {
             AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 2) {
                 SettingsNavigationCard(
-                    title = "NO RESULTS",
-                    description = "Try: blur, theme, dark, matrix, particles, doze, aggressive, notifications, gradient…",
+                    title = strings["search.no_results"].ifEmpty { "NO RESULTS" },
+                    description = strings["search.no_results_desc"].ifEmpty { "Try: blur, theme, dark, matrix, particles, doze, aggressive, notifications, gradient…" },
                     onClick = {},
                     isSmallScreen = isSmallScreen,
                     colors = colors,
@@ -1587,7 +1960,7 @@ fun EffectsPanel(
     ) { _ ->
         CleanTitle(text = LocalStrings.current["effects.title"].ifEmpty { "EFFECTS" }, fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
 
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4) {
             ToggleCard(
                 title = LocalStrings.current["blur.blur_toggle"].ifEmpty { "BLUR" },
                 description = LocalStrings.current["blur.blur_toggle_desc"].ifEmpty { "Frosted glass behind panels and dialogs — subtle depth that makes the UI feel premium" },
@@ -1597,7 +1970,7 @@ fun EffectsPanel(
                 isSmallScreen = isSmallScreen, oledMode = oledMode
             )
         }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 3) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 4) {
             ToggleCard(
                 title = LocalStrings.current["appearance.card_shadows"].ifEmpty { "CARD SHADOWS" },
                 description = LocalStrings.current["appearance.card_shadows_desc"].ifEmpty { "Drop shadows under cards — disable to reduce GPU load or fix visual glitches during animations" },
@@ -1607,7 +1980,7 @@ fun EffectsPanel(
                 isSmallScreen = isSmallScreen, oledMode = oledMode
             )
         }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 3) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 4) {
             SettingsNavigationCard(
                 title = LocalStrings.current["particles.toggle"].ifEmpty { "PARTICLES" }, description = LocalStrings.current["effects.particles_desc"].ifEmpty { "Floating dots, twinkling stars, or Matrix rain — choose your style" },
                 onClick = { performHaptic(); onParticlesClick() },
@@ -1816,7 +2189,7 @@ fun ParticlesSettingsPanel(
             label         = "ps_nav_alpha"
         )
 
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3, enabled = particlesEnabled) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4, enabled = particlesEnabled) {
             Box(modifier = Modifier.fillMaxWidth().graphicsLayer(alpha = navAlpha)) {
                 SettingsNavigationCard(
                     title       = LocalStrings.current["particles.appearance_title"].ifEmpty { "SHAPE & LOOK" },
@@ -1830,7 +2203,7 @@ fun ParticlesSettingsPanel(
                 )
             }
         }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 3, enabled = particlesEnabled) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 4, enabled = particlesEnabled) {
             Box(modifier = Modifier.fillMaxWidth().graphicsLayer(alpha = navAlpha)) {
                 SettingsNavigationCard(
                     title       = LocalStrings.current["particles.motion_title"].ifEmpty { "MOTION" },
@@ -1844,7 +2217,7 @@ fun ParticlesSettingsPanel(
                 )
             }
         }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 3, enabled = particlesEnabled) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 4, enabled = particlesEnabled) {
             Box(modifier = Modifier.fillMaxWidth().graphicsLayer(alpha = navAlpha)) {
                 SettingsNavigationCard(
                     title       = LocalStrings.current["particles.performance_title"].ifEmpty { "PERFORMANCE" },
@@ -1950,7 +2323,7 @@ fun ParticlesMotionPanel(
         CleanTitle(text = LocalStrings.current["particles.motion_title"].ifEmpty { "MOTION" }, fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
 
         // Speed card
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3, enabled = particlesEnabled) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4, enabled = particlesEnabled) {
             val cardScale by animateFloatAsState(
                 targetValue = if (particlesEnabled) 1f else 0.85f,
                 animationSpec = spring(
@@ -2014,7 +2387,7 @@ fun ParticlesMotionPanel(
         }
 
         // Parallax toggle
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 3, enabled = particlesEnabled) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 4, enabled = particlesEnabled) {
             ToggleCard(
                 title = LocalStrings.current["particles.parallax"].ifEmpty { "PARALLAX" },
                 description = LocalStrings.current["particles.parallax_desc"].ifEmpty { "Tilt your device and the particles shift with it for a subtle 3D depth effect" },
@@ -2027,7 +2400,7 @@ fun ParticlesMotionPanel(
         }
 
         // Parallax sensitivity — only meaningful when parallax is enabled
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 3, enabled = particlesEnabled && particleParallaxEnabled) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 4, enabled = particlesEnabled && particleParallaxEnabled) {
             val sensEnabled = particlesEnabled && particleParallaxEnabled
             val sensAlpha by animateFloatAsState(
                 targetValue = if (sensEnabled) 1f else 0.38f,
@@ -2113,7 +2486,7 @@ fun ParticlesPerformancePanel(
         CleanTitle(text = LocalStrings.current["particles.performance_title"].ifEmpty { "PERFORMANCE" }, fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
 
         // Count card
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3, enabled = particlesEnabled) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4, enabled = particlesEnabled) {
             val cardScale by animateFloatAsState(
                 targetValue = if (particlesEnabled) 1f else 0.85f,
                 animationSpec = spring(
@@ -2389,7 +2762,7 @@ fun GradientPanel(
         )
 
         // ── Enable toggle ─────────────────────────────────────────────────────
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3, enabled = gradientAvailable) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4, enabled = gradientAvailable) {
             val gradientCardScale by animateFloatAsState(
                 targetValue = if (gradientAvailable) 1f else 0.92f,
                 animationSpec = spring(
@@ -2425,7 +2798,7 @@ fun GradientPanel(
         }
 
         // ── Gradient start color ───────────────────────────────────────────────
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 3,
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 4,
             enabled = pickersEnabled) {
             CompactColorPickerCard(
                 title = LocalStrings.current["colors.gradient_start"].ifEmpty { "GRADIENT START" },
@@ -2445,7 +2818,7 @@ fun GradientPanel(
         }
 
         // ── Gradient end color ─────────────────────────────────────────────────
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 3,
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 4,
             enabled = pickersEnabled) {
             CompactColorPickerCard(
                 title = LocalStrings.current["colors.gradient_end"].ifEmpty { "GRADIENT END" },
@@ -2648,6 +3021,531 @@ fun RendererPanel(
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HapticsPanel
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun HapticPreviewButton(
+    text: String,
+    onClick: () -> Unit,
+    colors: ThemeColors,
+    oledMode: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val ts = LocalTypeScale.current
+    val shape = RoundedCornerShape(22.dp)
+    Box(
+        modifier = modifier
+            .height(54.dp)
+            .clip(shape)
+            .background(if (oledMode) Color.Black else colors.cardBackground)
+            .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), shape)
+            .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = colors.primaryAccent,
+            fontSize = ts.buttonLarge,
+            fontWeight = FontWeight.Bold,
+            fontFamily = quicksandFontFamily,
+            letterSpacing = 1.4.sp
+        )
+    }
+}
+
+
+
+
+@Composable
+private fun HapticStrengthCard(
+    title: String,
+    description: String,
+    value: Int,
+    onValueChange: (Int) -> Unit,
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    preview: () -> Unit,
+    previewAtValue: ((Int) -> Unit)? = null,
+    colors: ThemeColors,
+    cardBackground: Color,
+    oledMode: Boolean,
+    isSmallScreen: Boolean
+) {
+    val ts = LocalTypeScale.current
+    var lastSliderPreviewAtMs by remember { mutableStateOf(0L) }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp)),
+        colors = CardDefaults.cardColors(containerColor = cardBackground),
+        shape = RoundedCornerShape(28.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(if (isSmallScreen) 18.dp else 22.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        color = colors.primaryAccent.copy(alpha = 0.85f),
+                        fontSize = ts.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = quicksandFontFamily,
+                        letterSpacing = 1.6.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = description,
+                        color = colors.textSecondary,
+                        fontSize = ts.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = quicksandFontFamily
+                    )
+                }
+                Text(
+                    text = "$value%",
+                    color = colors.textPrimary,
+                    fontSize = ts.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(colors.primaryAccent.copy(alpha = 0.10f))
+                        .border(1.dp, colors.primaryAccent.copy(alpha = 0.30f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(colors.primaryAccent.copy(alpha = 0.07f))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (enabled) "PATTERN ENABLED" else "PATTERN OFF",
+                    color = if (enabled) colors.primaryAccent else colors.textSecondary,
+                    fontSize = ts.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily,
+                    letterSpacing = 1.2.sp
+                )
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = onEnabledChange,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = colors.primaryAccent,
+                        checkedTrackColor = colors.primaryAccent.copy(alpha = 0.35f),
+                        uncheckedThumbColor = colors.textSecondary.copy(alpha = 0.75f),
+                        uncheckedTrackColor = colors.textSecondary.copy(alpha = 0.14f)
+                    )
+                )
+            }
+
+            Slider(
+                value = value.toFloat(),
+                onValueChange = {
+                    val next = it.roundToInt().coerceIn(0, 100)
+                    onValueChange(next)
+                    val now = SystemClock.uptimeMillis()
+                    if (now - lastSliderPreviewAtMs > 90L) {
+                        lastSliderPreviewAtMs = now
+                        previewAtValue?.invoke(next)
+                    }
+                },
+                onValueChangeFinished = { previewAtValue?.invoke(value) ?: preview() },
+                valueRange = 0f..100f,
+                steps = 9,
+                colors = SliderDefaults.colors(
+                    thumbColor = colors.primaryAccent,
+                    activeTrackColor = colors.primaryAccent,
+                    inactiveTrackColor = colors.primaryAccent.copy(alpha = 0.18f),
+                    activeTickColor = colors.primaryAccent.copy(alpha = 0.55f),
+                    inactiveTickColor = colors.primaryAccent.copy(alpha = 0.20f)
+                )
+            )
+
+            HapticPreviewButton(
+                text = "PREVIEW FEEL",
+                onClick = preview,
+                colors = colors,
+                oledMode = oledMode,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+fun HapticsPanel(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    hapticsEnabled: Boolean,
+    onHapticsEnabledChange: (Boolean) -> Unit,
+    regularEnabled: Boolean,
+    onRegularEnabledChange: (Boolean) -> Unit,
+    holdEnabled: Boolean,
+    onHoldEnabledChange: (Boolean) -> Unit,
+    rendererEnabled: Boolean,
+    onRendererEnabledChange: (Boolean) -> Unit,
+    languageEnabled: Boolean,
+    onLanguageEnabledChange: (Boolean) -> Unit,
+    bounceEnabled: Boolean,
+    onBounceEnabledChange: (Boolean) -> Unit,
+    regularStrength: Int,
+    onRegularStrengthChange: (Int) -> Unit,
+    holdStrength: Int,
+    onHoldStrengthChange: (Int) -> Unit,
+    rendererStrength: Int,
+    onRendererStrengthChange: (Int) -> Unit,
+    languageStrength: Int,
+    onLanguageStrengthChange: (Int) -> Unit,
+    bounceStrength: Int,
+    onBounceStrengthChange: (Int) -> Unit,
+    bounceReturnStrength: Int,
+    onBounceReturnStrengthChange: (Int) -> Unit,
+    onResetHaptics: () -> Unit,
+    isSmallScreen: Boolean,
+    isLandscape: Boolean,
+    isTablet: Boolean,
+    colors: ThemeColors,
+    cardBackground: Color,
+    oledMode: Boolean,
+    performHaptic: () -> Unit
+) {
+    val ts = LocalTypeScale.current
+    val strings = LocalStrings.current
+    val context = LocalContext.current
+    val view = LocalView.current
+    var section by remember { mutableStateOf("overview") }
+
+    BackHandler(enabled = visible && section != "overview") {
+        section = "overview"
+    }
+
+    val title = when (section) {
+        "core" -> strings["haptics.core_title"].ifEmpty { "CORE FEEL" }
+        "actions" -> strings["haptics.actions_title"].ifEmpty { "ACTION HAPTICS" }
+        "layout" -> strings["haptics.layout_title"].ifEmpty { "LAYOUT MOTION" }
+        "reset" -> strings["haptics.reset_title"].ifEmpty { "RESET HAPTICS" }
+        else -> strings["haptics.title"].ifEmpty { "HAPTICS" }
+    }
+
+    PanelScaffold(
+        visible = visible,
+        onDismiss = {
+            if (section == "overview") onDismiss() else section = "overview"
+        },
+        isLandscape = isLandscape,
+        isSmallScreen = isSmallScreen,
+        oledMode = oledMode,
+        colors = colors
+    ) { scrollState ->
+        CleanTitle(
+            text = title,
+            fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
+            colors = colors,
+            scrollOffset = scrollState.value
+        )
+
+        PanelCaption(
+            text = when (section) {
+                "core" -> strings["haptics.core_caption"].ifEmpty { "Everyday tactile language: quick taps, first contact, and the stronger bloom after a deliberate hold." }
+                "actions" -> strings["haptics.actions_caption"].ifEmpty { "Special signatures for important actions. Renderer switches and language changes should feel different from regular UI." }
+                "layout" -> strings["haptics.layout_caption"].ifEmpty { "Mechanical feedback for visual motion: cards gently tick when they dodge the back button and settle harder when they return." }
+                "reset" -> strings["haptics.reset_caption"].ifEmpty { "Restore the factory GAMA haptics profile if the feel gets messy." }
+                else -> strings["haptics.caption"].ifEmpty { "GAMA has no sound effects by design, so this is the mechanical side of the interface. Tune it like a tiny physical instrument." }
+            },
+            colors = colors
+        )
+
+        when (section) {
+            "overview" -> {
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 6) {
+                    ToggleCard(
+                        title = strings["haptics.engine"].ifEmpty { "HAPTICS ENGINE" },
+                        description = strings["haptics.engine_desc"].ifEmpty { "Master switch for every custom vibration pattern in the app." },
+                        checked = hapticsEnabled,
+                        onCheckedChange = { performHaptic(); onHapticsEnabledChange(it) },
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        isSmallScreen = isSmallScreen,
+                        oledMode = oledMode,
+                        accentBorder = true
+                    )
+                }
+
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 6) {
+                    SettingsNavigationCard(
+                        title = strings["haptics.core_title"].ifEmpty { "CORE FEEL" },
+                        description = strings["haptics.core_desc"].ifEmpty { "Regular clicks, first-contact feedback, and press-and-hold release blooms." },
+                        onClick = { performHaptic(); section = "core" },
+                        isSmallScreen = isSmallScreen,
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        oledMode = oledMode
+                    )
+                }
+
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 6) {
+                    SettingsNavigationCard(
+                        title = strings["haptics.actions_title"].ifEmpty { "ACTION HAPTICS" },
+                        description = strings["haptics.actions_desc"].ifEmpty { "Dedicated patterns for Vulkan/OpenGL and language changes." },
+                        onClick = { performHaptic(); section = "actions" },
+                        isSmallScreen = isSmallScreen,
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        oledMode = oledMode
+                    )
+                }
+
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 4, totalItems = 6) {
+                    SettingsNavigationCard(
+                        title = strings["haptics.layout_title"].ifEmpty { "LAYOUT MOTION" },
+                        description = strings["haptics.layout_desc"].ifEmpty { "Dodge-left and return-to-normal vibrations for back-button avoidance." },
+                        onClick = { performHaptic(); section = "layout" },
+                        isSmallScreen = isSmallScreen,
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        oledMode = oledMode
+                    )
+                }
+
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 5, totalItems = 6) {
+                    SettingsNavigationCard(
+                        title = strings["haptics.preview_lab"].ifEmpty { "PREVIEW LAB" },
+                        description = strings["haptics.preview_lab_desc"].ifEmpty { "Use each sub-panel's clone buttons and sliders to feel changes instantly. The clones do not trigger actions." },
+                        onClick = { performHaptic() },
+                        isSmallScreen = isSmallScreen,
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        oledMode = oledMode
+                    )
+                }
+
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 6, totalItems = 6) {
+                    SettingsNavigationCard(
+                        title = strings["haptics.reset_title"].ifEmpty { "RESET HAPTICS" },
+                        description = strings["haptics.reset_desc"].ifEmpty { "Go back to GAMA's default premium vibration profile." },
+                        onClick = { performHaptic(); section = "reset" },
+                        isSmallScreen = isSmallScreen,
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        oledMode = oledMode
+                    )
+                }
+            }
+
+            "core" -> {
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4) {
+                    HapticStrengthCard(
+                        title = strings["haptics.regular_clicks"].ifEmpty { "REGULAR CLICKS" },
+                        description = strings["haptics.regular_clicks_desc"].ifEmpty { "The light contact tick for normal settings cards and quick buttons. It should be clean, not buzzy." },
+                        value = regularStrength,
+                        onValueChange = onRegularStrengthChange,
+                        enabled = regularEnabled,
+                        onEnabledChange = onRegularEnabledChange,
+                        preview = { GamaHaptics.lightClick(context, view) },
+                        previewAtValue = { GamaHaptics.lightClick(context, view, it) },
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        oledMode = oledMode,
+                        isSmallScreen = isSmallScreen
+                    )
+                }
+
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 4) {
+                    HapticStrengthCard(
+                        title = strings["haptics.hold_release"].ifEmpty { "HOLD RELEASE BLOOM" },
+                        description = strings["haptics.hold_release_desc"].ifEmpty { "The stronger second pulse after a deliberate press-and-hold. This should clearly contrast with a quick tap." },
+                        value = holdStrength,
+                        onValueChange = onHoldStrengthChange,
+                        enabled = holdEnabled,
+                        onEnabledChange = onHoldEnabledChange,
+                        preview = { GamaHaptics.releaseAfterPress(context, view, SystemClock.uptimeMillis() - 320L, true) },
+                        previewAtValue = { GamaHaptics.releaseAfterPress(context, view, SystemClock.uptimeMillis() - 320L, true, it) },
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        oledMode = oledMode,
+                        isSmallScreen = isSmallScreen
+                    )
+                }
+
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 4) {
+                    SettingsNavigationCard(
+                        title = strings["haptics.press_hold_test"].ifEmpty { "PRESS & HOLD TEST" },
+                        description = strings["haptics.press_hold_test_desc"].ifEmpty { "Hold this clone, then release. Quick taps should be one click; deliberate holds should bloom clearly." },
+                        onClick = { /* haptics are handled by the card surface itself */ },
+                        isSmallScreen = isSmallScreen,
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        oledMode = oledMode
+                    )
+                }
+
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 4, totalItems = 4) {
+                    HapticPreviewButton(
+                        text = strings["haptics.quick_tap_preview"].ifEmpty { "QUICK TAP PREVIEW" },
+                        onClick = { GamaHaptics.lightClick(context, view) },
+                        colors = colors,
+                        oledMode = oledMode,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            "actions" -> {
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3) {
+                    HapticStrengthCard(
+                        title = strings["haptics.renderer"].ifEmpty { "VULKAN / OPENGL" },
+                        description = strings["haptics.renderer_desc"].ifEmpty { "A firmer renderer intent click. First contact is immediate; the commit pulse is more decisive." },
+                        value = rendererStrength,
+                        onValueChange = onRendererStrengthChange,
+                        enabled = rendererEnabled,
+                        onEnabledChange = onRendererEnabledChange,
+                        preview = { GamaHaptics.rendererPressStart(context, view); GamaHaptics.rendererSelection(context, view) },
+                        previewAtValue = { GamaHaptics.rendererSelection(context, view, it) },
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        oledMode = oledMode,
+                        isSmallScreen = isSmallScreen
+                    )
+                }
+
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 3) {
+                    HapticStrengthCard(
+                        title = strings["haptics.language_change"].ifEmpty { "LANGUAGE CHANGE" },
+                        description = strings["haptics.language_change_desc"].ifEmpty { "A small signature pattern when the app language actually changes." },
+                        value = languageStrength,
+                        onValueChange = onLanguageStrengthChange,
+                        enabled = languageEnabled,
+                        onEnabledChange = onLanguageEnabledChange,
+                        preview = { GamaHaptics.languageChanged(context, view) },
+                        previewAtValue = { GamaHaptics.languageChanged(context, view, it) },
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        oledMode = oledMode,
+                        isSmallScreen = isSmallScreen
+                    )
+                }
+
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 3) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        HapticPreviewButton(
+                            text = strings["haptics.vulkan_clone"].ifEmpty { "VULKAN CLONE" },
+                            onClick = { GamaHaptics.rendererPressStart(context, view); GamaHaptics.rendererSelection(context, view) },
+                            colors = colors,
+                            oledMode = oledMode,
+                            modifier = Modifier.weight(1f)
+                        )
+                        HapticPreviewButton(
+                            text = strings["haptics.language_clone"].ifEmpty { "LANGUAGE CLONE" },
+                            onClick = { GamaHaptics.languageChanged(context, view) },
+                            colors = colors,
+                            oledMode = oledMode,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            "layout" -> {
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3) {
+                    HapticStrengthCard(
+                        title = strings["haptics.dodge_left"].ifEmpty { "DODGE LEFT" },
+                        description = strings["haptics.dodge_left_desc"].ifEmpty { "Gentle tick when a card rescales or moves left to avoid the floating back button." },
+                        value = bounceStrength,
+                        onValueChange = onBounceStrengthChange,
+                        enabled = bounceEnabled,
+                        onEnabledChange = onBounceEnabledChange,
+                        preview = { GamaHaptics.avoidanceDodge(context, view) },
+                        previewAtValue = { GamaHaptics.avoidanceDodge(context, view, it) },
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        oledMode = oledMode,
+                        isSmallScreen = isSmallScreen
+                    )
+                }
+
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 3) {
+                    HapticStrengthCard(
+                        title = strings["haptics.return_settle"].ifEmpty { "RETURN SETTLE" },
+                        description = strings["haptics.return_settle_desc"].ifEmpty { "Stronger settling pulse when the card returns to normal width. This should feel like the UI snapping home." },
+                        value = bounceReturnStrength,
+                        onValueChange = onBounceReturnStrengthChange,
+                        enabled = bounceEnabled,
+                        onEnabledChange = onBounceEnabledChange,
+                        preview = { GamaHaptics.avoidanceReturn(context, view) },
+                        previewAtValue = { GamaHaptics.avoidanceReturn(context, view, it) },
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        oledMode = oledMode,
+                        isSmallScreen = isSmallScreen
+                    )
+                }
+
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 3) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        HapticPreviewButton(
+                            text = strings["haptics.dodge_preview"].ifEmpty { "DODGE" },
+                            onClick = { GamaHaptics.avoidanceDodge(context, view) },
+                            colors = colors,
+                            oledMode = oledMode,
+                            modifier = Modifier.weight(1f)
+                        )
+                        HapticPreviewButton(
+                            text = strings["haptics.return_preview"].ifEmpty { "RETURN" },
+                            onClick = { GamaHaptics.avoidanceReturn(context, view) },
+                            colors = colors,
+                            oledMode = oledMode,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            "reset" -> {
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 2) {
+                    SettingsNavigationCard(
+                        title = strings["haptics.restore_default"].ifEmpty { "RESTORE DEFAULT PROFILE" },
+                        description = strings["haptics.restore_default_desc"].ifEmpty { "Resets all haptic toggles and strengths to the default GAMA feel." },
+                        onClick = {
+                            onResetHaptics()
+                            GamaHaptics.success(context, view)
+                            section = "overview"
+                        },
+                        isSmallScreen = isSmallScreen,
+                        colors = colors,
+                        cardBackground = cardBackground,
+                        oledMode = oledMode
+                    )
+                }
+
+                AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 2) {
+                    PanelCaption(
+                        text = strings["haptics.defaults_note"].ifEmpty { "Defaults are tuned for a flagship-style linear vibration motor: light quick taps, clear hold bloom, firmer renderer commits, and separate dodge/return motion." },
+                        colors = colors
+                    )
+                }
+            }
+        }
+    }
+}
+
 // SystemPanel  — replaces FunctionalityPanel + BehaviorPanel
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2727,7 +3625,8 @@ fun SystemPanel(
                 checked = verboseMode,
                 onCheckedChange = { performHaptic(); onVerboseModeChange(it) },
                 colors = colors, cardBackground = cardBackground,
-                isSmallScreen = isSmallScreen, oledMode = oledMode
+                isSmallScreen = isSmallScreen, oledMode = oledMode,
+                accentBorder = true
             )
         }
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 6, totalItems = 6) {
@@ -2737,7 +3636,8 @@ fun SystemPanel(
                 checked = dismissOnClickOutside,
                 onCheckedChange = { performHaptic(); onDismissOnClickOutsideChange(it) },
                 colors = colors, cardBackground = cardBackground,
-                isSmallScreen = isSmallScreen, oledMode = oledMode
+                isSmallScreen = isSmallScreen, oledMode = oledMode,
+                accentBorder = true
             )
         }
     }
@@ -2786,7 +3686,8 @@ fun BehaviorPanel(
                 checked = verboseMode,
                 onCheckedChange = { performHaptic(); onVerboseModeChange(it) },
                 colors = colors, cardBackground = cardBackground,
-                isSmallScreen = isSmallScreen, oledMode = oledMode
+                isSmallScreen = isSmallScreen, oledMode = oledMode,
+                accentBorder = true
             )
         }
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 5) {
@@ -2796,7 +3697,8 @@ fun BehaviorPanel(
                 checked = dismissOnClickOutside,
                 onCheckedChange = { performHaptic(); onDismissOnClickOutsideChange(it) },
                 colors = colors, cardBackground = cardBackground,
-                isSmallScreen = isSmallScreen, oledMode = oledMode
+                isSmallScreen = isSmallScreen, oledMode = oledMode,
+                accentBorder = true
             )
         }
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 4, totalItems = 5) {
@@ -3113,8 +4015,11 @@ private fun crashTimeFromMillis(timeMillis: Long): String {
 
 @Composable
 private fun CrashLogEntryCard(
+    title: String,
+    sourceLabel: String,
     date: String,
     time: String,
+    summary: String,
     onSave: () -> Unit,
     onView: () -> Unit,
     isSmallScreen: Boolean,
@@ -3127,7 +4032,7 @@ private fun CrashLogEntryCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, colors.primaryAccent.copy(alpha = 0.42f), RoundedCornerShape(28.dp))
+            .border(1.15.dp, colors.primaryAccent.copy(alpha = 0.62f), RoundedCornerShape(28.dp))
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -3139,17 +4044,52 @@ private fun CrashLogEntryCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(if (isSmallScreen) 18.dp else 20.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.Start
             ) {
-                Text(
-                    text = LocalStrings.current["crash_log.entry_title"].ifEmpty { "LOG" },
-                    fontSize = ts.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = quicksandFontFamily,
-                    color = colors.textPrimary,
-                    letterSpacing = 1.1.sp
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
+                            text = title,
+                            fontSize = ts.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = quicksandFontFamily,
+                            color = colors.textPrimary,
+                            letterSpacing = 1.1.sp,
+                            maxLines = 1
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = sourceLabel,
+                            fontSize = ts.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = quicksandFontFamily,
+                            color = colors.primaryAccent.copy(alpha = 0.72f),
+                            letterSpacing = 1.4.sp,
+                            maxLines = 1
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .border(1.dp, colors.primaryAccent.copy(alpha = 0.50f), RoundedCornerShape(999.dp))
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = time.take(5),
+                            fontSize = ts.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = quicksandFontFamily,
+                            color = colors.textSecondary.copy(alpha = 0.90f),
+                            maxLines = 1
+                        )
+                    }
+                }
+
                 Text(
                     text = date,
                     fontSize = ts.bodyMedium,
@@ -3157,32 +4097,45 @@ private fun CrashLogEntryCard(
                     fontFamily = quicksandFontFamily,
                     color = colors.textSecondary
                 )
-                Text(
-                    text = time,
-                    fontSize = ts.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = quicksandFontFamily,
-                    color = colors.textSecondary.copy(alpha = 0.82f)
-                )
+
+                if (summary.isNotBlank()) {
+                    Text(
+                        text = summary,
+                        fontSize = ts.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = quicksandFontFamily,
+                        color = colors.textSecondary.copy(alpha = 0.82f),
+                        maxLines = 3,
+                        lineHeight = 18.sp
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(2.dp))
-                FlatButton(
-                    text = LocalStrings.current["crash_log.save_button"].ifEmpty { "SAVE LOG" },
-                    onClick = onSave,
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    accent = true,
-                    colors = colors,
-                    maxLines = 1,
-                    oledMode = oledMode
-                )
-                FlatButton(
-                    text = LocalStrings.current["crash_log.view_button"].ifEmpty { "VIEW LOG" },
-                    onClick = onView,
-                    modifier = Modifier.fillMaxWidth(),
-                    accent = false,
-                    colors = colors,
-                    maxLines = 1,
-                    oledMode = oledMode
-                )
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    FlatButton(
+                        text = LocalStrings.current["crash_log.save_button"].ifEmpty { "SAVE" },
+                        onClick = onSave,
+                        modifier = Modifier.weight(1f),
+                        accent = true,
+                        colors = colors,
+                        maxLines = 1,
+                        oledMode = oledMode,
+                        cornerRadius = 20.dp
+                    )
+                    FlatButton(
+                        text = LocalStrings.current["crash_log.view_button"].ifEmpty { "VIEW LOG" },
+                        onClick = onView,
+                        modifier = Modifier.weight(1f),
+                        accent = false,
+                        colors = colors,
+                        maxLines = 1,
+                        oledMode = oledMode,
+                        cornerRadius = 20.dp
+                    )
+                }
             }
         }
     }
@@ -3252,6 +4205,7 @@ fun CrashLogPanel(
         CrashDetailPanel(
             visible       = isThisOpen,
             onDismiss     = { openedEntryKey = null },
+            title         = "GAMA LOG #${(idx + 1).toString().padStart(3, '0')}",
             date          = crashDateFromTimestamp(entry.timestamp),
             time          = crashTimeFromTimestamp(entry.timestamp),
             fullText      = entry.fullText,
@@ -3269,6 +4223,7 @@ fun CrashLogPanel(
         CrashDetailPanel(
             visible       = isThisOpen,
             onDismiss     = { openedEntryKey = null },
+            title         = "SYSTEM LOG #${(idx + 1).toString().padStart(3, '0')}",
             date          = crashDateFromMillis(entry.timeMillis),
             time          = crashTimeFromMillis(entry.timeMillis),
             fullText      = entry.fullText,
@@ -3299,11 +4254,11 @@ fun CrashLogPanel(
     val totalListItems  = 1 + emptyGamaSlots + 1 + systemSlots        // two section headers
 
     PanelScaffold(
-        visible   = visible,
+        visible   = visible && !anyDetailOpen,
         onDismiss = onDismiss,
         isLandscape   = isLandscape,
         isSmallScreen = isSmallScreen,
-        isBlurred = anyDetailOpen,
+        isBlurred = false,
         oledMode  = oledMode,
         colors    = colors
     ) { _ ->
@@ -3344,8 +4299,11 @@ fun CrashLogPanel(
                 // staggerIndex: header=0, cards start at 1
                 AnimatedElement(visible = listItemsVisible, staggerIndex = idx + 1, totalItems = totalListItems) {
                     CrashLogEntryCard(
+                        title = "GAMA LOG #${(idx + 1).toString().padStart(3, '0')}",
+                        sourceLabel = "APP CRASH • ${entry.thread.uppercase()}",
                         date = crashDateFromTimestamp(entry.timestamp),
                         time = crashTimeFromTimestamp(entry.timestamp),
+                        summary = entry.summary,
                         onSave = { onExportCrashLog(entry.fullText, "GAMA_crash_${entry.timestamp.replace(" ", "_").replace(":", "-")}.txt") },
                         onView = { openedEntryKey = "gama:$idx" },
                         isSmallScreen = isSmallScreen,
@@ -3446,8 +4404,11 @@ fun CrashLogPanel(
                         totalItems   = totalListItems
                     ) {
                         CrashLogEntryCard(
+                            title = "SYSTEM LOG #${(idx + 1).toString().padStart(3, '0')}",
+                            sourceLabel = entry.tag.uppercase(),
                             date = crashDateFromMillis(entry.timeMillis),
                             time = crashTimeFromMillis(entry.timeMillis),
+                            summary = entry.summary,
                             onSave = { onExportCrashLog(entry.fullText, "GAMA_system_crash_${entry.tag}_$fileTimestamp.txt") },
                             onView = { openedEntryKey = "system:$idx" },
                             isSmallScreen = isSmallScreen,
@@ -3470,6 +4431,7 @@ fun CrashLogPanel(
 private fun CrashDetailPanel(
     visible: Boolean,
     onDismiss: () -> Unit,
+    title: String,
     date: String,
     time: String,
     fullText: String,
@@ -3481,6 +4443,11 @@ private fun CrashDetailPanel(
     oledMode: Boolean
 ) {
     val ts = LocalTypeScale.current
+    val logScrollState = rememberScrollState()
+
+    LaunchedEffect(visible, fullText) {
+        if (visible) logScrollState.scrollTo(0)
+    }
 
     PanelScaffold(
         visible   = visible,
@@ -3489,16 +4456,17 @@ private fun CrashDetailPanel(
         isSmallScreen = isSmallScreen,
         oledMode  = oledMode,
         colors    = colors,
-        reserveBackButtonSpace = false,
-        contentAvoidsBackButton = false
+        reserveBackButtonSpace = true,
+        contentAvoidsBackButton = false,
+        contentScrollable = false
     ) { _ ->
         CleanTitle(
-            text     = LocalStrings.current["crash_log.entry_title"].ifEmpty { "LOG" },
+            text     = title,
             fontSize = if (isLandscape) ts.displaySmall else ts.displayMedium,
             colors   = colors
         )
 
-        AnimatedElement(visible = visible, cardShadow = false, staggerIndex = 1, totalItems = 3) {
+        AnimatedElement(visible = visible, cardShadow = false, staggerIndex = 1, totalItems = 4) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -3523,13 +4491,21 @@ private fun CrashDetailPanel(
             }
         }
 
-        AnimatedElement(visible = visible, cardShadow = false, staggerIndex = 2, totalItems = 3) {
+        AnimatedElement(
+            visible = visible,
+            cardShadow = false,
+            staggerIndex = 2,
+            totalItems = 4,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
             Card(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .border(
-                        width = 1.dp,
-                        color = if (isSystemUI) colors.primaryAccent.copy(alpha = 0.4f) else colors.border,
+                        width = 1.25.dp,
+                        color = colors.primaryAccent.copy(alpha = if (isSystemUI) 0.76f else 0.68f),
                         shape = RoundedCornerShape(28.dp)
                     ),
                 colors = CardDefaults.cardColors(containerColor = cardBackground),
@@ -3538,7 +4514,10 @@ private fun CrashDetailPanel(
             ) {
                 Text(
                     text = fullText,
-                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(logScrollState)
+                        .padding(20.dp),
                     fontSize = ts.labelSmall,
                     fontFamily = quicksandFontFamily,
                     color = colors.textSecondary,
@@ -3584,19 +4563,19 @@ fun DeveloperPanel(
             colors = colors
         )
 
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4) {
             FlatButton(
                 text = LocalStrings.current["notifications.send_test"].ifEmpty { "Send Test Notification" }, onClick = { performHaptic(); onTestNotification() },
                 modifier = Modifier.fillMaxWidth(), accent = false, colors = colors, maxLines = 1
             )
         }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 3) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 4) {
             FlatButton(
                 text = LocalStrings.current["notifications.boot_notification"].ifEmpty { "Send Boot Notification" }, onClick = { performHaptic(); onTestBootNotification() },
                 modifier = Modifier.fillMaxWidth(), accent = false, colors = colors, maxLines = 1
             )
         }
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 3) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 4) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = "TIME OFFSET: ${if (timeOffsetHours >= 0) "+" else ""}${timeOffsetHours.toInt()}h",
@@ -3819,6 +4798,7 @@ fun LanguagePanel(
 ) {
     val ts      = LocalTypeScale.current
     val context = LocalContext.current
+    val view    = LocalView.current
     val prefs   = remember { context.getSharedPreferences("gama_prefs", Context.MODE_PRIVATE) }
     val strings = LocalStrings.current
 
@@ -3868,7 +4848,7 @@ fun LanguagePanel(
         )
 
         // ── Search bar ─────────────────────────────────────────────────────
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -3958,7 +4938,7 @@ fun LanguagePanel(
         }
 
         // ── Language list ──────────────────────────────────────────────────
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 3) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 4) {
             if (filtered.isEmpty() && searchQuery.isNotEmpty()) {
                 Box(
                     modifier         = Modifier.fillMaxWidth().padding(vertical = 32.dp),
@@ -3999,12 +4979,16 @@ fun LanguagePanel(
                                     colors     = colors,
                                     oledMode   = oledMode,
                                     onClick    = {
-                                        performHaptic()
-                                        // Write to the shared state — provider reacts immediately
-                                        languageCodeState.value = lang.code
-                                        // Persist to prefs so it survives restarts
-                                        LocalizationManager.saveCode(prefs, lang.code)
-                                        LocalizationManager.invalidateCache()
+                                        if (lang.code != selectedCode) {
+                                            GamaHaptics.languageChanged(context, view)
+                                            // Write to the shared state — provider reacts immediately
+                                            languageCodeState.value = lang.code
+                                            // Persist to prefs so it survives restarts
+                                            LocalizationManager.saveCode(prefs, lang.code)
+                                            LocalizationManager.invalidateCache()
+                                        } else {
+                                            performHaptic()
+                                        }
                                     }
                                 )
                             }
@@ -4034,6 +5018,8 @@ private fun LanguageRow(
 ) {
     val ts = LocalTypeScale.current
     val strings = LocalStrings.current
+    val context = LocalContext.current
+    val view = LocalView.current
 
     var isPressed by remember { mutableStateOf(false) }
     val pressScale by animateFloatAsState(
@@ -4068,9 +5054,11 @@ private fun LanguageRow(
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {
+                        val hapticStartedAt = GamaHaptics.pressStart(context, view)
                         isPressed = true
                         val released = tryAwaitRelease()
                         isPressed = false
+                        GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
                         if (released) onClick()
                     }
                 )
@@ -4344,7 +5332,7 @@ fun MatrixMotionPanel(
         )
 
         // ── Speed ─────────────────────────────────────────────────────────────
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 3, enabled = enabled) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4, enabled = enabled) {
             val alpha by animateFloatAsState(if (enabled) 1f else 0.38f, tween(260, easing = MotionTokens.Easing.velvet), label = "mm_speed_a")
             Box(
                 modifier = Modifier.fillMaxWidth().graphicsLayer(alpha = alpha)
@@ -4383,7 +5371,7 @@ fun MatrixMotionPanel(
         }
 
         // ── Density ───────────────────────────────────────────────────────────
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 3, enabled = enabled) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 4, enabled = enabled) {
             val alpha by animateFloatAsState(if (enabled) 1f else 0.38f, tween(260, easing = MotionTokens.Easing.velvet), label = "mm_den_a")
             Box(
                 modifier = Modifier.fillMaxWidth().graphicsLayer(alpha = alpha)
@@ -4422,7 +5410,7 @@ fun MatrixMotionPanel(
         }
 
         // ── Trail length ──────────────────────────────────────────────────────
-        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 3, enabled = enabled) {
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 4, enabled = enabled) {
             val alpha by animateFloatAsState(if (enabled) 1f else 0.38f, tween(260, easing = MotionTokens.Easing.velvet), label = "mm_trail_a")
             Box(
                 modifier = Modifier.fillMaxWidth().graphicsLayer(alpha = alpha)

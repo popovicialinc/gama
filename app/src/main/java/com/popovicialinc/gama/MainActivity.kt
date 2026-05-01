@@ -46,7 +46,10 @@ class MainActivity : ComponentActivity() {
                 }
                 if (intent != null) {
                     startActivity(intent)
-                    Runtime.getRuntime().exit(0)
+                    finishAffinity()
+                    overridePendingTransition(0, 0)
+                } else {
+                    recreate()
                 }
             }
         }

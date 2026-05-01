@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.view.HapticFeedbackConstants
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -128,36 +129,24 @@ fun GamaUI(
     val isLandscape = screenWidth > screenHeight
     val isTablet = screenWidth >= 600.dp && screenHeight >= 600.dp
 
-    fun performHaptic(type: Int = HapticFeedbackConstants.LONG_PRESS) {
-        view.performHapticFeedback(type)
+    fun performHaptic(type: Int = HapticFeedbackConstants.CONTEXT_CLICK) {
+        GamaHaptics.feedback(context, view, type)
     }
 
-    // Enhanced haptic pattern for success
     fun performSuccessHaptic() {
-        scope.launch {
-            // Success pattern: quick double tap followed by a long confirmation
-            view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-            delay(80)
-            view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-            delay(120)
-            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-        }
+        GamaHaptics.success(context, view)
     }
 
-    // Enhanced haptic pattern for errors/warnings
     fun performErrorHaptic() {
-        scope.launch {
-            // Error pattern: three short pulses
-            repeat(3) {
-                view.performHapticFeedback(HapticFeedbackConstants.REJECT)
-                delay(100)
-            }
-        }
+        GamaHaptics.error(context, view)
     }
 
-    // Enhanced haptic for interactions (more pronounced than simple click)
     fun performInteractionHaptic() {
-        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        GamaHaptics.selection(context, view)
+    }
+
+    fun performRendererHaptic() {
+        GamaHaptics.rendererSelection(context, view)
     }
 
     val prefs = remember { context.getSharedPreferences("gama_prefs", android.content.Context.MODE_PRIVATE) }
@@ -236,6 +225,7 @@ fun GamaUI(
     var pendingExternalLinkDescription by remember { mutableStateOf("") }
     var showSettings by remember { mutableStateOf(false) }
     var showSettingsSearch by remember { mutableStateOf(false) }
+    var showHapticsPanel by remember { mutableStateOf(false) }
     var showAppearance by remember { mutableStateOf(false) }
     var showEffects by remember { mutableStateOf(false) }
     var showColorCustomization by remember { mutableStateOf(false) }
@@ -415,7 +405,12 @@ fun GamaUI(
         showSettingsSearch = false
     }
 
-    BackHandler(enabled = showSettings && !showSettingsSearch && !showAppearance && !showColorCustomization && !showGradient && !showEffects && !showParticles && !showSystem && !showNotifications && !showBackup && !showCrashLog && !showRendererPanel && !showLanguage) {
+    BackHandler(enabled = showHapticsPanel) {
+        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+        showHapticsPanel = false
+    }
+
+    BackHandler(enabled = showSettings && !showSettingsSearch && !showHapticsPanel && !showAppearance && !showColorCustomization && !showGradient && !showEffects && !showParticles && !showSystem && !showNotifications && !showBackup && !showCrashLog && !showRendererPanel && !showLanguage && !showHapticsPanel) {
         performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
         showSettings = false
         showSettingsSearch = false
@@ -497,6 +492,18 @@ fun GamaUI(
     var staggerEnabled by remember { mutableStateOf(prefs.getBoolean("stagger_enabled", true)) }
     var backButtonAvoidanceEnabled by remember { mutableStateOf(prefs.getBoolean("back_button_avoidance_enabled", true)) }
     var shadowsEnabled by remember { mutableStateOf(prefs.getBoolean("shadows_enabled", true)) }
+    var hapticsEnabled by remember { mutableStateOf(prefs.getBoolean(GamaHaptics.PREF_ENABLED, GamaHaptics.DEFAULT_ENABLED)) }
+    var hapticsRegularEnabled by remember { mutableStateOf(prefs.getBoolean(GamaHaptics.PREF_REGULAR_ENABLED, GamaHaptics.DEFAULT_REGULAR_ENABLED)) }
+    var hapticsHoldEnabled by remember { mutableStateOf(prefs.getBoolean(GamaHaptics.PREF_HOLD_ENABLED, GamaHaptics.DEFAULT_HOLD_ENABLED)) }
+    var hapticsRendererEnabled by remember { mutableStateOf(prefs.getBoolean(GamaHaptics.PREF_RENDERER_ENABLED, GamaHaptics.DEFAULT_RENDERER_ENABLED)) }
+    var hapticsLanguageEnabled by remember { mutableStateOf(prefs.getBoolean(GamaHaptics.PREF_LANGUAGE_ENABLED, GamaHaptics.DEFAULT_LANGUAGE_ENABLED)) }
+    var hapticsBounceEnabled by remember { mutableStateOf(prefs.getBoolean(GamaHaptics.PREF_BOUNCE_ENABLED, GamaHaptics.DEFAULT_BOUNCE_ENABLED)) }
+    var hapticsRegularStrength by remember { mutableStateOf(prefs.getInt(GamaHaptics.PREF_REGULAR_STRENGTH, GamaHaptics.DEFAULT_REGULAR_STRENGTH)) }
+    var hapticsHoldStrength by remember { mutableStateOf(prefs.getInt(GamaHaptics.PREF_HOLD_STRENGTH, GamaHaptics.DEFAULT_HOLD_STRENGTH)) }
+    var hapticsRendererStrength by remember { mutableStateOf(prefs.getInt(GamaHaptics.PREF_RENDERER_STRENGTH, GamaHaptics.DEFAULT_RENDERER_STRENGTH)) }
+    var hapticsLanguageStrength by remember { mutableStateOf(prefs.getInt(GamaHaptics.PREF_LANGUAGE_STRENGTH, GamaHaptics.DEFAULT_LANGUAGE_STRENGTH)) }
+    var hapticsBounceStrength by remember { mutableStateOf(prefs.getInt(GamaHaptics.PREF_BOUNCE_STRENGTH, GamaHaptics.DEFAULT_BOUNCE_STRENGTH)) }
+    var hapticsBounceReturnStrength by remember { mutableStateOf(prefs.getInt(GamaHaptics.PREF_BOUNCE_RETURN_STRENGTH, GamaHaptics.DEFAULT_BOUNCE_RETURN_STRENGTH)) }
     var particleNativeRefreshRate  by remember { mutableStateOf(prefs.getBoolean("particle_native_refresh_rate", false)) }
     var particleQuarterRefreshRate by remember { mutableStateOf(prefs.getBoolean("particle_quarter_refresh_rate", false)) }
     // Using SnapshotStateList for instant updates
@@ -772,6 +779,18 @@ fun GamaUI(
         val snapStagger          = staggerEnabled
         val snapBackButtonAvoidance = backButtonAvoidanceEnabled
         val snapShadows          = shadowsEnabled
+        val snapHapticsEnabled   = hapticsEnabled
+        val snapHapticsRegularEnabled = hapticsRegularEnabled
+        val snapHapticsHoldEnabled    = hapticsHoldEnabled
+        val snapHapticsRendererEnabled = hapticsRendererEnabled
+        val snapHapticsLanguageEnabled = hapticsLanguageEnabled
+        val snapHapticsBounceEnabled   = hapticsBounceEnabled
+        val snapHapticsRegular   = hapticsRegularStrength
+        val snapHapticsHold      = hapticsHoldStrength
+        val snapHapticsRenderer  = hapticsRendererStrength
+        val snapHapticsLanguage  = hapticsLanguageStrength
+        val snapHapticsBounce    = hapticsBounceStrength
+        val snapHapticsBounceReturn = hapticsBounceReturnStrength
         val snapParticleNativeRefresh  = particleNativeRefreshRate
         val snapParticleQuarterRefresh = particleQuarterRefreshRate
         val snapMatrixMode       = matrixMode
@@ -819,6 +838,18 @@ fun GamaUI(
                 putBoolean("stagger_enabled",           snapStagger)
                 putBoolean("back_button_avoidance_enabled", snapBackButtonAvoidance)
                 putBoolean("shadows_enabled",           snapShadows)
+                putBoolean(GamaHaptics.PREF_ENABLED,     snapHapticsEnabled)
+                putBoolean(GamaHaptics.PREF_REGULAR_ENABLED,  snapHapticsRegularEnabled)
+                putBoolean(GamaHaptics.PREF_HOLD_ENABLED,     snapHapticsHoldEnabled)
+                putBoolean(GamaHaptics.PREF_RENDERER_ENABLED, snapHapticsRendererEnabled)
+                putBoolean(GamaHaptics.PREF_LANGUAGE_ENABLED, snapHapticsLanguageEnabled)
+                putBoolean(GamaHaptics.PREF_BOUNCE_ENABLED,   snapHapticsBounceEnabled)
+                putInt(GamaHaptics.PREF_REGULAR_STRENGTH,  snapHapticsRegular)
+                putInt(GamaHaptics.PREF_HOLD_STRENGTH,     snapHapticsHold)
+                putInt(GamaHaptics.PREF_RENDERER_STRENGTH, snapHapticsRenderer)
+                putInt(GamaHaptics.PREF_LANGUAGE_STRENGTH, snapHapticsLanguage)
+                putInt(GamaHaptics.PREF_BOUNCE_STRENGTH,   snapHapticsBounce)
+                putInt(GamaHaptics.PREF_BOUNCE_RETURN_STRENGTH, snapHapticsBounceReturn)
                 putBoolean("particle_native_refresh_rate",  snapParticleNativeRefresh)
                 putBoolean("particle_quarter_refresh_rate", snapParticleQuarterRefresh)
                 putBoolean("matrix_native_refresh_rate",    false)
@@ -865,6 +896,7 @@ fun GamaUI(
         showIntegrationInfoDialog = false
         showSettings = false
         showSettingsSearch = false
+        showHapticsPanel = false
         showAppearance = false
         showEffects = false
         showColorCustomization = false
@@ -907,7 +939,7 @@ fun GamaUI(
     val anyPanelOpen by remember {
         derivedStateOf {
             showWarningDialog || showGitHubDialog || showResourcesPanel || showExternalLinkConfirm ||
-            showSettings || showSettingsSearch || showAppearance || showColorCustomization || showGradient ||
+            showSettings || showSettingsSearch || showHapticsPanel || showAppearance || showColorCustomization || showGradient ||
             showSystem || showRendererPanel ||
             showShizukuHelp || showSuccessDialog || showClearRecentsDialog ||
             showVerbosePanel || showAggressiveWarning || showGPUWatchConfirm ||
@@ -921,7 +953,7 @@ fun GamaUI(
     val anyFullPanelOpen by remember {
         derivedStateOf {
             showWarningDialog || showGitHubDialog || showResourcesPanel ||
-            showSettings || showSettingsSearch || showAppearance || showColorCustomization || showGradient ||
+            showSettings || showSettingsSearch || showHapticsPanel || showAppearance || showColorCustomization || showGradient ||
             showSystem || showRendererPanel ||
             showShizukuHelp || showSuccessDialog || showClearRecentsDialog ||
             showVerbosePanel || showAggressiveWarning || showGPUWatchConfirm ||
@@ -1464,7 +1496,7 @@ fun GamaUI(
                                                     BigRendererButton(
                                                         text = strings["renderer.vulkan"].ifEmpty { "Vulkan" },
                                                         onClick = {
-                                                            performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                            performRendererHaptic()
                                                             if (!shizukuRunning || !shizukuPermissionGranted) {
                                                                 shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
                                                                 openMainPanelExclusive { showShizukuHelp = true }
@@ -1497,7 +1529,7 @@ fun GamaUI(
                                                     BigRendererButton(
                                                         text = strings["renderer.opengl"].ifEmpty { "OpenGL" },
                                                         onClick = {
-                                                            performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                            performRendererHaptic()
                                                             if (!shizukuRunning || !shizukuPermissionGranted) {
                                                                 shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
                                                                 openMainPanelExclusive { showShizukuHelp = true }
@@ -1829,7 +1861,7 @@ fun GamaUI(
                                                 BigRendererButton(
                                                     text = strings["renderer.vulkan"].ifEmpty { "Vulkan" },
                                                     onClick = {
-                                                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                        performRendererHaptic()
                                                         if (!shizukuRunning || !shizukuPermissionGranted) {
                                                             shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
                                                             openMainPanelExclusive { showShizukuHelp = true }
@@ -1862,7 +1894,7 @@ fun GamaUI(
                                                 BigRendererButton(
                                                     text = strings["renderer.opengl"].ifEmpty { "OpenGL" },
                                                     onClick = {
-                                                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                                                        performRendererHaptic()
                                                         if (!shizukuRunning || !shizukuPermissionGranted) {
                                                             shizukuHelpType = if (!shizukuRunning) "not_running" else "permission"
                                                             openMainPanelExclusive { showShizukuHelp = true }
@@ -2214,7 +2246,14 @@ fun GamaUI(
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showClearRecentsDialog = false
                     scope.launch {
-                        try { ShizukuHelper.runCommand("am clear-recent-tasks") } catch (_: Exception) {}
+                        val result = ShizukuHelper.clearBackgroundApps()
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(
+                                context,
+                                if (result.startsWith("Error", ignoreCase = true)) "Could not clear background apps" else "Background apps cleared",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                     }
                 },
                 isSmallScreen = isSmallScreen,
@@ -2298,7 +2337,7 @@ fun GamaUI(
 
 
             SettingsPanel(
-                visible = showSettings && !showSettingsSearch && !showAppearance && !showColorCustomization && !showGradient && !showSystem && !showEffects && !showParticles && !showNotifications && !showBackup && !showCrashLog && !showRendererPanel && !showLanguage,
+                visible = showSettings && !showSettingsSearch && !showHapticsPanel && !showAppearance && !showColorCustomization && !showGradient && !showSystem && !showEffects && !showParticles && !showNotifications && !showBackup && !showCrashLog && !showRendererPanel && !showLanguage && !showHapticsPanel,
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showSettings = false
@@ -2319,6 +2358,10 @@ fun GamaUI(
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showSystem = true
                 },
+                onHapticsClick = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showHapticsPanel = true
+                },
                 isSmallScreen = isSmallScreen,
                 isLandscape = isLandscape,
                 isTablet = isTablet,
@@ -2334,6 +2377,18 @@ fun GamaUI(
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                     showSettingsSearch = false
                 },
+                onAppearanceClick = { showAppearance = true },
+                onColorCustomizationClick = { showColorCustomization = true },
+                onGradientClick = { showColorCustomization = true; showGradient = true },
+                onEffectsClick = { showEffects = true },
+                onParticlesClick = { showParticles = true },
+                onRendererClick = { showRendererPanel = true },
+                onSystemClick = { showSystem = true },
+                onNotificationsClick = { showSystem = true; showNotifications = true },
+                onBackupClick = { showSystem = true; showBackup = true },
+                onCrashLogClick = { showSystem = true; showCrashLog = true },
+                onLanguageClick = { showSystem = true; showLanguage = true },
+                onHapticsClick = { showHapticsPanel = true },
                 // Visuals / Appearance
                 themePreference = themePreference,
                 onThemeChange = { themePreference = it; savePreferences() },
@@ -2357,6 +2412,12 @@ fun GamaUI(
                 onAdvancedColorPickerChange = { advancedColorPicker = it; savePreferences() },
                 gradientEnabled = gradientEnabled,
                 onGradientChange = { gradientEnabled = it; savePreferences() },
+                customAccentColor = customAccentColor,
+                onAccentColorChange = { color -> customAccentColor = color; savePreferencesDebounced() },
+                customGradientStart = customGradientStart,
+                onGradientStartChange = { color -> customGradientStart = color; savePreferencesDebounced() },
+                customGradientEnd = customGradientEnd,
+                onGradientEndChange = { color -> customGradientEnd = color; savePreferencesDebounced() },
                 // Effects
                 blurEnabled = blurEnabled,
                 onBlurChange = { blurEnabled = it; savePreferences() },
@@ -2417,6 +2478,61 @@ fun GamaUI(
                 performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) }
             )
 
+
+
+            HapticsPanel(
+                visible = showHapticsPanel,
+                onDismiss = {
+                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                    showHapticsPanel = false
+                },
+                hapticsEnabled = hapticsEnabled,
+                onHapticsEnabledChange = { hapticsEnabled = it; savePreferences() },
+                regularEnabled = hapticsRegularEnabled,
+                onRegularEnabledChange = { hapticsRegularEnabled = it; savePreferences() },
+                holdEnabled = hapticsHoldEnabled,
+                onHoldEnabledChange = { hapticsHoldEnabled = it; savePreferences() },
+                rendererEnabled = hapticsRendererEnabled,
+                onRendererEnabledChange = { hapticsRendererEnabled = it; savePreferences() },
+                languageEnabled = hapticsLanguageEnabled,
+                onLanguageEnabledChange = { hapticsLanguageEnabled = it; savePreferences() },
+                bounceEnabled = hapticsBounceEnabled,
+                onBounceEnabledChange = { hapticsBounceEnabled = it; savePreferences() },
+                regularStrength = hapticsRegularStrength,
+                onRegularStrengthChange = { hapticsRegularStrength = it; savePreferencesDebounced() },
+                holdStrength = hapticsHoldStrength,
+                onHoldStrengthChange = { hapticsHoldStrength = it; savePreferencesDebounced() },
+                rendererStrength = hapticsRendererStrength,
+                onRendererStrengthChange = { hapticsRendererStrength = it; savePreferencesDebounced() },
+                languageStrength = hapticsLanguageStrength,
+                onLanguageStrengthChange = { hapticsLanguageStrength = it; savePreferencesDebounced() },
+                bounceStrength = hapticsBounceStrength,
+                onBounceStrengthChange = { hapticsBounceStrength = it; savePreferencesDebounced() },
+                bounceReturnStrength = hapticsBounceReturnStrength,
+                onBounceReturnStrengthChange = { hapticsBounceReturnStrength = it; savePreferencesDebounced() },
+                onResetHaptics = {
+                    GamaHaptics.resetToDefaults(context)
+                    hapticsEnabled = GamaHaptics.DEFAULT_ENABLED
+                    hapticsRegularEnabled = GamaHaptics.DEFAULT_REGULAR_ENABLED
+                    hapticsHoldEnabled = GamaHaptics.DEFAULT_HOLD_ENABLED
+                    hapticsRendererEnabled = GamaHaptics.DEFAULT_RENDERER_ENABLED
+                    hapticsLanguageEnabled = GamaHaptics.DEFAULT_LANGUAGE_ENABLED
+                    hapticsBounceEnabled = GamaHaptics.DEFAULT_BOUNCE_ENABLED
+                    hapticsRegularStrength = GamaHaptics.DEFAULT_REGULAR_STRENGTH
+                    hapticsHoldStrength = GamaHaptics.DEFAULT_HOLD_STRENGTH
+                    hapticsRendererStrength = GamaHaptics.DEFAULT_RENDERER_STRENGTH
+                    hapticsLanguageStrength = GamaHaptics.DEFAULT_LANGUAGE_STRENGTH
+                    hapticsBounceStrength = GamaHaptics.DEFAULT_BOUNCE_STRENGTH
+                    hapticsBounceReturnStrength = GamaHaptics.DEFAULT_BOUNCE_RETURN_STRENGTH
+                },
+                isSmallScreen = isSmallScreen,
+                isLandscape = isLandscape,
+                isTablet = isTablet,
+                colors = colors,
+                cardBackground = cardBackground,
+                oledMode = effectiveOledMode,
+                performHaptic = { performHaptic(HapticFeedbackConstants.CONTEXT_CLICK) }
+            )
 
             // Blur wrapper for RendererPanel when Aggressive Warning is shown.
             Box(
@@ -3370,11 +3486,12 @@ fun GamaUI(
                                         .pointerInput(Unit) {
                                             detectTapGestures(
                                                 onPress = {
+                                                    val hapticStartedAt = GamaHaptics.pressStart(context, view)
                                                     settingsPressed = true
                                                     val released = tryAwaitRelease()
                                                     settingsPressed = false
+                                                    GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
                                                     if (released) {
-                                                        performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
                                                         openMainPanelExclusive { showSettings = true }
                                                     }
                                                 }
