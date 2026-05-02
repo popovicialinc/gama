@@ -27,7 +27,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.layout.onSizeChanged
@@ -59,6 +58,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.luminance
@@ -80,6 +81,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -113,6 +115,150 @@ import kotlin.math.PI
 import kotlin.math.roundToInt
 
 
+private fun String.withoutGreetingEmoji(): String = this
+    .replace("☀️", "")
+    .replace("🌙", "")
+    .replace("👋", "")
+    .replace("✅", "")
+    .replace("⚠️", "")
+    .replace("❌", "")
+    .replace(Regex("\\s+"), " ")
+    .trim()
+
+
+/**
+ * Draws the held-state accent outline glow without blurring the whole surface.
+ * The normal solid border stays crisp; this only blooms while pressProgress > 0.
+ */
+fun Modifier.pressedAccentOutlineGlow(
+    pressProgress: Float,
+    color: Color,
+    cornerRadius: Dp,
+    strokeWidth: Dp = 2.dp,
+    glowRadius: Dp = 9.dp,
+    maxAlpha: Float = 0.70f
+): Modifier = this.drawWithContent {
+    drawContent()
+
+    val alpha = (pressProgress * maxAlpha).coerceIn(0f, maxAlpha)
+    if (alpha <= 0.01f || size.width <= 0f || size.height <= 0f) return@drawWithContent
+
+    val strokePx = strokeWidth.toPx().coerceAtLeast(1f)
+    val blurPx = glowRadius.toPx().coerceAtLeast(0f)
+    val inset = (strokePx / 2f + blurPx * 0.28f).coerceAtMost(minOf(size.width, size.height) / 3f)
+    val radiusPx = cornerRadius.toPx().coerceAtMost(minOf(size.width, size.height) / 2f)
+
+    val glowPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        style = android.graphics.Paint.Style.STROKE
+        this.strokeWidth = strokePx
+        this.color = color.copy(alpha = alpha).toArgb()
+        maskFilter = if (blurPx > 0f) BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL) else null
+    }
+
+    drawIntoCanvas { canvas ->
+        canvas.nativeCanvas.drawRoundRect(
+            android.graphics.RectF(
+                inset,
+                inset,
+                size.width - inset,
+                size.height - inset
+            ),
+            radiusPx,
+            radiusPx,
+            glowPaint
+        )
+    }
+
+    // More subtle interior edge spill, clipped to the same rounded shape so the glow
+    // actually matches the card curvature instead of looking boxy in the corners.
+    val innerAlpha = (pressProgress * 0.085f).coerceIn(0f, 0.085f)
+    if (innerAlpha <= 0.002f) return@drawWithContent
+
+    val left = inset
+    val top = inset
+    val right = size.width - inset
+    val bottom = size.height - inset
+    val innerWidth = (right - left).coerceAtLeast(0f)
+    val innerHeight = (bottom - top).coerceAtLeast(0f)
+    if (innerWidth <= 0f || innerHeight <= 0f) return@drawWithContent
+
+    val edgeHeight = minOf(innerHeight * 0.18f, 18.dp.toPx())
+    val edgeWidth = minOf(innerWidth * 0.14f, 14.dp.toPx())
+    val innerCorner = (radiusPx - inset).coerceAtLeast(0f)
+    val clipShape = Path().apply {
+        addRoundRect(
+            RoundRect(
+                left = left,
+                top = top,
+                right = right,
+                bottom = bottom,
+                cornerRadius = CornerRadius(innerCorner, innerCorner)
+            )
+        )
+    }
+
+    clipPath(clipShape) {
+        if (edgeHeight > 0f) {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        color.copy(alpha = innerAlpha),
+                        color.copy(alpha = innerAlpha * 0.42f),
+                        Color.Transparent
+                    ),
+                    startY = top,
+                    endY = top + edgeHeight
+                ),
+                topLeft = Offset(left, top),
+                size = Size(innerWidth, edgeHeight)
+            )
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        color.copy(alpha = innerAlpha * 0.42f),
+                        color.copy(alpha = innerAlpha)
+                    ),
+                    startY = bottom - edgeHeight,
+                    endY = bottom
+                ),
+                topLeft = Offset(left, bottom - edgeHeight),
+                size = Size(innerWidth, edgeHeight)
+            )
+        }
+
+        if (edgeWidth > 0f) {
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        color.copy(alpha = innerAlpha),
+                        color.copy(alpha = innerAlpha * 0.42f),
+                        Color.Transparent
+                    ),
+                    startX = left,
+                    endX = left + edgeWidth
+                ),
+                topLeft = Offset(left, top),
+                size = Size(edgeWidth, innerHeight)
+            )
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        color.copy(alpha = innerAlpha * 0.42f),
+                        color.copy(alpha = innerAlpha)
+                    ),
+                    startX = right - edgeWidth,
+                    endX = right
+                ),
+                topLeft = Offset(right - edgeWidth, top),
+                size = Size(edgeWidth, innerHeight)
+            )
+        }
+    }
+}
+
+
 // ============================================================
 // Components: reusable UI building blocks
 // ============================================================
@@ -142,16 +288,15 @@ fun GlideOptionSelector(
 ) {
     val ts = LocalTypeScale.current
     val animLevel = LocalAnimationLevel.current
-    val viewConfiguration = LocalViewConfiguration.current
     val density = LocalDensity.current
-    var dragIndicatorCenterPx by remember { mutableStateOf<Float?>(null) }
+    val viewConfiguration = LocalViewConfiguration.current
 
     val currentOnOptionSelected by rememberUpdatedState(onOptionSelected)
     val currentSelectedIndex by rememberUpdatedState(selectedIndex)
 
     val scale by animateFloatAsState(
         targetValue = if (enabled) 1f else 0.85f,
-        animationSpec = spring(
+        animationSpec = if (animLevel == 2) snap() else if (animLevel == 1) tween(260, easing = MotionTokens.Easing.emphasized) else spring(
             dampingRatio = MotionTokens.Springs.gentle.dampingRatio,
             stiffness = MotionTokens.Springs.gentle.stiffness
         ),
@@ -178,22 +323,24 @@ fun GlideOptionSelector(
         val itemWidth = maxWidth / options.size
 
         val itemWidthPxForIndicator = with(density) { itemWidth.toPx() }
-        val selectedOffsetPx = itemWidthPxForIndicator * selectedIndex
-        val liveOffsetPx = dragIndicatorCenterPx
-            ?.let { (it - itemWidthPxForIndicator / 2f).coerceIn(0f, itemWidthPxForIndicator * (options.size - 1)) }
-            ?: selectedOffsetPx
+        val selectedOffsetPx = itemWidthPxForIndicator * selectedIndex.coerceIn(0, options.lastIndex)
 
-        // Smart live indicator: while dragging it follows the finger continuously,
-        // then eases to the nearest stop. This avoids jitter when the user skips
-        // several stops quickly.
+        // Anchored indicator: it does not follow the finger anymore.
+        // Touching/dragging over another option updates selection, then the accent pill
+        // glides to that selected stop with a small spring overshoot.
         val animatedIndicatorPx by animateFloatAsState(
-            targetValue = liveOffsetPx,
+            targetValue = selectedOffsetPx,
             animationSpec = if (animLevel == 2) {
                 snap()
-            } else if (dragIndicatorCenterPx != null) {
-                tween(durationMillis = 42, easing = CubicBezierEasing(0.22f, 0.0f, 0.2f, 1.0f))
             } else {
-                tween(durationMillis = if (animLevel == 0) 170 else 120, easing = CubicBezierEasing(0.18f, 0.85f, 0.32f, 1.0f))
+                if (animLevel == 1) {
+                    tween(durationMillis = 430, easing = MotionTokens.Easing.velvet)
+                } else {
+                    spring(
+                        dampingRatio = 0.78f,
+                        stiffness = 220f
+                    )
+                }
             },
             label = "indicator"
         )
@@ -253,42 +400,33 @@ fun GlideOptionSelector(
                         val itemWidthPx = size.width.toFloat() / options.size
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
-                            dragIndicatorCenterPx = down.position.x
                             var lastIndex = (down.position.x / itemWidthPx)
                                 .toInt().coerceIn(0, options.size - 1)
                             var isDrag = false
+
+                            if (lastIndex != currentSelectedIndex) {
+                                currentOnOptionSelected(lastIndex)
+                            }
 
                             do {
                                 val event = awaitPointerEvent()
                                 val ptr = event.changes.firstOrNull() ?: break
                                 if (!ptr.pressed) break // finger lifted
 
-                                dragIndicatorCenterPx = ptr.position.x
                                 val newIndex = (ptr.position.x / itemWidthPx)
                                     .toInt().coerceIn(0, options.size - 1)
 
                                 if (!isDrag) {
-                                    // Treat as drag once the finger moves more than a few px
                                     val dx = kotlin.math.abs(ptr.position.x - down.position.x)
                                     if (dx > viewConfiguration.touchSlop) isDrag = true
                                 }
 
-                                if (isDrag && newIndex != lastIndex) {
+                                if (newIndex != lastIndex) {
                                     currentOnOptionSelected(newIndex)
                                     lastIndex = newIndex
                                     ptr.consume()
                                 }
                             } while (true)
-
-                            // Finger up — if it never became a drag, treat as a tap
-                            if (!isDrag) {
-                                val tapIndex = (down.position.x / itemWidthPx)
-                                    .toInt().coerceIn(0, options.size - 1)
-                                if (tapIndex != currentSelectedIndex) {
-                                    currentOnOptionSelected(tapIndex)
-                                }
-                            }
-                            dragIndicatorCenterPx = null
                         }
                     }
             )
@@ -391,7 +529,7 @@ fun TitleSection(colors: ThemeColors, isSmallScreen: Boolean, isLandscape: Boole
             strings["greetings.late_night_4"].ifEmpty { "The world narrows to this moment. 🌙" }
         )
     }
-    val displayText = remember(currentHour, userName, strings) { greetingPool.random() }
+    val displayText = remember(currentHour, userName, strings) { greetingPool.random().withoutGreetingEmoji() }
 
     val configuration = LocalConfiguration.current
     val isLandscapeTitle = configuration.screenWidthDp > configuration.screenHeightDp
@@ -641,8 +779,8 @@ fun AnimatedElement(
                         else staggerCounter?.total() ?: 0
     val animationLevel = LocalAnimationLevel.current
     val staggerEnabled = LocalStaggerEnabled.current
-    val density = LocalDensity.current
     val view = LocalView.current
+    val density = LocalDensity.current
     val context = LocalContext.current
     val backButtonAvoidance = LocalFloatingBackButtonAvoidance.current
     val backButtonInversed = LocalBackButtonInversed.current
@@ -680,7 +818,6 @@ fun AnimatedElement(
 
     var localVisible by remember { mutableStateOf(if (resolvedIndex == 0) visible else !visible) }
     val progress = remember { Animatable(if (localVisible) 1f else 0f) }
-    val scope = rememberCoroutineScope()
 
     val offsetYPx = remember(density, animationLevel) {
         with(density) { when (animationLevel) { 0 -> 20f; 1 -> 8f; else -> 0f }.dp.toPx() }
@@ -701,7 +838,7 @@ fun AnimatedElement(
                 progress.snapTo(1f)
             } else {
                 // Full = springy. Reduced = no bounce, simple ease-in-out.
-                val enterSpec: AnimationSpec<Float> = if (animationLevel == 0)
+                val enterSpec: FiniteAnimationSpec<Float> = if (animationLevel == 0)
                     spring(dampingRatio = 0.55f, stiffness = 260f)
                 else
                     tween(durationMillis = 210, easing = MotionTokens.Easing.emphasizedDecelerate)
@@ -806,6 +943,7 @@ fun Modifier.directionalShadow(
     blurRadius: Dp = 12.dp,
     cornerRadius: Dp = 18.dp
 ): Modifier = composed {
+    val density = LocalDensity.current
     val shadowsEnabled = LocalShadowsEnabled.current
     val cardProgress   = LocalCardProgress.current
     val cardEnabled    = LocalCardEnabled.current
@@ -898,7 +1036,7 @@ fun SettingsNavigationCard(
     val ts = LocalTypeScale.current
     val context = LocalContext.current
     val view = LocalView.current
-    // --- disabled-state animations (unchanged) ---
+
     val disabledScale by animateFloatAsState(
         targetValue = if (enabled) 1f else 0.88f,
         animationSpec = spring(
@@ -912,15 +1050,9 @@ fun SettingsNavigationCard(
         animationSpec = tween(durationMillis = 360, easing = MotionTokens.Easing.emphasized),
         label = "settings_nav_alpha"
     )
-    // --- press-state: single Animatable drives all press effects via graphicsLayer ---
-    // Previously 5 separate animateFloatAsState / animateDpAsState all responding to
-    // the same isPressed flag — that's 5 animators running simultaneously on every
-    // card press/release. Consolidating to one Animatable<Float> in [0,1] lets us
-    // derive every visual property with simple lerp in graphicsLayer (draw phase only,
-    // zero recompositions).
+
     var isPressed by remember { mutableStateOf(false) }
     val pressProgress = remember { Animatable(0f) }
-    val scope = rememberCoroutineScope()
     val animLevel = LocalAnimationLevel.current
     LaunchedEffect(isPressed) {
         if (animLevel == 2) {
@@ -930,60 +1062,54 @@ fun SettingsNavigationCard(
                 targetValue = if (isPressed && enabled) 1f else 0f,
                 animationSpec = spring(
                     dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                    stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+                    stiffness = if (isPressed) MotionTokens.Springs.pressDown.stiffness else MotionTokens.Springs.pressUp.stiffness
                 )
             )
         }
     }
-    val p = pressProgress.value  // single read; all derived values computed below
-
-    val density = LocalDensity.current
-    // Derive all press visuals from p — evaluated in draw phase via graphicsLayer
-    val pressScale       = 1f - p * (1f - MotionTokens.Scale.subtle)
-    // Chevron: scales up AND nudges right on press — feels like it's pointing the way
-    val chevronScaleVal  = 1f + p * 0.25f
-    val chevronTXVal     = p * with(density) { 3.dp.toPx() }   // subtler nudge: 3dp instead of 4dp
-    val chevronAlphaVal  = 0.55f + p * 0.45f                   // starts slightly more visible at rest
-    val borderWidthVal   = (if (oledMode) 0.75f else 1f) + p * ((if (oledMode) 0.75f else 1f))  // 1dp → 2dp
-    val cardBorderWidth  = borderWidthVal.dp
+    val p = pressProgress.value
+    val pressScale = 1f - p * (1f - MotionTokens.Scale.subtle)
+    val chevronScaleVal = 1f + p * 0.18f
+    val chevronAlphaVal = 0.55f + p * 0.45f
+    val borderWidthVal = (if (oledMode) 0.75f else 1f) + p * (if (oledMode) 0.75f else 1f)
+    val cardBorderWidth = borderWidthVal.dp
 
     val animatedCardBorderColor = when {
-        !enabled             -> colors.primaryAccent.copy(alpha = 0.25f)
-        isPressed            -> colors.primaryAccent
-        else                 -> colors.primaryAccent.copy(alpha = 0.55f)
+        !enabled -> colors.primaryAccent.copy(alpha = 0.25f)
+        isPressed -> colors.primaryAccent
+        else -> colors.primaryAccent.copy(alpha = 0.55f)
     }
-
-    val chevronColor = if (isPressed && enabled)
-        colors.primaryAccent
-    else
-        colors.textSecondary.copy(alpha = chevronAlphaVal)
+    val chevronColor = if (isPressed && enabled) colors.primaryAccent else colors.textSecondary.copy(alpha = chevronAlphaVal)
+    val shape = RoundedCornerShape(28.dp)
+    val minHeight = if (LocalConfiguration.current.screenWidthDp.dp < 360.dp) 72.dp else 80.dp
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = if (LocalConfiguration.current.screenWidthDp.dp < 360.dp) 72.dp else 80.dp)
-            // combine disabled scale and press scale
-            .graphicsLayer(
-                scaleX = disabledScale * pressScale,
-                scaleY = disabledScale * pressScale,
-                clip = false
-            )
-            .border(width = cardBorderWidth, color = animatedCardBorderColor, shape = RoundedCornerShape(28.dp))
+            .heightIn(min = minHeight),
+        contentAlignment = Alignment.Center
     ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // Note: blurred border overlay removed — the solid border already reads as accent neon on dark backgrounds,
-            // and the blur(8dp) + border Box was adding one RenderEffect per card (~8–12 extra GPU passes when scrolling).
-        }
-        Card(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = if (LocalConfiguration.current.screenWidthDp.dp < 360.dp) 72.dp else 80.dp)
+                .matchParentSize()
+                .graphicsLayer(
+                    scaleX = disabledScale * pressScale,
+                    scaleY = disabledScale * pressScale,
+                    clip = false
+                )
+                .pressedAccentOutlineGlow(
+                    pressProgress = p,
+                    color = colors.primaryAccent,
+                    cornerRadius = 28.dp,
+                    strokeWidth = cardBorderWidth,
+                    glowRadius = 9.dp,
+                    maxAlpha = 0.46f
+                )
+                .clip(shape)
+                .background(cardBackground)
+                .border(width = cardBorderWidth, color = animatedCardBorderColor, shape = shape)
                 .graphicsLayer(alpha = alpha)
-                .then(if (!enabled) Modifier.pointerInput(enabled) {
-                    // Intercept taps only — vertical scroll events pass through to parent scrollable
-                    detectTapGestures { }
-                } else Modifier)
-                // Replace .clickable with pointerInput so we can track press/release
+                .then(if (!enabled) Modifier.pointerInput(enabled) { detectTapGestures { } } else Modifier)
                 .pointerInput(enabled) {
                     if (!enabled) return@pointerInput
                     detectTapGestures(
@@ -996,31 +1122,28 @@ fun SettingsNavigationCard(
                             if (released) onClick()
                         }
                     )
-                },
-            colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(28.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                }
+                .background(colors.primaryAccent.copy(alpha = if (enabled) p * 0.08f else 0f))
+                .padding(if (isSmallScreen) 20.dp else 24.dp)
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = if (LocalConfiguration.current.screenWidthDp.dp < 360.dp) 72.dp else 80.dp)
-                    .padding(if (isSmallScreen) 20.dp else 24.dp),
+                modifier = Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center
+                ) {
                     Text(
                         text = title,
                         color = colors.primaryAccent.copy(alpha = 0.7f),
                         fontSize = ts.labelLarge,
-                        fontWeight = FontWeight.Bold, // Force Bold
+                        fontWeight = FontWeight.Bold,
                         letterSpacing = 2.sp,
                         fontFamily = quicksandFontFamily
                     )
                     Spacer(modifier = Modifier.height(4.dp))
-
-                    // Animated description text with crossfade + subtle slide
                     androidx.compose.animation.AnimatedContent(
                         targetState = description,
                         transitionSpec = {
@@ -1036,41 +1159,42 @@ fun SettingsNavigationCard(
                             color = colors.textSecondary,
                             fontSize = ts.bodyMedium,
                             fontFamily = quicksandFontFamily,
-                            fontWeight = FontWeight.Bold // Force Bold
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
 
-                // Chevron with spring scale + rightward nudge + accent color pulse on press
-                Canvas(
+                Box(
                     modifier = Modifier
-                        .size(24.dp)
+                        .padding(start = 12.dp)
                         .graphicsLayer(
                             scaleX = chevronScaleVal,
                             scaleY = chevronScaleVal,
-                            translationX = chevronTXVal
-                        )
+                            clip = false
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    val path = Path().apply {
-                        moveTo(size.width * 0.4f, size.height * 0.2f)
-                        lineTo(size.width * 0.7f, size.height * 0.5f)
-                        lineTo(size.width * 0.4f, size.height * 0.8f)
-                    }
-                    drawPath(
-                        path = path,
-                        color = chevronColor,
-                        style = Stroke(
-                            width = 2.dp.toPx(),
-                            cap = StrokeCap.Round,
-                            join = StrokeJoin.Round
+                    Canvas(modifier = Modifier.size(24.dp)) {
+                        val path = Path().apply {
+                            moveTo(size.width * 0.4f, size.height * 0.2f)
+                            lineTo(size.width * 0.7f, size.height * 0.5f)
+                            lineTo(size.width * 0.4f, size.height * 0.8f)
+                        }
+                        drawPath(
+                            path = path,
+                            color = chevronColor,
+                            style = Stroke(
+                                width = 2.dp.toPx(),
+                                cap = StrokeCap.Round,
+                                join = StrokeJoin.Round
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
-    } // end border Box
+    }
 }
-
 
 @Composable
 fun FlatButton(
@@ -1085,22 +1209,24 @@ fun FlatButton(
     cornerRadius: Dp = 28.dp
 ) {
     val animLevel = LocalAnimationLevel.current
-    var isPressed by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val view = LocalView.current
-    val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val density = LocalDensity.current
+    val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
 
     val baseHeight = if (isSmallScreen) 54.dp else 58.dp
     val ts = LocalTypeScale.current
     val baseFontSize = ts.buttonLarge
     val shape = RoundedCornerShape(cornerRadius)
 
+    // FlatButton owns its own press state because it uses pointerInput/detectTapGestures
+    // rather than a clickable InteractionSource.
+    var isPressed by remember { mutableStateOf(false) }
+
     // Single Animatable<Float> [0=rest, 1=pressed] drives ALL press visuals via
     // graphicsLayer — replaces 5 separate animateFloatAsState/animateDpAsState calls
     // that previously ran simultaneously on every press/release.
     val pressProgress = remember { Animatable(0f) }
-    val flatBtnScope  = rememberCoroutineScope()
     LaunchedEffect(isPressed) {
         pressProgress.animateTo(
             targetValue   = if (isPressed && enabled) 1f else 0f,
@@ -1158,12 +1284,21 @@ fun FlatButton(
                 .graphicsLayer(scaleX = pressScale, scaleY = pressScale)
                 .clip(shape)
                 .background(animatedButtonColor)
+                .background(colors.primaryAccent.copy(alpha = if (enabled) pp * 0.10f else 0f))
                 .then(
-                    if (shouldShowBorder) Modifier.border(
-                        width = borderWidthDp,
-                        color = borderColor,
-                        shape = shape
-                    ) else Modifier
+                    if (shouldShowBorder) Modifier
+                        .pressedAccentOutlineGlow(
+                            pressProgress = pp,
+                            color = colors.primaryAccent,
+                            cornerRadius = cornerRadius,
+                            strokeWidth = borderWidthDp,
+                            glowRadius = 10.dp
+                        )
+                        .border(
+                            width = borderWidthDp,
+                            color = borderColor,
+                            shape = shape
+                        ) else Modifier
                 )
                 .then(
                     if (enabled) Modifier.pointerInput(enabled) {
@@ -1198,6 +1333,114 @@ fun FlatButton(
     }
 }
 
+
+@Composable
+private fun MainMenuPressShell(
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    colors: ThemeColors,
+    cardBackground: Color,
+    shape: RoundedCornerShape,
+    oledMode: Boolean = false,
+    selected: Boolean = false,
+    hapticStyle: String = "regular",
+    semanticsLabel: String? = null,
+    contentAlignment: Alignment = Alignment.Center,
+    onClick: () -> Unit,
+    content: @Composable BoxScope.(Float) -> Unit
+) {
+    val context = LocalContext.current
+    val view = LocalView.current
+    val animLevel = LocalAnimationLevel.current
+
+    val disabledScale by animateFloatAsState(
+        targetValue = if (enabled) 1f else 0.88f,
+        animationSpec = if (animLevel == 2) snap() else if (animLevel == 1) tween(220, easing = MotionTokens.Easing.emphasized) else spring(dampingRatio = 0.60f, stiffness = 440f),
+        label = "main_menu_shell_disabled_scale"
+    )
+    val disabledAlpha by animateFloatAsState(
+        targetValue = if (enabled) 1f else 0.32f,
+        animationSpec = tween(durationMillis = 360, easing = MotionTokens.Easing.emphasized),
+        label = "main_menu_shell_disabled_alpha"
+    )
+
+    var isPressed by remember { mutableStateOf(false) }
+    val pressProgress = remember { Animatable(0f) }
+    LaunchedEffect(isPressed, enabled, animLevel) {
+        val target = if (isPressed && enabled) 1f else 0f
+        when (animLevel) {
+            2 -> pressProgress.snapTo(target)
+            1 -> pressProgress.animateTo(target, animationSpec = tween(durationMillis = 135, easing = MotionTokens.Easing.emphasized))
+            else -> pressProgress.animateTo(
+                targetValue = target,
+                animationSpec = spring(
+                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                    stiffness = if (isPressed) MotionTokens.Springs.pressDown.stiffness else MotionTokens.Springs.pressUp.stiffness
+                )
+            )
+        }
+    }
+
+    val p = pressProgress.value
+    val pressScale = 1f - p * (1f - MotionTokens.Scale.subtle)
+    val restBorderWidth = if (oledMode) 0.75f else 1f
+    val borderWidth = (restBorderWidth + p * restBorderWidth).dp
+    val borderColor = when {
+        !enabled -> colors.primaryAccent.copy(alpha = 0.25f)
+        selected -> colors.primaryAccent.copy(alpha = 0.82f + p * 0.18f)
+        else -> colors.primaryAccent.copy(alpha = 0.55f + p * 0.45f)
+    }
+
+    Box(
+        modifier = modifier
+            .graphicsLayer(
+                scaleX = disabledScale * pressScale,
+                scaleY = disabledScale * pressScale,
+                alpha = disabledAlpha,
+                clip = false
+            )
+            .then(if (semanticsLabel != null) Modifier.semantics(mergeDescendants = true) { contentDescription = semanticsLabel } else Modifier)
+            .pressedAccentOutlineGlow(
+                pressProgress = p,
+                color = colors.primaryAccent,
+                cornerRadius = 28.dp,
+                strokeWidth = borderWidth,
+                glowRadius = 11.dp
+            )
+            .border(width = borderWidth, color = borderColor, shape = shape),
+        contentAlignment = contentAlignment
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(shape)
+                .background(cardBackground)
+                .background(colors.primaryAccent.copy(alpha = if (enabled) p * 0.10f else 0f))
+                .then(
+                    if (enabled) Modifier.pointerInput(enabled, onClick, hapticStyle) {
+                        detectTapGestures(
+                            onPress = {
+                                val hapticStartedAt = if (hapticStyle == "renderer") {
+                                    GamaHaptics.rendererPressStart(context, view)
+                                } else {
+                                    GamaHaptics.pressStart(context, view)
+                                }
+                                isPressed = true
+                                val released = tryAwaitRelease()
+                                isPressed = false
+                                GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
+                                if (released) onClick()
+                            }
+                        )
+                    } else Modifier
+                ),
+            contentAlignment = contentAlignment
+        ) {
+            content(p)
+        }
+    }
+}
+
 @Composable
 fun IllustratedButton(
     text: String,
@@ -1209,219 +1452,142 @@ fun IllustratedButton(
     oledMode: Boolean = false,
     iconType: String   // "vulkan" | "opengl" | "resources" | "gpuwatch"
 ) {
-    val animLevel = LocalAnimationLevel.current
-    var isPressed by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-    val view = LocalView.current
     val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
     val isSmallScreen = configuration.screenWidthDp.dp < 360.dp
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val screenMinDp = minOf(configuration.screenWidthDp, configuration.screenHeightDp)
-    val density = LocalDensity.current
     val ts = LocalTypeScale.current
 
-    // Height scales with the smaller screen dimension so the button is always
-    // proportionate regardless of orientation, resolution, or form factor.
     val baseHeight = when {
         isSmallScreen -> 46.dp
         isLandscape   -> (screenMinDp * 0.125f).dp.coerceIn(44.dp, 54.dp)
         else          -> (screenMinDp * 0.145f).dp.coerceIn(54.dp, 68.dp)
     }
-    // Corner radius scales with button height for consistent curvature at any size.
     val cornerRadius = (baseHeight.value * 0.48f).dp.coerceIn(22.dp, 32.dp)
     val shape = RoundedCornerShape(cornerRadius)
 
-
-    // Single Animatable<Float> drives ALL press visuals — same pattern as FlatButton.
-    // Replaces 5 separate animators (pressScale, textScale, textTranslateY,
-    // borderWidth, borderAlpha) that all fired simultaneously on every press.
-    val pressProgress = remember { Animatable(0f) }
-    LaunchedEffect(isPressed) {
-        pressProgress.animateTo(
-            targetValue   = if (isPressed && enabled) 1f else 0f,
-            animationSpec = when (animLevel) {
-                2 -> snap()
-                1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasized)
-                else -> spring(
-                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                    stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-                )
-            }
-        )
-    }
-    val pp = pressProgress.value
-    val nudgePx = with(density) { 2.dp.toPx() }
-    val pressScale      = 1f - pp * (1f - MotionTokens.Scale.moderate)
-    val textScale       = 1f - pp * 0.07f
-    val textTranslateY  = pp * nudgePx
-
-    // Same physical reaction language as settings cards: slight zoom-in, thicker outline.
-    val restBorderWidth = if (oledMode) 0.75f else 1f
-    val borderWidthDp = (restBorderWidth + pp * restBorderWidth).dp
-    val animatedButtonColor = if (!enabled) colors.cardBackground
-    else if (iconType == "vulkan" || iconType == "opengl") Color.Transparent
-    else colors.cardBackground
-
-    val contentColor = colors.textPrimary
-    val animatedTextColor = if (!enabled) colors.textSecondary.copy(alpha = 0.3f) else contentColor
-
-    // Outline brightens on press, matching SettingsNavigationCard.
-    val borderColor = when {
-        !enabled  -> colors.primaryAccent.copy(alpha = 0.25f)
-        isPressed -> colors.primaryAccent
-        else      -> colors.primaryAccent.copy(alpha = 0.55f)
-    }
-
-    // The icon colour: vulkan bolt always neon accent; accent buttons get full accent;
-    // non-accent (Resources, GPUWatch) get slightly dimmed accent.
-    val iconColor = when {
-        iconType == "vulkan"    -> colors.primaryAccent
-        accent && !oledMode     -> colors.primaryAccent
-        enabled                 -> colors.primaryAccent.copy(alpha = 0.85f)
-        else                    -> colors.primaryAccent.copy(alpha = 0.3f)
-    }
-
-    // Screen-reader description
     val iconDescription = when (iconType) {
-        "vulkan"   -> "Vulkan lightning bolt icon"
-        "opengl"   -> "OpenGL hexagon icon"
-        "resources"-> "Resources list icon"
-        "gpuwatch" -> "GPU activity waveform icon"
-        else       -> "Button icon"
+        "vulkan"    -> "Vulkan lightning bolt icon"
+        "opengl"    -> "OpenGL hexagon icon"
+        "resources" -> "Resources list icon"
+        "gpuwatch"  -> "GPU activity waveform icon"
+        else        -> "Button icon"
     }
-    val semanticsLabel = if (enabled) "$iconDescription, $text button"
-    else         "$iconDescription, $text button, disabled"
+    val semanticsLabel = if (enabled) "$iconDescription, $text button" else "$iconDescription, $text button, disabled"
 
-    // Vulkan bloom glow radius — matches container glow radius formula
+    val isRendererIconButton = iconType == "vulkan" || iconType == "opengl"
+    val allowWholeButtonGlow = oledMode
+    val allowIconGlow = oledMode || isRendererIconButton
     val glowBlurRadius = (screenMinDp * 0.027f).dp.coerceIn(7.dp, 14.dp)
 
-    BoxWithConstraints(
+    val baseButtonColor = when {
+        !enabled -> colors.cardBackground.copy(alpha = 0.92f)
+        accent && !oledMode -> colors.primaryAccent.copy(alpha = 0.16f)
+        else -> colors.cardBackground
+    }
+    val iconColor = when {
+        !enabled -> colors.primaryAccent.copy(alpha = 0.55f)
+        iconType == "opengl" -> colors.primaryAccent.copy(alpha = 0.85f)
+        else -> colors.primaryAccent
+    }
+    val textColor = if (accent && !oledMode && colors.primaryAccent.luminance() > 0.5f) Color.Black else colors.textPrimary
+
+    MainMenuPressShell(
         modifier = modifier
             .fillMaxWidth()
-            .height(baseHeight)
-            .semantics(mergeDescendants = true) { contentDescription = semanticsLabel },
-        contentAlignment = Alignment.Center
-    ) {
-        // Outer Box owns the press scale transform — must be OUTSIDE clip so the
-        // scale actually moves pixels. graphicsLayer before clip is a no-op visually.
+            .height(baseHeight),
+        enabled = enabled,
+        colors = colors,
+        cardBackground = baseButtonColor,
+        shape = shape,
+        oledMode = oledMode,
+        selected = accent,
+        semanticsLabel = semanticsLabel,
+        onClick = onClick
+    ) { press ->
+        if (enabled && allowWholeButtonGlow && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .blur(glowBlurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    .border(1.dp, colors.primaryAccent.copy(alpha = 0.62f), shape)
+            )
+        }
+
         Box(
             modifier = Modifier
+                .matchParentSize()
+                .background(colors.primaryAccent.copy(alpha = if (enabled) press * 0.10f else 0f))
+                .background(
+                    Brush.radialGradient(
+                        0.0f to colors.primaryAccent.copy(alpha = if (enabled && allowWholeButtonGlow) 0.12f else 0.0f),
+                        0.58f to colors.primaryAccent.copy(alpha = if (enabled && allowWholeButtonGlow) 0.040f else 0.0f),
+                        1.0f to Color.Transparent,
+                        radius = with(density) { 150.dp.toPx() },
+                        center = Offset.Unspecified
+                    )
+                )
+                .background(
+                    Brush.verticalGradient(
+                        0.0f to colors.primaryAccent.copy(alpha = if (enabled && allowWholeButtonGlow) 0.030f else 0.0f),
+                        0.55f to Color.Transparent,
+                        1.0f to colors.primaryAccent.copy(alpha = if (enabled && allowWholeButtonGlow) 0.065f else 0.0f)
+                    )
+                )
+        )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer(scaleX = pressScale, scaleY = pressScale),
-            contentAlignment = Alignment.Center
+                .padding(horizontal = 8.dp)
         ) {
-
-            // Same soft accent glow style used by CURRENT RENDERER.
-            // Drawn outside the clipped button so the glow can bleed past the edges.
-            if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val buttonGlowAlpha = if (oledMode) 0.62f else 0.42f
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .blur(glowBlurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                        .border(borderWidthDp, colors.primaryAccent.copy(alpha = buttonGlowAlpha), shape)
-                )
-            }
-
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(shape)
-                    .background(animatedButtonColor)
-                    .background(
-                        Brush.radialGradient(
-                            0.0f to colors.primaryAccent.copy(alpha = if (enabled) 0.12f else 0.04f),
-                            0.58f to colors.primaryAccent.copy(alpha = if (enabled) 0.040f else 0.015f),
+            val iconSizeDp = (baseHeight.value * 0.43f).dp.coerceIn(18.dp, 30.dp)
+            val spacerWidth = (baseHeight.value * 0.13f).dp.coerceIn(6.dp, 12.dp)
+            Canvas(modifier = Modifier.size(iconSizeDp)) {
+                val w = size.width
+                val h = size.height
+                val r = w * 0.72f
+                if (allowIconGlow) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            0.0f to iconColor.copy(alpha = 0.28f),
+                            0.5f to iconColor.copy(alpha = 0.10f),
                             1.0f to Color.Transparent,
-                            radius = with(density) { 150.dp.toPx() },
-                            center = Offset.Unspecified
-                        )
+                            radius = r * 1.45f
+                        ),
+                        radius = r * 1.45f
                     )
-                    .background(
-                        Brush.verticalGradient(
-                            0.0f to colors.primaryAccent.copy(alpha = if (enabled) 0.030f else 0.0f),
-                            0.55f to Color.Transparent,
-                            1.0f to colors.primaryAccent.copy(alpha = if (enabled) 0.065f else 0.0f)
-                        )
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            0.0f to iconColor.copy(alpha = 0.55f),
+                            0.6f to iconColor.copy(alpha = 0.15f),
+                            1.0f to Color.Transparent,
+                            radius = r * 0.80f
+                        ),
+                        radius = r * 0.80f
                     )
-                    .border(borderWidthDp, borderColor, shape)
-                    .then(
-                        if (enabled) Modifier.pointerInput(enabled) {
-                            detectTapGestures(
-                                onPress = {
-                                    val hapticStartedAt = if (iconType == "vulkan" || iconType == "opengl") {
-                                        GamaHaptics.rendererPressStart(context, view)
-                                    } else {
-                                        GamaHaptics.pressStart(context, view)
-                                    }
-                                    isPressed = true
-                                    val released = tryAwaitRelease()
-                                    isPressed = false
-                                    GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
-                                    if (released) onClick()
-                                }
-                            )
-                        } else Modifier
-                    )
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .graphicsLayer(scaleX = textScale, scaleY = textScale, translationY = textTranslateY)
-                        .padding(horizontal = 8.dp)
-                ) {
-                // ── Custom Canvas illustration ───────────────────────────────
-                // Icon and spacer scale with button height for visual harmony at any size/orientation.
-                val iconSizeDp = (baseHeight.value * 0.43f).dp.coerceIn(18.dp, 30.dp)
-                val spacerWidth = (baseHeight.value * 0.13f).dp.coerceIn(6.dp, 12.dp)
-                Box(contentAlignment = Alignment.Center) {
-                    // Icon bloom — previously two Modifier.blur() Canvas layers (2 RenderEffects per button).
-                    // Replaced: a single radial gradient drawn on the same Canvas as the icon.
-                    // drawCircle with a radialGradient brush is a single GPU draw call — zero extra layers.
-                    Canvas(modifier = Modifier.size(iconSizeDp)) {
-                        val w = size.width; val h = size.height
-                        val r = w * 0.72f
-                        // Fake bloom: outer halo + tight ring, both purely alpha composited
-                        if (oledMode) {
-                            drawCircle(
-                                brush = Brush.radialGradient(
-                                    0.0f to iconColor.copy(alpha = 0.28f),
-                                    0.5f to iconColor.copy(alpha = 0.10f),
-                                    1.0f to Color.Transparent,
-                                    radius = r * 1.45f
-                                ),
-                                radius = r * 1.45f
-                            )
-                            drawCircle(
-                                brush = Brush.radialGradient(
-                                    0.0f to iconColor.copy(alpha = 0.55f),
-                                    0.6f to iconColor.copy(alpha = 0.15f),
-                                    1.0f to Color.Transparent,
-                                    radius = r * 0.80f
-                                ),
-                                radius = r * 0.80f
-                            )
-                        }
-                        drawIconShapeInline(iconType, w, h, iconColor)
-                    }
                 }
-                Spacer(modifier = Modifier.width(spacerWidth))
-                Text(
-                    text = text,
-                    fontSize = ts.buttonLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = animatedTextColor,
-                    fontFamily = quicksandFontFamily,
-                    maxLines = 1,
-                    textAlign = TextAlign.Start
-                )
+                drawIconShapeInline(iconType, w, h, iconColor)
             }
+            Spacer(modifier = Modifier.width(spacerWidth))
+            Text(
+                text = text,
+                fontSize = ts.buttonLarge,
+                fontWeight = FontWeight.Bold,
+                color = textColor,
+                fontFamily = quicksandFontFamily,
+                maxLines = 1,
+                textAlign = TextAlign.Start
+            )
         }
     }
 }
-}
+
+
+
 
 private fun DrawScope.drawIconShapeInline(iconType: String, w: Float, h: Float, color: Color) {
     val stroke = Stroke(width = w * 0.095f, cap = StrokeCap.Round, join = StrokeJoin.Round)
@@ -1521,172 +1687,79 @@ fun BigRendererButton(
     oledMode: Boolean = false,
     iconType: String
 ) {
-    val animLevel = LocalAnimationLevel.current
-    val strings = LocalStrings.current
-    val context = LocalContext.current
-    val view = LocalView.current
-    val density   = LocalDensity.current
-    val ts        = LocalTypeScale.current
+    val ts = LocalTypeScale.current
     val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
     val isSmallScreen = configuration.screenWidthDp.dp < 360.dp
-    val isLandscape   = configuration.screenWidthDp > configuration.screenHeightDp
-    val screenMinDp   = minOf(configuration.screenWidthDp, configuration.screenHeightDp)
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val screenMinDp = minOf(configuration.screenWidthDp, configuration.screenHeightDp)
     val buttonHeight = when {
         isSmallScreen -> 88.dp
         isLandscape   -> (screenMinDp * 0.26f).dp.coerceIn(80.dp, 110.dp)
         else          -> (screenMinDp * 0.30f).dp.coerceIn(90.dp, 130.dp)
     }
 
-    var isPressed by remember { mutableStateOf(false) }
-    val pressProgress = remember { Animatable(0f) }
-    LaunchedEffect(isPressed) {
-        pressProgress.animateTo(
-            targetValue   = if (isPressed && enabled) 1f else 0f,
-            animationSpec = when (animLevel) {
-                2 -> snap()
-                1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasized)
-                else -> spring(
-                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                    stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-                )
-            }
-        )
-    }
-    val pp         = pressProgress.value
-    val pressScale = 1f - pp * (1f - MotionTokens.Scale.moderate)
-    val contentTY  = pp * with(density) { 2.dp.toPx() }
-    val rendererBorderWidth = (1f + pp * 1.2f).dp
-    // Shape and icon size are derived at layout time via BoxWithConstraints so they
-    // scale correctly across all screen sizes, densities, and orientations.
-
     val highlighted = isSelected || forceHighlight
-    val bgColor = when {
-        !enabled -> colors.cardBackground
-        oledMode -> colors.cardBackground
-        else     -> colors.cardBackground
-    }
-    // Border: both buttons use the same accent-based style as the Resources button
-    // (primaryAccent at 0.55f at rest, full accent on highlight/press).
-    val borderColor = when {
-        !enabled    -> colors.primaryAccent.copy(alpha = 0.20f)
-        highlighted -> colors.primaryAccent
-        isPressed   -> colors.primaryAccent
-        else        -> colors.primaryAccent.copy(alpha = 0.55f)
-    }
-    // Icon: both use primaryAccent; dimmed slightly for the non-selected OpenGL state.
-    val openGLGray = Color(0xFFE5E7EB)  // light gray for OpenGL text only
+    val bgColor = colors.cardBackground
     val iconColor = when {
-        !enabled                             -> colors.primaryAccent.copy(alpha = 0.55f)
+        !enabled -> colors.primaryAccent.copy(alpha = 0.55f)
         iconType == "opengl" && !highlighted -> colors.primaryAccent.copy(alpha = 0.65f)
-        else                                 -> colors.primaryAccent
+        else -> colors.primaryAccent
     }
-    // Text: Vulkan = bright white (maximum legibility on dark card); OpenGL = light gray.
-    // colors.primaryAccent is already derived from the user's wallpaper via ThemeColors,
-    // so the Vulkan label inherits the correct wallpaper accent automatically.
-    // Text is always full-brightness textPrimary — same as the Resources button.
-    // We do NOT dim when disabled; the disabled state is communicated via icon/bg alpha.
     val textColor = colors.textPrimary
 
-    // ── Outer wrapper — NOT clipped, so the glow blob bleeds freely ──────────
-    // When disabled (Shizuku not ready): zoom out + fade to match REMINDERS card style.
-    val disabledScale by animateFloatAsState(
-        targetValue = if (enabled) 1f else 0.88f,
-        animationSpec = spring(dampingRatio = 0.58f, stiffness = 430f),
-        label = "big_btn_scale"
-    )
-    val disabledAlpha by animateFloatAsState(
-        targetValue = if (enabled) 1f else 0.32f,
-        animationSpec = tween(durationMillis = 360, easing = MotionTokens.Easing.emphasized),
-        label = "big_btn_alpha"
-    )
-    BoxWithConstraints(
+    MainMenuPressShell(
         modifier = modifier
             .fillMaxWidth()
-            .height(buttonHeight)
-            .graphicsLayer(scaleX = disabledScale, scaleY = disabledScale, alpha = disabledAlpha),
-        contentAlignment = Alignment.Center
-    ) {
-        // Derive sizes from actual rendered dimensions — correct at every resolution and orientation.
-        val buttonSize = minOf(maxWidth, maxHeight)
-        val shape      = RoundedCornerShape((buttonSize.value * 0.18f).dp.coerceIn(16.dp, 32.dp))
-        val iconSizeDp = (buttonSize.value * 0.34f).dp.coerceIn(36.dp, 72.dp)
-        val spacerDp   = (buttonSize.value * 0.065f).dp.coerceIn(6.dp, 14.dp)
-        val glowBlurRadius = (buttonSize.value * 0.11f).dp.coerceIn(8.dp, 16.dp)
+            .height(buttonHeight),
+        enabled = enabled,
+        colors = colors,
+        cardBackground = bgColor,
+        shape = RoundedCornerShape(28.dp),
+        oledMode = oledMode,
+        selected = highlighted,
+        hapticStyle = "renderer",
+        onClick = onClick
+    ) { press ->
+        BoxWithConstraints(modifier = Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+            val buttonSize = minOf(maxWidth, maxHeight)
+            val shape = RoundedCornerShape((buttonSize.value * 0.18f).dp.coerceIn(16.dp, 32.dp))
+            val iconSizeDp = (buttonSize.value * 0.34f).dp.coerceIn(36.dp, 72.dp)
+            val spacerDp = (buttonSize.value * 0.065f).dp.coerceIn(6.dp, 14.dp)
+            val allowWholeButtonGlow = oledMode
+            val allowIconGlow = oledMode || iconType == "vulkan" || iconType == "opengl"
 
-
-
-        // ── Outer box owns scale transform — graphicsLayer MUST be outside clip ──
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer(scaleX = pressScale, scaleY = pressScale),
-            contentAlignment = Alignment.Center
-        ) {
-        // Same soft accent glow style used by CURRENT RENDERER.
-        // It sits behind the clipped card so the glow can bleed around the square buttons.
-        if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val buttonGlowAlpha = when {
-                highlighted -> if (oledMode) 0.78f else 0.55f
-                oledMode    -> 0.58f
-                else        -> 0.38f
-            }
             Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .blur(glowBlurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                    .border(rendererBorderWidth, colors.primaryAccent.copy(alpha = buttonGlowAlpha), shape)
+                    .clip(shape)
+                    .background(colors.primaryAccent.copy(alpha = if (enabled) press * 0.10f else 0f))
+                    .background(
+                        Brush.radialGradient(
+                            0.0f to colors.primaryAccent.copy(alpha = if (enabled && allowWholeButtonGlow) 0.13f else 0.0f),
+                            0.58f to colors.primaryAccent.copy(alpha = if (enabled && allowWholeButtonGlow) 0.045f else 0.0f),
+                            1.0f to Color.Transparent,
+                            radius = with(density) { 210.dp.toPx() },
+                            center = Offset.Unspecified
+                        )
+                    )
+                    .background(
+                        Brush.verticalGradient(
+                            0.0f to colors.primaryAccent.copy(alpha = if (enabled && allowWholeButtonGlow) 0.035f else 0.0f),
+                            0.55f to Color.Transparent,
+                            1.0f to colors.primaryAccent.copy(alpha = if (enabled && allowWholeButtonGlow) 0.075f else 0.0f)
+                        )
+                    )
             )
-        }
 
-        // ── Card (clipped) ────────────────────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(shape)
-                .background(bgColor)
-                .background(
-                    Brush.radialGradient(
-                        0.0f to colors.primaryAccent.copy(alpha = if (enabled) 0.13f else 0.04f),
-                        0.58f to colors.primaryAccent.copy(alpha = if (enabled) 0.045f else 0.015f),
-                        1.0f to Color.Transparent,
-                        radius = with(density) { 210.dp.toPx() },
-                        center = Offset.Unspecified
-                    )
-                )
-                .background(
-                    Brush.verticalGradient(
-                        0.0f to colors.primaryAccent.copy(alpha = if (enabled) 0.035f else 0.0f),
-                        0.55f to Color.Transparent,
-                        1.0f to colors.primaryAccent.copy(alpha = if (enabled) 0.075f else 0.0f)
-                    )
-                )
-                .border(rendererBorderWidth, borderColor, shape)
-                .then(if (enabled) Modifier.pointerInput(enabled) {
-                    detectTapGestures(
-                        onPress = {
-                            val hapticStartedAt = GamaHaptics.rendererPressStart(context, view)
-                            isPressed = true
-                            val released = tryAwaitRelease()
-                            isPressed = false
-                            GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
-                            if (released) onClick()
-                        }
-                    )
-                } else Modifier),
-            contentAlignment = Alignment.Center
-        ) {
             Column(
-                modifier = Modifier.graphicsLayer(translationY = contentTY).padding(horizontal = (buttonSize.value * 0.05f).dp.coerceIn(4.dp, 12.dp)),
+                modifier = Modifier.padding(horizontal = (buttonSize.value * 0.05f).dp.coerceIn(4.dp, 12.dp)),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // ── Icon bloom — previously 2 blur() Canvas layers (2 RenderEffects per button per frame) ──
-                // Replaced: single Canvas with radial gradient under the icon shape.
-                // drawCircle(brush=radialGradient) is one GPU call — no extra compositor layers.
-                Box(contentAlignment = Alignment.Center) {
-                    Canvas(modifier = Modifier.size(iconSizeDp)) {
-                        val r = size.minDimension * 0.52f
-                        // Outer soft halo
+                Canvas(modifier = Modifier.size(iconSizeDp)) {
+                    val r = size.minDimension * 0.52f
+                    if (allowIconGlow) {
                         drawCircle(
                             brush = Brush.radialGradient(
                                 0.0f to iconColor.copy(alpha = 0.30f),
@@ -1696,29 +1769,35 @@ fun BigRendererButton(
                             ),
                             radius = r * 1.60f
                         )
-                        // Tight inner bloom
                         drawCircle(
                             brush = Brush.radialGradient(
                                 0.0f to iconColor.copy(alpha = 0.60f),
                                 0.50f to iconColor.copy(alpha = 0.18f),
                                 1.0f to Color.Transparent,
-                                radius = r * 0.85f
+                                radius = r * 0.90f
                             ),
-                            radius = r * 0.85f
+                            radius = r * 0.90f
                         )
-                        // Crisp icon on top
-                        drawIconShape(iconType, size, iconColor)
                     }
+                    drawIconShape(iconType, size, iconColor)
                 }
                 Spacer(modifier = Modifier.height(spacerDp))
-                Text(text, fontSize = ts.buttonLarge, fontWeight = FontWeight.Bold,
-                    color = textColor, fontFamily = quicksandFontFamily,
-                    maxLines = 1, textAlign = TextAlign.Start)
+                Text(
+                    text = text,
+                    color = textColor,
+                    fontSize = ts.buttonLarge,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center
+                )
             }
         }
-        } // close outer graphicsLayer scale Box
     }
 }
+
+
+
 
 // ── RealtimeBlurBox ──────────────────────────────────────────────────────────
 // Captures the screen region behind this composable at 1/4 resolution every
@@ -1750,7 +1829,6 @@ fun RealtimeBlurBox(
     }
 
     val view  = LocalView.current
-    val density = LocalDensity.current
 
     // Mutable state holding the latest blurred bitmap to paint as background
     var blurredBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -2074,9 +2152,9 @@ fun RendererCard(
 ) {
     val ts = LocalTypeScale.current
     val animLevel = LocalAnimationLevel.current
-    val density = LocalDensity.current
     val context = LocalContext.current
     val view = LocalView.current
+    val density = LocalDensity.current
     val strings = LocalStrings.current
     val configuration = LocalConfiguration.current
     val isLandscape   = configuration.screenWidthDp > configuration.screenHeightDp
@@ -2090,6 +2168,7 @@ fun RendererCard(
     }
     val cardInnerSpacing = (screenMinDp * 0.024f).dp.coerceIn(9.dp, 15.dp)
     val glowBlurRadius   = (screenMinDp * 0.027f).dp.coerceIn(8.dp, 14.dp)
+    val allowWholeCardGlow = oledMode
 
     // ── State color: accent when ready, red/amber when not ──────────────────
     val stateColor = when {
@@ -2132,59 +2211,44 @@ fun RendererCard(
 
     // (rendererTextAlpha removed — was declared but never consumed anywhere in RendererCard)
 
-    // ── Press state — single Animatable<Float> [0=rest, 1=pressed] drives all ──
-    // press visuals via draw-phase lerp, replacing 3 separate animateFloatAsState
-    // calls that all fired simultaneously with identical spring specs on every
-    // press/release.  Same pattern used by IllustratedButton and FlatButton.
-    var isPressed by remember { mutableStateOf(false) }
+    // ── Press state: current renderer card owns its visible shell press state ─
+    var currentRendererPressed by remember { mutableStateOf(false) }
     val rendererCardPress = remember { Animatable(0f) }
-    LaunchedEffect(isPressed) {
+    LaunchedEffect(currentRendererPressed) {
         rendererCardPress.animateTo(
-            targetValue   = if (isPressed) 1f else 0f,
+            targetValue   = if (currentRendererPressed) 1f else 0f,
             animationSpec = when (animLevel) {
                 2 -> snap()
                 1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasized)
                 else -> spring(
-                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                    stiffness    = if (isPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+                    dampingRatio = if (currentRendererPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                    stiffness    = if (currentRendererPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
                 )
             }
         )
     }
     val rcp        = rendererCardPress.value  // single read; all visuals derived below
-    val nudgePx    = with(density) { -2.dp.toPx() }
-    // Derived press visuals — evaluated at draw-phase via graphicsLayer, zero recomposition
-    val pressScale = 1f - rcp * (1f - MotionTokens.Scale.subtle)
-    val nameScale  = 1f + rcp * 0.08f
-    val nameTY     = rcp * nudgePx
+    // Same physical reaction language as SettingsNavigationCard / VISUALS:
+    // the whole card compresses slightly and the outline thickens. Keep the text stable.
+    val pressScale = 1f - rcp * 0.045f
+    val nameScale  = 1f
+    val nameTY     = 0f
 
     // ── Colors ───────────────────────────────────────────────────────────────
-    val borderColor = if (isPressed) {
-        colors.primaryAccent
-    } else if (!shizukuReady) {
+    val borderColor = if (!shizukuReady) {
         // Breathing outline in error/warning state
         stateColor.copy(alpha = warningBorderAlpha)
     } else {
-        colors.primaryAccent.copy(alpha = 0.55f)
+        colors.primaryAccent.copy(alpha = 0.55f + rcp * 0.45f)
     }
 
-    // Border width: use animateFloatAsState so the value is read at draw time via .dp
-    // conversion inside graphicsLayer-adjacent code — avoids a layout pass on change.
-    val borderWidthF by animateFloatAsState(
-        targetValue = when {
-            isPressed       -> 2f
-            !shizukuReady   -> 2f
-            oledMode        -> 0.75f
-            shizukuReady    -> 1f
-            else            -> 1f
-        },
-        animationSpec = if (animLevel == 2) snap() else tween(
-            durationMillis = if (isPressed) MotionTokens.Duration.flash else MotionTokens.Duration.quick,
-            easing = MotionTokens.Easing.velvet
-        ),
-        label = "renderer_border_width"
-    )
-    val borderWidth = borderWidthF.dp
+    // Border width follows the same single press progress as the scale, exactly like SettingsNavigationCard.
+    val rendererCardRestBorderWidth = if (oledMode) 0.75f else 1f
+    val borderWidth = when {
+        !shizukuReady -> 2.dp
+        else          -> (rendererCardRestBorderWidth + rcp * 2.25f).dp
+    }
+    val rendererCardPressedTintAlpha = if (shizukuReady) rcp * 0.08f else 0f
 
     val isDarkTheme = cardBackground.luminance() < 0.5f
     val subtleWarningBackground = if (!shizukuReady) {
@@ -2261,8 +2325,8 @@ fun RendererCard(
             contentAlignment = Alignment.Center
         ) {
             // Neon glow behind the card border
-            if (shizukuReady && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val cardGlowAlpha = if (oledMode) 0.80f else 0.55f
+            if (shizukuReady && allowWholeCardGlow && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val cardGlowAlpha = 0.80f
                 Box(
                     modifier = Modifier
                         .matchParentSize()
@@ -2274,12 +2338,20 @@ fun RendererCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .graphicsLayer(scaleX = pressScale, scaleY = pressScale)
+                    .pressedAccentOutlineGlow(
+                        pressProgress = rcp,
+                        color = colors.primaryAccent,
+                        cornerRadius = cardCorner,
+                        strokeWidth = borderWidth,
+                        glowRadius = 12.dp
+                    )
                     .clip(RoundedCornerShape(cardCorner))
                     .background(subtleWarningBackground)
+                    .background(colors.primaryAccent.copy(alpha = rendererCardPressedTintAlpha))
                     .background(
                         Brush.radialGradient(
-                            0.0f to colors.primaryAccent.copy(alpha = if (shizukuReady) 0.13f else 0.05f),
-                            0.58f to colors.primaryAccent.copy(alpha = if (shizukuReady) 0.045f else 0.02f),
+                            0.0f to colors.primaryAccent.copy(alpha = if (shizukuReady && allowWholeCardGlow) 0.13f else 0.0f),
+                            0.58f to colors.primaryAccent.copy(alpha = if (shizukuReady && allowWholeCardGlow) 0.045f else 0.0f),
                             1.0f to Color.Transparent,
                             radius = with(density) { 210.dp.toPx() },
                             center = Offset.Unspecified
@@ -2287,9 +2359,9 @@ fun RendererCard(
                     )
                     .background(
                         Brush.verticalGradient(
-                            0.0f to colors.primaryAccent.copy(alpha = if (shizukuReady) 0.035f else 0.0f),
+                            0.0f to colors.primaryAccent.copy(alpha = if (shizukuReady && allowWholeCardGlow) 0.035f else 0.0f),
                             0.55f to Color.Transparent,
-                            1.0f to colors.primaryAccent.copy(alpha = if (shizukuReady) 0.075f else 0.0f)
+                            1.0f to colors.primaryAccent.copy(alpha = if (shizukuReady && allowWholeCardGlow) 0.075f else 0.0f)
                         )
                     )
                     .border(
@@ -2297,17 +2369,15 @@ fun RendererCard(
                         color = borderColor,
                         shape = RoundedCornerShape(cardCorner)
                     )
-                    .pointerInput(shizukuReady) {
+                    .pointerInput(shizukuReady, onShizukuErrorClick) {
                         detectTapGestures(
                             onPress = {
                                 val hapticStartedAt = GamaHaptics.pressStart(context, view)
-                                isPressed = true
+                                currentRendererPressed = true
                                 val released = tryAwaitRelease()
-                                isPressed = false
+                                currentRendererPressed = false
                                 GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
-                            },
-                            onTap = {
-                                if (!shizukuReady) onShizukuErrorClick()
+                                if (released && !shizukuReady) onShizukuErrorClick()
                             }
                         )
                     }
@@ -2501,9 +2571,10 @@ fun CompactColorPickerCard(
     // Border color comes directly from the already-animated colors.* — no local tween needed
     val cardBorderColor = colors.primaryAccent.copy(alpha = if (enabled) 0.55f else 0.25f)
 
+    val colorCardShape = RoundedCornerShape(28.dp)
     val colorCardScale by animateFloatAsState(
         targetValue = if (enabled) 1f else 0.88f,
-        animationSpec = spring(
+        animationSpec = if (LocalAnimationLevel.current == 1) tween(360, easing = MotionTokens.Easing.emphasized) else spring(
             dampingRatio = MotionTokens.Springs.balanced.dampingRatio,
             stiffness = MotionTokens.Springs.balanced.stiffness
         ),
@@ -2518,7 +2589,8 @@ fun CompactColorPickerCard(
         modifier = modifier
             .fillMaxWidth()
             .graphicsLayer(scaleX = colorCardScale, scaleY = colorCardScale)
-            .border(width = 1.dp, color = cardBorderColor, shape = RoundedCornerShape(28.dp))
+            .clip(colorCardShape)
+            .border(width = 1.dp, color = cardBorderColor, shape = colorCardShape)
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             // Blurred border overlay removed for performance (one RenderEffect per card was the main overdraw culprit).
@@ -2526,13 +2598,19 @@ fun CompactColorPickerCard(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
+                .animateContentSize(
+                    animationSpec = tween(
+                        durationMillis = 560,
+                        easing = MotionTokens.Easing.velvet
+                    )
+                )
                 .graphicsLayer(alpha = colorCardAlpha)
                 .then(if (!enabled) Modifier.pointerInput(enabled) {
                     // Intercept taps only — vertical scroll events pass through to parent scrollable
                     detectTapGestures { }
                 } else Modifier),
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(28.dp),
+            shape = colorCardShape,
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             // Left accent bar + content side-by-side using IntrinsicSize.Min
@@ -2637,11 +2715,11 @@ fun CompactColorPickerCard(
                     AnimatedVisibility(
                         visible = advancedPicker && enabled,
                         enter = expandVertically(
-                            animationSpec = tween(320, easing = MotionTokens.Easing.emphasizedDecelerate)
-                        ) + fadeIn(animationSpec = tween(240, delayMillis = 60, easing = MotionTokens.Easing.enter)),
+                            animationSpec = tween(520, easing = MotionTokens.Easing.velvet)
+                        ) + fadeIn(animationSpec = tween(360, delayMillis = 90, easing = MotionTokens.Easing.enter)),
                         exit = shrinkVertically(
-                            animationSpec = tween(220, easing = MotionTokens.Easing.emphasizedAccelerate)
-                        ) + fadeOut(animationSpec = tween(140, easing = MotionTokens.Easing.exit))
+                            animationSpec = tween(380, easing = MotionTokens.Easing.velvet)
+                        ) + fadeOut(animationSpec = tween(220, easing = MotionTokens.Easing.exit))
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(
@@ -2740,20 +2818,54 @@ fun CompactColorBox(
     isLandscape: Boolean
 ) {
     val size = if (isLandscape) 32.dp else 36.dp
+    val animLevel = LocalAnimationLevel.current
+    var isPressed by remember { mutableStateOf(false) }
+    val pressProgress = remember { Animatable(0f) }
+    LaunchedEffect(isPressed) {
+        pressProgress.animateTo(
+            targetValue = if (isPressed) 1f else 0f,
+            animationSpec = when (animLevel) {
+                2 -> snap()
+                1 -> tween(durationMillis = 110, easing = MotionTokens.Easing.emphasized)
+                else -> spring(
+                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                    stiffness = if (isPressed) MotionTokens.Springs.pressDown.stiffness else MotionTokens.Springs.pressUp.stiffness
+                )
+            }
+        )
+    }
+    val pp = pressProgress.value
+    val pressScale = 1f - pp * (1f - MotionTokens.Scale.subtle)
 
     Box(
         modifier = Modifier
             .size(size)
-            .background(color, RoundedCornerShape(8.dp))
+            .graphicsLayer(scaleX = pressScale, scaleY = pressScale)
+            .clip(RoundedCornerShape(8.dp))
+            .background(color)
+            .background(colors.primaryAccent.copy(alpha = pp * 0.16f))
+            .pressedAccentOutlineGlow(
+                pressProgress = pp,
+                color = colors.primaryAccent,
+                cornerRadius = 8.dp,
+                strokeWidth = if (isSelected) 2.5.dp else 1.dp,
+                glowRadius = 7.dp,
+                maxAlpha = 0.85f
+            )
             .border(
                 width = if (isSelected) 2.5.dp else 1.dp,
-                color = if (isSelected) colors.primaryAccent else colors.border.copy(alpha = 0.4f),
+                color = if (isSelected) colors.primaryAccent else colors.border.copy(alpha = 0.4f + pp * 0.35f),
                 shape = RoundedCornerShape(8.dp)
             )
             .pointerInput(Unit) {
-                detectTapGestures {
-                    onClick()
-                }
+                detectTapGestures(
+                    onPress = {
+                        isPressed = true
+                        val released = tryAwaitRelease()
+                        isPressed = false
+                        if (released) onClick()
+                    }
+                )
             },
         contentAlignment = Alignment.Center
     ) {
@@ -2826,12 +2938,18 @@ fun CleanTitle(
         }
     }
 
-    // Cache the Paint outside drawWithContent — previously allocated fresh on every
-    // draw frame. setShadowLayer radius (80f) and text alignment are constant.
-    val titleGlowPaint = remember(colors.primaryAccent, fontSize) {
+    val darkTitleGlowMode = colors.background.luminance() < 0.2f
+
+    // Cache the Paint outside drawWithContent — stronger white glow in dark/oled,
+    // completely disabled in light mode so titles stay clean there.
+    val titleGlowPaint = remember(darkTitleGlowMode, fontSize) {
         Paint().asFrameworkPaint().apply {
             color = android.graphics.Color.TRANSPARENT
-            setShadowLayer(80f, 0f, 0f, colors.primaryAccent.toArgb())
+            if (darkTitleGlowMode) {
+                setShadowLayer(108f, 0f, 0f, Color.White.copy(alpha = 0.90f).toArgb())
+            } else {
+                clearShadowLayer()
+            }
             textAlign = android.graphics.Paint.Align.CENTER
             isDither = true
         }
@@ -2892,15 +3010,17 @@ fun CleanTitle(
             modifier = Modifier
                 .padding(horizontal = 24.dp)
                 .drawWithContent {
-                    drawIntoCanvas { canvas ->
-                        // Reuse cached Paint; only textSize depends on draw-scope density
-                        titleGlowPaint.textSize = fontSize.toPx()
-                        canvas.nativeCanvas.drawText(
-                            text,
-                            size.width / 2,
-                            size.height / 2 + (fontSize.toPx() * 0.25f),
-                            titleGlowPaint
-                        )
+                    if (darkTitleGlowMode) {
+                        drawIntoCanvas { canvas ->
+                            // Reuse cached Paint; only textSize depends on draw-scope density
+                            titleGlowPaint.textSize = fontSize.toPx()
+                            canvas.nativeCanvas.drawText(
+                                text,
+                                size.width / 2,
+                                size.height / 2 + (fontSize.toPx() * 0.25f),
+                                titleGlowPaint
+                            )
+                        }
                     }
                     drawContent()
                 }
@@ -3110,25 +3230,32 @@ fun ToggleCard(
                         )
                     }
 
-                    // Switch colors use colors.* directly — those values are already
-                    // globally animated. A local animateColorAsState on top causes double-animation
-                    // (chasing a moving target), making colors appear delayed.
-                    // Only oledMode switching (boolean→ static Color) still gets a tween.
+                    // Material Switch does not reliably animate palette swaps by itself,
+                    // so theme changes looked like a snap even while the rest of the app
+                    // eased slowly. Animate the final colours locally with the same gentle
+                    // theme timing; checked-state motion stays handled by Switch itself.
                     val oledTrackAlpha by animateFloatAsState(
                         targetValue = if (oledMode) 1f else 0f,
-                        animationSpec = tween(durationMillis = 300, easing = MotionTokens.Easing.emphasized),
+                        animationSpec = tween(durationMillis = 520, easing = MotionTokens.Easing.velvet),
                         label = "oled_track_alpha"
                     )
-                    val checkedTrackColor = lerp(colors.primaryAccent, Color(0xFF1A1A1A), oledTrackAlpha)
-                    // In light mode: soft accent-tinted track instead of harsh grey
-                    val uncheckedTrackColor = lerp(
+                    val targetCheckedTrackColor = lerp(colors.primaryAccent, Color(0xFF1A1A1A), oledTrackAlpha)
+                    val targetUncheckedTrackColor = lerp(
                         colors.primaryAccent.copy(alpha = 0.20f),
                         Color(0xFF1A1A1A),
                         oledTrackAlpha
                     )
-                    val checkedThumbColor = lerp(Color.White, colors.primaryAccent, oledTrackAlpha)
-                    // Unchecked thumb: white in light mode (clean, pill-shaped look), accent in oled
-                    val uncheckedThumbColor = lerp(Color.White, colors.primaryAccent.copy(alpha = 0.6f), oledTrackAlpha)
+                    val targetCheckedThumbColor = lerp(Color.White, colors.primaryAccent, oledTrackAlpha)
+                    val targetUncheckedThumbColor = lerp(Color.White, colors.primaryAccent.copy(alpha = 0.6f), oledTrackAlpha)
+
+                    val toggleColorSpec = tween<Color>(durationMillis = 760, easing = MotionTokens.Easing.velvet)
+                    val checkedTrackColor by animateColorAsState(targetCheckedTrackColor, toggleColorSpec, label = "switch_checked_track_theme")
+                    val uncheckedTrackColor by animateColorAsState(targetUncheckedTrackColor, toggleColorSpec, label = "switch_unchecked_track_theme")
+                    val checkedThumbColor by animateColorAsState(targetCheckedThumbColor, toggleColorSpec, label = "switch_checked_thumb_theme")
+                    val uncheckedThumbColor by animateColorAsState(targetUncheckedThumbColor, toggleColorSpec, label = "switch_unchecked_thumb_theme")
+                    val disabledCheckedTrackColor by animateColorAsState(colors.primaryAccent.copy(alpha = 0.15f), toggleColorSpec, label = "switch_disabled_checked_track_theme")
+                    val disabledUncheckedTrackColor by animateColorAsState(colors.primaryAccent.copy(alpha = 0.10f), toggleColorSpec, label = "switch_disabled_unchecked_track_theme")
+                    val disabledCheckedThumbColor by animateColorAsState(colors.textSecondary.copy(alpha = 0.4f), toggleColorSpec, label = "switch_disabled_checked_thumb_theme")
 
                     val switchColors = SwitchDefaults.colors(
                         checkedThumbColor = checkedThumbColor,
@@ -3137,10 +3264,10 @@ fun ToggleCard(
                         uncheckedTrackColor = uncheckedTrackColor,
                         checkedBorderColor = Color.Transparent,
                         uncheckedBorderColor = Color.Transparent,
-                        disabledCheckedThumbColor = colors.textSecondary.copy(alpha = 0.4f),
-                        disabledCheckedTrackColor = colors.primaryAccent.copy(alpha = 0.15f),
+                        disabledCheckedThumbColor = disabledCheckedThumbColor,
+                        disabledCheckedTrackColor = disabledCheckedTrackColor,
                         disabledUncheckedThumbColor = Color.White.copy(alpha = 0.6f),
-                        disabledUncheckedTrackColor = colors.primaryAccent.copy(alpha = 0.10f)
+                        disabledUncheckedTrackColor = disabledUncheckedTrackColor
                     )
 
                     Switch(
@@ -3245,6 +3372,14 @@ fun BackArrowButton(
                         )
                     )
                 )
+                .background(colors.primaryAccent.copy(alpha = pp * 0.12f))
+                .pressedAccentOutlineGlow(
+                    pressProgress = pp,
+                    color = colors.primaryAccent,
+                    cornerRadius = 999.dp,
+                    strokeWidth = borderWidthDp,
+                    glowRadius = 9.dp
+                )
                 .border(borderWidthDp, borderColor, CircleShape)
                 .pointerInput(Unit) {
                     detectTapGestures(
@@ -3308,6 +3443,7 @@ fun PanelBackButton(
     val animLevel = LocalAnimationLevel.current
     val context = LocalContext.current
     val view = LocalView.current
+    val density = LocalDensity.current
     val currentOnClick by rememberUpdatedState(onClick)
     val btnSize  = if (isSmallScreen) 48.dp else 52.dp
     val iconSize = if (isSmallScreen) 22.dp else 26.dp
@@ -3334,10 +3470,9 @@ fun PanelBackButton(
         )
     }
     val pp = pressProgress.value
-    val density = LocalDensity.current
     val appearScale by animateFloatAsState(
         targetValue = if (enabled) 1f else 0.82f,
-        animationSpec = spring(dampingRatio = 0.58f, stiffness = 360f),
+        animationSpec = if (animLevel == 2) snap() else if (animLevel == 1) tween(240, easing = MotionTokens.Easing.emphasized) else spring(dampingRatio = 0.58f, stiffness = 360f),
         label = "panel_back_appear_scale"
     )
     val pressScale    = (1f - pp * (1f - MotionTokens.Scale.subtle)) * appearScale
@@ -3397,6 +3532,14 @@ fun PanelBackButton(
                         )
                     )
                 )
+                .background(colors.primaryAccent.copy(alpha = pp * 0.12f))
+                .pressedAccentOutlineGlow(
+                    pressProgress = pp,
+                    color = colors.primaryAccent,
+                    cornerRadius = 28.dp,
+                    strokeWidth = borderWidthDp,
+                    glowRadius = 10.dp
+                )
                 .border(
                     borderWidthDp,
                     colors.primaryAccent.copy(alpha = borderAlphaVal),
@@ -3455,6 +3598,7 @@ fun PanelSearchButton(
     val strings = LocalStrings.current
     val context = LocalContext.current
     val view = LocalView.current
+    val density = LocalDensity.current
     val currentOnClick by rememberUpdatedState(onClick)
     val btnSize  = if (isSmallScreen) 48.dp else 52.dp
     val iconSize = if (isSmallScreen) 23.dp else 27.dp
@@ -3477,7 +3621,6 @@ fun PanelSearchButton(
     }
 
     val pp = pressProgress.value
-    val density = LocalDensity.current
     val appearScale by animateFloatAsState(
         targetValue = if (enabled) 1f else 0.82f,
         animationSpec = spring(dampingRatio = 0.58f, stiffness = 360f),
@@ -3537,6 +3680,14 @@ fun PanelSearchButton(
                             colors.primaryAccent.copy(alpha = 0.08f)
                         )
                     )
+                )
+                .background(colors.primaryAccent.copy(alpha = pp * 0.12f))
+                .pressedAccentOutlineGlow(
+                    pressProgress = pp,
+                    color = colors.primaryAccent,
+                    cornerRadius = 28.dp,
+                    strokeWidth = borderWidthDp,
+                    glowRadius = 10.dp
                 )
                 .border(
                     borderWidthDp,
@@ -3599,6 +3750,7 @@ fun PanelGlobalButton(
     val strings = LocalStrings.current
     val context = LocalContext.current
     val view = LocalView.current
+    val density = LocalDensity.current
     val currentOnClick by rememberUpdatedState(onClick)
     val btnSize  = if (isSmallScreen) 48.dp else 52.dp
     val iconSize = if (isSmallScreen) 24.dp else 28.dp
@@ -3621,7 +3773,6 @@ fun PanelGlobalButton(
     }
 
     val pp = pressProgress.value
-    val density = LocalDensity.current
     val appearScale by animateFloatAsState(
         targetValue = if (enabled) 1f else 0.82f,
         animationSpec = spring(dampingRatio = 0.58f, stiffness = 360f),
@@ -3681,6 +3832,14 @@ fun PanelGlobalButton(
                             colors.primaryAccent.copy(alpha = 0.08f)
                         )
                     )
+                )
+                .background(colors.primaryAccent.copy(alpha = pp * 0.12f))
+                .pressedAccentOutlineGlow(
+                    pressProgress = pp,
+                    color = colors.primaryAccent,
+                    cornerRadius = 28.dp,
+                    strokeWidth = borderWidthDp,
+                    glowRadius = 10.dp
                 )
                 .border(
                     borderWidthDp,
@@ -3790,8 +3949,8 @@ fun DialogButton(
     var isPressed by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val view = LocalView.current
-    val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val density = LocalDensity.current
+    val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val shape = RoundedCornerShape(28.dp)
 
     // ── Single Animatable<Float> [0=rest, 1=pressed] drives ALL press visuals ─
@@ -3851,6 +4010,14 @@ fun DialogButton(
                 .graphicsLayer(scaleX = pressScale, scaleY = pressScale)
                 .clip(shape)
                 .background(containerColor)
+                .background(colors.primaryAccent.copy(alpha = pp * 0.10f))
+                .pressedAccentOutlineGlow(
+                    pressProgress = pp,
+                    color = colors.primaryAccent,
+                    cornerRadius = 28.dp,
+                    strokeWidth = borderWidthDp.dp,
+                    glowRadius = 10.dp
+                )
                 .border(width = borderWidthDp.dp, color = borderColor, shape = shape)
                 .pointerInput(Unit) {
                     detectTapGestures(
@@ -3899,7 +4066,6 @@ fun BouncyDialog(
 ) {
     val animLevel = LocalAnimationLevel.current
     val dismissOnClickOutside = LocalDismissOnClickOutside.current
-    val density = LocalDensity.current
     // Capture the latest onDismiss without restarting pointerInput on every recomposition.
     // Using the lambda directly as a pointerInput key causes the swipe coroutine to cancel
     // and restart whenever the lambda reference changes (e.g. after pressing the back button
@@ -3948,7 +4114,7 @@ fun BouncyDialog(
             animAlpha.snapTo(0f)
 
             // Full = springy pop. Reduced = no bounce, lighter fade/scale.
-            val enterSpec: AnimationSpec<Float> = when (animLevel) {
+            val enterSpec: FiniteAnimationSpec<Float> = when (animLevel) {
                 0 -> spring(dampingRatio = 0.42f, stiffness = 190f)
                 else -> tween(durationMillis = 210, easing = MotionTokens.Easing.emphasizedDecelerate)
             }
@@ -4111,6 +4277,14 @@ fun SecondaryIconButton(
             .graphicsLayer(scaleX = pressScale, scaleY = pressScale)
             .clip(RoundedCornerShape(14.dp))
             .background(bgColor)
+            .background(colors.primaryAccent.copy(alpha = pp * 0.10f))
+            .pressedAccentOutlineGlow(
+                pressProgress = pp,
+                color = colors.primaryAccent,
+                cornerRadius = 14.dp,
+                strokeWidth = borderWidthDp.dp,
+                glowRadius = 8.dp
+            )
             .border(borderWidthDp.dp, borderColor, RoundedCornerShape(14.dp))
             .pointerInput(Unit) {
                 detectTapGestures(

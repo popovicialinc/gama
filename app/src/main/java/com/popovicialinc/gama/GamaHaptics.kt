@@ -147,13 +147,22 @@ object GamaHaptics {
         if (heldForMs < HOLD_RELEASE_THRESHOLD_MS) return
 
         lastSurfaceHapticAtMs = SystemClock.uptimeMillis()
-        val a1 = scaled(context, PREF_HOLD_STRENGTH, 255, 150, 255, DEFAULT_HOLD_STRENGTH, strengthOverride)
-        val a2 = scaled(context, PREF_HOLD_STRENGTH, 218, 112, 255, DEFAULT_HOLD_STRENGTH, strengthOverride)
-        val a3 = scaled(context, PREF_HOLD_STRENGTH, 128, 56, 208, DEFAULT_HOLD_STRENGTH, strengthOverride)
+
+        // Release after a deliberate hold should not feel like a second click.
+        // Keep the initial contact as the click from pressStart(), then let go with
+        // a continuous low-amplitude tail that gently fades out. Consecutive
+        // non-zero waveform segments avoid the old pulse / gap / pulse feeling.
+        val a1 = scaled(context, PREF_HOLD_STRENGTH, 128, 56, 170, DEFAULT_HOLD_STRENGTH, strengthOverride)
+        val a2 = scaled(context, PREF_HOLD_STRENGTH, 110, 46, 150, DEFAULT_HOLD_STRENGTH, strengthOverride)
+        val a3 = scaled(context, PREF_HOLD_STRENGTH, 92, 36, 130, DEFAULT_HOLD_STRENGTH, strengthOverride)
+        val a4 = scaled(context, PREF_HOLD_STRENGTH, 72, 28, 108, DEFAULT_HOLD_STRENGTH, strengthOverride)
+        val a5 = scaled(context, PREF_HOLD_STRENGTH, 54, 20, 86, DEFAULT_HOLD_STRENGTH, strengthOverride)
+        val a6 = scaled(context, PREF_HOLD_STRENGTH, 36, 12, 64, DEFAULT_HOLD_STRENGTH, strengthOverride)
+        val a7 = scaled(context, PREF_HOLD_STRENGTH, 20, 6, 42, DEFAULT_HOLD_STRENGTH, strengthOverride)
         if (!vibratePattern(
                 context,
-                longArrayOf(0L, 38L, 26L, 30L, 38L, 18L),
-                intArrayOf(0, a1, 0, a2, 0, a3)
+                longArrayOf(0L, 28L, 34L, 42L, 52L, 64L, 78L, 92L),
+                intArrayOf(0, a1, a2, a3, a4, a5, a6, a7)
             )
         ) {
             view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)

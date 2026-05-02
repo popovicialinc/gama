@@ -103,6 +103,17 @@ import kotlin.math.PI
 import kotlin.math.roundToInt
 
 
+private fun String.withoutGreetingEmoji(): String = this
+    .replace("☀️", "")
+    .replace("🌙", "")
+    .replace("👋", "")
+    .replace("✅", "")
+    .replace("⚠️", "")
+    .replace("❌", "")
+    .replace(Regex("\\s+"), " ")
+    .trim()
+
+
 // ============================================================
 // GamaUI: main composable — state, navigation, layout
 // ============================================================
@@ -538,14 +549,23 @@ fun GamaUI(
     // This also makes Auto follow the system: if the phone is in dark mode, GAMA uses pure black.
     val effectiveOledMode = isDarkTheme || oledMode
 
-    // Manual light/dark switching used to feel laggy because every major theme color
-    // animated for hundreds of milliseconds, forcing the whole UI to redraw every frame.
-    // During an actual mode flip we use a very short transition instead: still not a
-    // harsh snap, but cheap enough to feel instant even with blur + matrix enabled.
+    // Dark/OLED mode uses a pure black background, so card shadows are effectively invisible.
+    // Keep the setting honest: if the app enters dark mode, turn CARD SHADOWS off instead of
+    // leaving a useless GPU blur pass enabled behind black cards.
+    LaunchedEffect(effectiveOledMode) {
+        if (effectiveOledMode && shadowsEnabled) {
+            shadowsEnabled = false
+            prefs.edit().putBoolean("shadows_enabled", false).apply()
+        }
+    }
+
+    // Theme changes should feel slow and premium, but not like the whole app is
+    // fighting the GPU. Keep one shared transition window and let different UI
+    // channels ease at slightly different durations instead of forcing a hard snap.
     var themeModeSwitchInProgress by remember { mutableStateOf(false) }
     LaunchedEffect(effectiveOledMode) {
         themeModeSwitchInProgress = true
-        delay(140)
+        delay(900)
         themeModeSwitchInProgress = false
     }
 
@@ -639,22 +659,22 @@ fun GamaUI(
 
     val animatedEffectsAccent by animateColorAsState(
         targetValue = targetEffectsAccent,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 110 else 240, easing = FastOutSlowInEasing),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 760 else 260, easing = MotionTokens.Easing.velvet),
         label = "effects_accent_anim"
     )
     val matrixHeadColor by animateColorAsState(
         targetValue = targetMatrixHeadColor,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 110 else 240, easing = FastOutSlowInEasing),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 760 else 260, easing = MotionTokens.Easing.velvet),
         label = "matrix_head_color_anim"
     )
     val matrixRainColor by animateColorAsState(
         targetValue = targetMatrixRainColor,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 110 else 240, easing = FastOutSlowInEasing),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 760 else 260, easing = MotionTokens.Easing.velvet),
         label = "matrix_rain_color_anim"
     )
     val matrixTrailColor by animateColorAsState(
         targetValue = targetMatrixTrailColor,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 110 else 240, easing = FastOutSlowInEasing),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 760 else 260, easing = MotionTokens.Easing.velvet),
         label = "matrix_trail_color_anim"
     )
     // Determine target colors.
@@ -675,9 +695,23 @@ fun GamaUI(
     // naturally), without needing artificial delays that desync fast toggles.
     val themeColorAnimSpec: AnimationSpec<Color> = when {
         animationLevel == 2 -> snap()
-        themeModeSwitchInProgress -> tween(durationMillis = 110, easing = MotionTokens.Easing.emphasized)
-        animationLevel == 1 -> tween(durationMillis = 140, easing = MotionTokens.Easing.emphasized)
-        else -> tween(durationMillis = 220, easing = MotionTokens.Easing.emphasized)
+        themeModeSwitchInProgress -> tween(durationMillis = 780, easing = MotionTokens.Easing.velvet)
+        animationLevel == 1 -> tween(durationMillis = 180, easing = MotionTokens.Easing.emphasized)
+        else -> tween(durationMillis = 320, easing = MotionTokens.Easing.emphasized)
+    }
+
+    val themeTextAnimSpec: AnimationSpec<Color> = when {
+        animationLevel == 2 -> snap()
+        themeModeSwitchInProgress -> tween(durationMillis = 560, easing = MotionTokens.Easing.velvet)
+        animationLevel == 1 -> tween(durationMillis = 160, easing = MotionTokens.Easing.emphasized)
+        else -> tween(durationMillis = 260, easing = MotionTokens.Easing.emphasized)
+    }
+
+    val themeBackgroundAnimSpec: AnimationSpec<Color> = when {
+        animationLevel == 2 -> snap()
+        themeModeSwitchInProgress -> tween(durationMillis = 900, easing = MotionTokens.Easing.velvet)
+        animationLevel == 1 -> tween(durationMillis = 200, easing = MotionTokens.Easing.emphasized)
+        else -> tween(durationMillis = 360, easing = MotionTokens.Easing.emphasized)
     }
 
     val animatedAccent by animateColorAsState(
@@ -692,12 +726,12 @@ fun GamaUI(
     )
     val animatedTextPrimary by animateColorAsState(
         targetValue = targetColors.textPrimary,
-        animationSpec = themeColorAnimSpec,
+        animationSpec = themeTextAnimSpec,
         label = "text_primary_anim"
     )
     val animatedTextSecondary by animateColorAsState(
         targetValue = targetColors.textSecondary,
-        animationSpec = themeColorAnimSpec,
+        animationSpec = themeTextAnimSpec,
         label = "text_secondary_anim"
     )
     val animatedCardBackground by animateColorAsState(
@@ -707,17 +741,17 @@ fun GamaUI(
     )
     val animatedBackgroundColor by animateColorAsState(
         targetValue = targetColors.background,
-        animationSpec = themeColorAnimSpec,
+        animationSpec = themeBackgroundAnimSpec,
         label = "bg_anim"
     )
     val animatedGradientStart by animateColorAsState(
         targetValue = targetColors.gradientStart,
-        animationSpec = themeColorAnimSpec,
+        animationSpec = themeBackgroundAnimSpec,
         label = "grad_start_anim"
     )
     val animatedGradientEnd by animateColorAsState(
         targetValue = targetColors.gradientEnd,
-        animationSpec = themeColorAnimSpec,
+        animationSpec = themeBackgroundAnimSpec,
         label = "grad_end_anim"
     )
 
@@ -1140,9 +1174,19 @@ fun GamaUI(
         else -> 1f // 100%
     }
 
-    // Instant UI scale change (no animation to prevent lag)
-    // Using remember to prevent recomposition lag
-    val animatedUiScale = remember(uiScale) { uiScaleMultiplier }
+    // UI scale must animate the actual layout, not zoom the whole root layer.
+    // Root-layer zoom pushed edge buttons off-screen because they were scaled
+    // around the screen center. Animating the density keeps every anchor honest:
+    // the < button stays on-screen while text/cards ease from old size to new size.
+    val animatedUiScale by animateFloatAsState(
+        targetValue = uiScaleMultiplier,
+        animationSpec = when (animationLevel) {
+            2 -> snap()
+            1 -> tween(durationMillis = 260, easing = MotionTokens.Easing.emphasizedDecelerate)
+            else -> tween(durationMillis = 460, easing = MotionTokens.Easing.velvet)
+        },
+        label = "ui_scale_density_anim"
+    )
 
     // Adaptive type scale — computed once here, available everywhere via LocalTypeScale
     val typeScale = rememberAdaptiveType()
@@ -1168,12 +1212,11 @@ fun GamaUI(
             modifier = Modifier
                 .fillMaxSize()
                 .background(animatedBackgroundColor)
-                .graphicsLayer { clip = false } // Hardware acceleration for smooth animations
         ) {
             // Gradient Overlay
             val gradientAlpha by animateFloatAsState(
                 targetValue = if (gradientEnabled && !effectiveOledMode) 1f else 0f,
-                animationSpec = if (animationLevel == 2) snap<Float>() else tween<Float>(durationMillis = if (themeModeSwitchInProgress) 90 else 260, easing = MotionTokens.Easing.emphasizedDecelerate),
+                animationSpec = if (animationLevel == 2) snap<Float>() else tween<Float>(durationMillis = if (themeModeSwitchInProgress) 760 else 260, easing = MotionTokens.Easing.velvet),
                 label = "gradient_visibility"
             )
 
@@ -1301,7 +1344,7 @@ fun GamaUI(
                                         }
                                         AnimatedElement(visible = isVisible, staggerIndex = 0, totalItems = 8) {
                                             Text(
-                                                text = lsGreeting,
+                                                text = lsGreeting.withoutGreetingEmoji(),
                                                 fontSize = ts.bodyLarge,
                                                 fontFamily = quicksandFontFamily,
                                                 color = colors.textSecondary.copy(alpha = 0.8f),
@@ -1432,24 +1475,80 @@ fun GamaUI(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .clip(RoundedCornerShape(44.dp))
+                                                .drawWithContent {
+                                                    val edgeDepth = 30.dp.toPx()
+                                                    val sideDepth = 24.dp.toPx()
+
+                                                    // Interior edge glow: cheap gradients drawn inside the parent box,
+                                                    // so the accent outline looks like it spills light inward.
+                                                    drawRect(
+                                                        brush = Brush.verticalGradient(
+                                                            colors = listOf(
+                                                                colors.primaryAccent.copy(alpha = 0.18f),
+                                                                colors.primaryAccent.copy(alpha = 0.08f),
+                                                                Color.Transparent
+                                                            ),
+                                                            startY = 0f,
+                                                            endY = edgeDepth
+                                                        ),
+                                                        topLeft = Offset.Zero,
+                                                        size = Size(size.width, edgeDepth)
+                                                    )
+                                                    drawRect(
+                                                        brush = Brush.verticalGradient(
+                                                            colors = listOf(
+                                                                Color.Transparent,
+                                                                colors.primaryAccent.copy(alpha = 0.08f),
+                                                                colors.primaryAccent.copy(alpha = 0.18f)
+                                                            ),
+                                                            startY = size.height - edgeDepth,
+                                                            endY = size.height
+                                                        ),
+                                                        topLeft = Offset(0f, size.height - edgeDepth),
+                                                        size = Size(size.width, edgeDepth)
+                                                    )
+                                                    drawRect(
+                                                        brush = Brush.horizontalGradient(
+                                                            colors = listOf(
+                                                                colors.primaryAccent.copy(alpha = 0.15f),
+                                                                colors.primaryAccent.copy(alpha = 0.06f),
+                                                                Color.Transparent
+                                                            ),
+                                                            startX = 0f,
+                                                            endX = sideDepth
+                                                        ),
+                                                        topLeft = Offset.Zero,
+                                                        size = Size(sideDepth, size.height)
+                                                    )
+                                                    drawRect(
+                                                        brush = Brush.horizontalGradient(
+                                                            colors = listOf(
+                                                                Color.Transparent,
+                                                                colors.primaryAccent.copy(alpha = 0.06f),
+                                                                colors.primaryAccent.copy(alpha = 0.15f)
+                                                            ),
+                                                            startX = size.width - sideDepth,
+                                                            endX = size.width
+                                                        ),
+                                                        topLeft = Offset(size.width - sideDepth, 0f),
+                                                        size = Size(sideDepth, size.height)
+                                                    )
+
+                                                    drawContent()
+
+                                                    val outlineWidth = 1.dp.toPx()
+                                                    val inset = outlineWidth / 2f
+                                                    val radius = 44.dp.toPx() - inset
+                                                    drawRoundRect(
+                                                        color = colors.primaryAccent.copy(alpha = 0.44f),
+                                                        topLeft = Offset(inset, inset),
+                                                        size = Size(size.width - outlineWidth, size.height - outlineWidth),
+                                                        cornerRadius = CornerRadius(radius, radius),
+                                                        style = Stroke(width = outlineWidth)
+                                                    )
+                                                }
                                         ) {
                                             // Transparent card — no blur, no frosted backdrop.
-                                            Box(
-                                                modifier = Modifier
-                                                    .matchParentSize()
-                                                    .background(Color.Transparent)
-                                                    .border(
-                                                        width = 1.dp,
-                                                        brush = Brush.linearGradient(
-                                                            colors = listOf(
-                                                                colors.primaryAccent.copy(alpha = 0.45f),
-                                                                colors.border.copy(alpha = 0.12f),
-                                                                colors.primaryAccent.copy(alpha = 0.28f)
-                                                            )
-                                                        ),
-                                                        shape = RoundedCornerShape(44.dp)
-                                                    )
-                                            )
                                             // Sharp content layer
                                             Column(
                                                 modifier = Modifier.padding(16.dp),
@@ -1655,7 +1754,7 @@ fun GamaUI(
                                 AnimatedElement(visible = isVisible, staggerIndex = 0,
                                     totalItems = 8) {
                                     Text(
-                                        text = greeting,
+                                        text = greeting.withoutGreetingEmoji(),
                                         fontSize = ts.bodyLarge,
                                         fontFamily = quicksandFontFamily,
                                         color = colors.textSecondary.copy(alpha = 0.8f),
@@ -1794,24 +1893,80 @@ fun GamaUI(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(44.dp))
+                                                .drawWithContent {
+                                                    val edgeDepth = 30.dp.toPx()
+                                                    val sideDepth = 24.dp.toPx()
+
+                                                    // Interior edge glow: cheap gradients drawn inside the parent box,
+                                                    // so the accent outline looks like it spills light inward.
+                                                    drawRect(
+                                                        brush = Brush.verticalGradient(
+                                                            colors = listOf(
+                                                                colors.primaryAccent.copy(alpha = 0.18f),
+                                                                colors.primaryAccent.copy(alpha = 0.08f),
+                                                                Color.Transparent
+                                                            ),
+                                                            startY = 0f,
+                                                            endY = edgeDepth
+                                                        ),
+                                                        topLeft = Offset.Zero,
+                                                        size = Size(size.width, edgeDepth)
+                                                    )
+                                                    drawRect(
+                                                        brush = Brush.verticalGradient(
+                                                            colors = listOf(
+                                                                Color.Transparent,
+                                                                colors.primaryAccent.copy(alpha = 0.08f),
+                                                                colors.primaryAccent.copy(alpha = 0.18f)
+                                                            ),
+                                                            startY = size.height - edgeDepth,
+                                                            endY = size.height
+                                                        ),
+                                                        topLeft = Offset(0f, size.height - edgeDepth),
+                                                        size = Size(size.width, edgeDepth)
+                                                    )
+                                                    drawRect(
+                                                        brush = Brush.horizontalGradient(
+                                                            colors = listOf(
+                                                                colors.primaryAccent.copy(alpha = 0.15f),
+                                                                colors.primaryAccent.copy(alpha = 0.06f),
+                                                                Color.Transparent
+                                                            ),
+                                                            startX = 0f,
+                                                            endX = sideDepth
+                                                        ),
+                                                        topLeft = Offset.Zero,
+                                                        size = Size(sideDepth, size.height)
+                                                    )
+                                                    drawRect(
+                                                        brush = Brush.horizontalGradient(
+                                                            colors = listOf(
+                                                                Color.Transparent,
+                                                                colors.primaryAccent.copy(alpha = 0.06f),
+                                                                colors.primaryAccent.copy(alpha = 0.15f)
+                                                            ),
+                                                            startX = size.width - sideDepth,
+                                                            endX = size.width
+                                                        ),
+                                                        topLeft = Offset(size.width - sideDepth, 0f),
+                                                        size = Size(sideDepth, size.height)
+                                                    )
+
+                                                    drawContent()
+
+                                                    val outlineWidth = 1.dp.toPx()
+                                                    val inset = outlineWidth / 2f
+                                                    val radius = 44.dp.toPx() - inset
+                                                    drawRoundRect(
+                                                        color = colors.primaryAccent.copy(alpha = 0.44f),
+                                                        topLeft = Offset(inset, inset),
+                                                        size = Size(size.width - outlineWidth, size.height - outlineWidth),
+                                                        cornerRadius = CornerRadius(radius, radius),
+                                                        style = Stroke(width = outlineWidth)
+                                                    )
+                                                }
                                     ) {
                                         // Accent tint + border, fully opaque, on top of transparent bg
-                                        Box(
-                                            modifier = Modifier
-                                                .matchParentSize()
-                                                .background(Color.Transparent)
-                                                .border(
-                                                    width = 1.dp,
-                                                    brush = Brush.linearGradient(
-                                                        colors = listOf(
-                                                            colors.primaryAccent.copy(alpha = 0.45f),
-                                                            colors.border.copy(alpha = 0.12f),
-                                                            colors.primaryAccent.copy(alpha = 0.28f)
-                                                        )
-                                                    ),
-                                                    shape = RoundedCornerShape(44.dp)
-                                                )
-                                        )
 
                                         // Sharp content on top
                                         Column(
@@ -2084,13 +2239,14 @@ fun GamaUI(
                 particleCount    = particleCount,
                 particleCountCustom = particleCountCustom.toIntOrNull() ?: 150,
                 parallaxSensitivity = animatedParallaxSensitivity,
-                starMode         = particleStarMode,
+                starMode         = false,
                 timeModeEnabled  = particleTimeMode,
                 timeOffsetHours  = timeOffsetHours,
                 anyPanelOpen     = anyPanelOpen,
                 isLandscape      = isLandscape,
                 nativeRefreshRate  = particleNativeRefreshRate,
-                quarterRefreshRate = particleQuarterRefreshRate
+                quarterRefreshRate = particleQuarterRefreshRate,
+                celestialDarkMode = effectiveOledMode
             )
 
             // ── Main content layers ───────────────────────────────────────────
@@ -2107,19 +2263,26 @@ fun GamaUI(
             ) { mainContent() }
 
             // Blurred — fades in when a panel opens. Fixed radius = kernel built once.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer(alpha = blurAlpha)
-                        .blur(radius = 20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                ) { mainContent() }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer(alpha = blurAlpha)
-                ) { mainContent() }
+            // IMPORTANT: do not keep a fully transparent duplicate of mainContent() on top.
+            // Even at alpha = 0, Compose still hit-tests that layer, so taps can go to the
+            // invisible copy instead of the visible sharp copy underneath. That is why the
+            // main menu buttons were clicking functionally but not showing their press animation.
+            val shouldRenderBlurredMainContent = blurShouldApply || blurAlpha > 0.001f
+            if (shouldRenderBlurredMainContent) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(alpha = blurAlpha)
+                            .blur(radius = 20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    ) { mainContent() }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(alpha = blurAlpha)
+                    ) { mainContent() }
+                }
             }
 
             // Scrim — dims everything (including particles) behind open panels.
@@ -2350,7 +2513,7 @@ fun GamaUI(
                 },
                 onAppearanceClick = { showAppearance = true },
                 onColorCustomizationClick = { showColorCustomization = true },
-                onGradientClick = { showColorCustomization = true; showGradient = true },
+                onGradientClick = { },
                 onEffectsClick = { showEffects = true },
                 onParticlesClick = { showParticles = true },
                 onRendererClick = { showRendererPanel = true },
@@ -3218,10 +3381,7 @@ fun GamaUI(
                     customAccentColor = color
                     savePreferencesDebounced()
                 },
-                onGradientClick = {
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showGradient = true
-                },
+                onGradientClick = { },
                 isDarkTheme = isDarkTheme,
                 performHaptic = { performHaptic(HapticFeedbackConstants.CONTEXT_CLICK) },
                 isSmallScreen = isSmallScreen,
@@ -3231,41 +3391,7 @@ fun GamaUI(
                 cardBackground = cardBackground
             )
 
-            GradientPanel(
-                visible = showGradient,
-                onDismiss = {
-                    performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-                    showGradient = false
-                },
-                gradientEnabled = gradientEnabled,
-                onGradientChange = { value ->
-                    performHaptic(HapticFeedbackConstants.CLOCK_TICK)
-                    gradientEnabled = value
-                    savePreferences()
-                },
-                customGradientStart = customGradientStart,
-                onGradientStartChange = { color ->
-                    customGradientStart = color
-                    savePreferencesDebounced()
-                },
-                customGradientEnd = customGradientEnd,
-                onGradientEndChange = { color ->
-                    customGradientEnd = color
-                    savePreferencesDebounced()
-                },
-                useDynamicColor = useDynamicColor,
-                advancedColorPicker = advancedColorPicker,
-                oledMode = effectiveOledMode,
-                darkModeActive = effectiveOledMode,
-                isSmallScreen = isSmallScreen,
-                isLandscape = isLandscape,
-                isTablet = isTablet,
-                colors = colors,
-                cardBackground = cardBackground,
-                performHaptic = { performHaptic(HapticFeedbackConstants.CLOCK_TICK) }
-            )
-
-            VerbosePanel(
+VerbosePanel(
                 visible = showVerbosePanel,
                 onDismiss = {
                     performHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
@@ -3374,7 +3500,8 @@ fun GamaUI(
                         )
                     }
 
-                    // Settings button (bottom-end)
+                    // Settings button (bottom-end). This is the source-of-truth anchor.
+                    // Panel back/search/global buttons mirror this exact resting position.
                     AnimatedElement(visible = isVisible, staggerIndex = 4,
                         totalItems = 8, modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = if (isSmallScreen) 18.dp else 24.dp).offset(x = 20.dp, y = if (isSmallScreen) 20.dp else 30.dp)) {
                         val btnSize = if (isSmallScreen) 48.dp else 52.dp
@@ -3386,24 +3513,33 @@ fun GamaUI(
                         // caused a recomposition every frame on the idle main screen.
                         val settingsGlowAlpha = 0.25f
                         var settingsPressed by remember { mutableStateOf(false) }
+                        val animationLevel = LocalAnimationLevel.current
                         // ── Single Animatable replaces 3 separate animators ───
                         val settingsPressProgress = remember { Animatable(0f) }
-                        LaunchedEffect(settingsPressed) {
+                        LaunchedEffect(settingsPressed, animationLevel) {
                             settingsPressProgress.animateTo(
                                 targetValue   = if (settingsPressed) 1f else 0f,
-                                animationSpec = spring(
-                                    dampingRatio = if (settingsPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                                    stiffness    = if (settingsPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
-                                )
+                                animationSpec = when (animationLevel) {
+                                    2 -> snap()
+                                    1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasized)
+                                    else -> spring(
+                                        dampingRatio = if (settingsPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
+                                        stiffness    = if (settingsPressed) MotionTokens.Springs.pressDown.stiffness    else MotionTokens.Springs.pressUp.stiffness
+                                    )
+                                }
                             )
                         }
                         val spp = settingsPressProgress.value
                         val settingsAppearScale by animateFloatAsState(
                             targetValue = if (isVisible) 1f else 0.82f,
-                            animationSpec = spring(
-                                dampingRatio = 0.58f,
-                                stiffness = 360f
-                            ),
+                            animationSpec = when (LocalAnimationLevel.current) {
+                                2 -> snap()
+                                1 -> tween(240, easing = MotionTokens.Easing.emphasized)
+                                else -> spring(
+                                    dampingRatio = 0.58f,
+                                    stiffness = 360f
+                                )
+                            },
                             label = "settings_appear_scale"
                         )
                         val settingsPressScale  = (1f - spp * (1f - MotionTokens.Scale.subtle)) * settingsAppearScale
@@ -3459,6 +3595,14 @@ fun GamaUI(
                                                     colors.primaryAccent.copy(alpha = 0.08f)
                                                 )
                                             )
+                                        )
+                                        .background(colors.primaryAccent.copy(alpha = spp * 0.12f))
+                                        .pressedAccentOutlineGlow(
+                                            pressProgress = spp,
+                                            color = colors.primaryAccent,
+                                            cornerRadius = 28.dp,
+                                            strokeWidth = settingsBorderWidth,
+                                            glowRadius = 10.dp
                                         )
                                         .border(settingsBorderWidth, colors.primaryAccent.copy(alpha = settingsBorderAlpha), RoundedCornerShape(28.dp))
                                         .semantics { contentDescription = "Open Settings" }

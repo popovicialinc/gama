@@ -142,7 +142,7 @@ data class ParticleState(
 
     // Pre-baked base alpha for star bucketing: alpha * 0.6 — alpha is a val so this
     // never changes. Eliminates one float multiplication per particle per draw frame.
-    val baseStarAlpha: Float = alpha * 0.6f
+    val baseStarAlpha: Float = alpha * 1.0f
 
     fun update(
         speedMultiplier: Float = 1f,
@@ -385,6 +385,7 @@ private class PhysicsInputs {
 // Alpha step of 0.25 is imperceptible for 2–14px sparkle particles.
 // Circle mode still uses 4 buckets via circleBatchPaths (same constant).
 private const val STAR_ALPHA_BUCKETS = 4
+private const val STAR_DOT_SIZE_BUCKETS = 3
 private const val TRAIL_LUT_SIZE = 64
 
 // Standalone Particles Overlay Component
@@ -403,7 +404,8 @@ fun ParticlesOverlay(
     anyPanelOpen: Boolean = false, // Hide celestials when panels are open
     isLandscape: Boolean = false, // NEW: Constrain celestials to left half in landscape
     nativeRefreshRate: Boolean = false, // true = render every vsync; false = skip every other (default, saves battery)
-    quarterRefreshRate: Boolean = false  // true = render at 1/4 native rate; only applies when nativeRefreshRate is false
+    quarterRefreshRate: Boolean = false,  // true = render at 1/4 native rate; only applies when nativeRefreshRate is false
+    celestialDarkMode: Boolean = true // dark/OLED keeps accent celestials; light mode uses subtle black celestials
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -422,9 +424,20 @@ fun ParticlesOverlay(
     // paint colour used during draw. This means ACCENT COLOR changes ease smoothly
     // over the existing stars/celestials instead of creating a fresh particle set.
     val renderedParticleColor by animateColorAsState(
-        targetValue = color,
+        targetValue = lerp(color, Color.White, 0.42f),
         animationSpec = tween(durationMillis = 520, easing = FastOutSlowInEasing),
         label = "particles_render_color"
+    )
+
+    val renderedCelestialColor by animateColorAsState(
+        targetValue = if (celestialDarkMode) renderedParticleColor else Color.Black,
+        animationSpec = tween(durationMillis = 620, easing = FastOutSlowInEasing),
+        label = "celestial_render_color"
+    )
+    val celestialOpacityMultiplier by animateFloatAsState(
+        targetValue = if (celestialDarkMode) 1f else 0.58f,
+        animationSpec = tween(durationMillis = 620, easing = FastOutSlowInEasing),
+        label = "celestial_opacity"
     )
 
     // Celestial position — recomputed at most once per second via a tick counter.
@@ -905,6 +918,19 @@ fun ParticlesOverlay(
             strokeWidth = 2.5f
         }
     }
+    // Star style is now rendered as tiny round points instead of star polygons/lines.
+    // This keeps the brighter "stars" look, but uses nativeCanvas.drawPoints() with
+    // alpha + size buckets, avoiding Path tessellation and hundreds of tiny ovals.
+    val starDotPointBuffers = remember(actualParticleCount) {
+        Array(STAR_ALPHA_BUCKETS * STAR_DOT_SIZE_BUCKETS) { FloatArray(actualParticleCount * 2) }
+    }
+    val starDotPointCounts = remember { IntArray(STAR_ALPHA_BUCKETS * STAR_DOT_SIZE_BUCKETS) }
+    val nativeStarDotPaint = remember {
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            style = android.graphics.Paint.Style.STROKE
+            strokeCap = android.graphics.Paint.Cap.ROUND
+        }
+    }
     // circleBatchPaths still used for circle (non-star) particle mode
     val circleBatchPaths = remember { Array(STAR_ALPHA_BUCKETS) { Path() } }
     val reusableRayPath   = remember { Path() }
@@ -959,90 +985,64 @@ fun ParticlesOverlay(
             // Reading frameCount tells Compose this Canvas depends on it,
             // so it redraws every time the physics loop increments it.
             @Suppress("UNUSED_VARIABLE") val frame = frameCount
-            val useStars = starMode || (timeModeEnabled && !frameIsDaytime)
-            if (useStars) {
-                // ── Native drawLines star rendering ──────────────────────────
-                // Each star = 4 line segments (H, V, diagonal \, diagonal /)
-                // with ROUND stroke caps. The intersecting lines with rounded
-                // endpoints naturally form a ✦ sparkle shape.
-                //
-                // All lines for a given alpha bucket are packed into a single
-                // pre-allocated FloatArray, then dispatched as ONE native
-                // drawLines() call per bucket — a direct GPU line primitive
-                // with ZERO path tessellation, ZERO Compose DrawScope overhead.
-                //
-                // floats layout per star: [x1,y1,x2,y2] × 4 lines = 16 floats
-
-                // Zero counts (no allocation — just int writes)
-                for (i in 0 until STAR_ALPHA_BUCKETS) starLineCounts[i] = 0
-
-                // Pass 1: write line coords into per-bucket FloatArrays.
-                //
-                // Optimisations vs previous version:
-                //  • particle.starR / particle.starRd are pre-baked vals — no float multiply here
-                //  • particle.baseStarAlpha is pre-baked (alpha * 0.6) — one less multiply
-                //  • particleAlpha is the only per-frame factor remaining (single multiply)
-                //  • coerceIn(0f,1f) removed — a is always [0, 0.6] (particle.alpha ∈ [0.3,1.0])
-                //  • early-skip threshold 0.008 (≈2/255) avoids 16 float writes for invisible particles
-                //  • local idx accumulator: avoids re-reading starLineCounts[bucket] each line
-                particles.forEach { particle ->
-                    val a = particle.baseStarAlpha * particleAlpha
-                    if (a < 0.008f) return@forEach  // invisible — skip 16 float writes + GPU lines
-
-                    val bucket = (a * (STAR_ALPHA_BUCKETS - 1) + 0.5f).toInt()
-                        .coerceIn(0, STAR_ALPHA_BUCKETS - 1)
-
-                    val buf = starLineBuffers[bucket]
-                    var idx = starLineCounts[bucket]
-
-                    val cx  = size.width  * particle.x
-                    val cy  = size.height * particle.y
-                    val r   = particle.starR
-                    val rd  = particle.starRd
-
-                    // Horizontal arm ─
-                    buf[idx] = cx - r;  buf[idx+1] = cy;       buf[idx+2] = cx + r;  buf[idx+3] = cy
-                    // Vertical arm │
-                    buf[idx+4] = cx;    buf[idx+5] = cy - r;   buf[idx+6] = cx;      buf[idx+7] = cy + r
-                    // Diagonal arm ╲
-                    buf[idx+8] = cx - rd; buf[idx+9] = cy - rd; buf[idx+10] = cx + rd; buf[idx+11] = cy + rd
-                    // Diagonal arm ╱
-                    buf[idx+12] = cx - rd; buf[idx+13] = cy + rd; buf[idx+14] = cx + rd; buf[idx+15] = cy - rd
-
-                    starLineCounts[bucket] = idx + 16
+            val useStarDots = starMode || (timeModeEnabled && !frameIsDaytime)
+            if (useStarDots) {
+                // Fast star style: bright tiny circles, rendered like a matrix-style primitive.
+                // drawPoints() avoids per-particle Paths/Ovals and keeps the GPU pipeline simple.
+                for (i in 0 until STAR_ALPHA_BUCKETS * STAR_DOT_SIZE_BUCKETS) {
+                    starDotPointCounts[i] = 0
                 }
 
-                // Pass 2: one nativeCanvas.drawLines() per non-empty bucket.
-                // ≤ STAR_ALPHA_BUCKETS (4) total GPU draw calls, regardless of particle count.
-                //
-                // IMPORTANT: drawContext.canvas.nativeCanvas instead of drawIntoCanvas { }.
-                // drawIntoCanvas forces the entire Canvas composable into SOFTWARE rendering,
-                // which is why star mode was so much laggier than circle mode.
-                // drawContext.canvas.nativeCanvas accesses the same underlying canvas but
-                // stays inside the hardware-accelerated pipeline — zero software fallback.
+                particles.forEach { particle ->
+                    val a = particle.baseStarAlpha * particleAlpha
+                    if (a < 0.008f) return@forEach
+
+                    val alphaBucket = (a * (STAR_ALPHA_BUCKETS - 1) + 0.5f).toInt()
+                        .coerceIn(0, STAR_ALPHA_BUCKETS - 1)
+                    val sizeBucket = when {
+                        particle.size < 2.8f -> 0
+                        particle.size < 5.2f -> 1
+                        else -> 2
+                    }
+                    val bucket = alphaBucket * STAR_DOT_SIZE_BUCKETS + sizeBucket
+                    val buf = starDotPointBuffers[bucket]
+                    var idx = starDotPointCounts[bucket]
+
+                    buf[idx] = size.width * particle.x
+                    buf[idx + 1] = size.height * particle.y
+                    starDotPointCounts[bucket] = idx + 2
+                }
+
                 val nc = drawContext.canvas.nativeCanvas
-                nativeStarPaint.color = colorArgb  // RGB set once; alpha overridden per bucket
-                for (bucket in 0 until STAR_ALPHA_BUCKETS) {
-                    val count = starLineCounts[bucket]
-                    if (count == 0) continue
-                    // bucketAlpha255: pre-divided and pre-rounded per bucket.
-                    // Division by (STAR_ALPHA_BUCKETS-1) = 3 is a constant fold at runtime.
-                    nativeStarPaint.alpha = when (bucket) {
-                        0 -> 0
-                        1 -> 85
-                        2 -> 170
+                nativeStarDotPaint.color = colorArgb
+
+                for (alphaBucket in 0 until STAR_ALPHA_BUCKETS) {
+                    nativeStarDotPaint.alpha = when (alphaBucket) {
+                        0 -> 72
+                        1 -> 132
+                        2 -> 204
                         else -> 255
                     }
-                    nc.drawLines(starLineBuffers[bucket], 0, count, nativeStarPaint)
+
+                    for (sizeBucket in 0 until STAR_DOT_SIZE_BUCKETS) {
+                        val bucket = alphaBucket * STAR_DOT_SIZE_BUCKETS + sizeBucket
+                        val count = starDotPointCounts[bucket]
+                        if (count == 0) continue
+
+                        nativeStarDotPaint.strokeWidth = when (sizeBucket) {
+                            0 -> 3.2f
+                            1 -> 5.4f
+                            else -> 7.6f
+                        }
+                        nc.drawPoints(starDotPointBuffers[bucket], 0, count, nativeStarDotPaint)
+                    }
                 }
             } else {
                 // Circle mode — batch into alpha buckets exactly like star mode.
                 // Reduces N draw calls (one per particle) to ≤ STAR_ALPHA_BUCKETS GPU draw calls.
-                // Reuse circleBatchPaths — the star arrays are unused in this branch.
                 for (i in 0 until STAR_ALPHA_BUCKETS) circleBatchPaths[i].reset()
 
                 particles.forEach { particle ->
-                    // particle.baseStarAlpha = alpha * 0.6; circle uses * 0.5 so scale down
                     val a = particle.baseStarAlpha * (5f / 6f) * particleAlpha
                     if (a < 0.008f) return@forEach
                     val bucket = (a * (STAR_ALPHA_BUCKETS - 1) + 0.5f).toInt()
@@ -1057,7 +1057,6 @@ fun ParticlesOverlay(
 
                 for (bucket in 0 until STAR_ALPHA_BUCKETS) {
                     if (circleBatchPaths[bucket].isEmpty) continue
-                    // Hardcoded ARGB ints for 4 buckets (0/85/170/255 alpha) — no float math here
                     val aInt = when (bucket) {
                         0    -> (0x00 shl 24) or colorArgb
                         1    -> (0x55 shl 24) or colorArgb
@@ -1085,13 +1084,12 @@ fun ParticlesOverlay(
                 val cel = celestialState ?: return@drawLambda
                 val adjustedX = if (isLandscape) cel.x * 0.5f else cel.x
                 val isSun = frameIsDaytime
-                val effectiveAlpha = cel.alpha * celestialAlpha
+                val effectiveAlpha = cel.alpha * celestialAlpha * celestialOpacityMultiplier
 
                 // Pre-compute base RGB int (alpha stripped) — same technique as the
-                // particle draw loop.  Avoids color.copy(alpha=…) which allocates a
-                // new Color object per call.  At 30fps on old 60hz devices these 13
-                // calls would otherwise generate ~390 Color allocations/sec.
-                val colorRgb = renderedParticleColor.toArgb() and 0x00FFFFFF
+                // particle draw loop. In light mode the celestial object is black
+                // with reduced opacity; in dark/OLED it stays accent-colored.
+                val colorRgb = renderedCelestialColor.toArgb() and 0x00FFFFFF
                 // Helper: assemble a Color from a pre-stripped RGB int + float alpha [0,1]
                 fun colorWithAlpha(alpha: Float): Color =
                     Color((((alpha * 255f + 0.5f).toInt().coerceIn(0, 255) shl 24) or colorRgb))

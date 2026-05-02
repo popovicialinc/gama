@@ -706,6 +706,13 @@ fun IntegrationInfoCard(
                 scaleY = pressScale,
                 clip = false
             )
+            .pressedAccentOutlineGlow(
+                pressProgress = p,
+                color = colors.primaryAccent,
+                cornerRadius = 28.dp,
+                strokeWidth = cardBorderWidth,
+                glowRadius = 11.dp
+            )
             .border(
                 width = cardBorderWidth,
                 color = cardBorderColor,
@@ -740,6 +747,7 @@ fun IntegrationInfoCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = minCardHeight)
+                    .background(colors.primaryAccent.copy(alpha = if (enabled) p * 0.10f else 0f))
                     .padding(if (isSmallScreen) 20.dp else 24.dp),
                 verticalArrangement = Arrangement.Center
             ) {
