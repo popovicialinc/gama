@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -58,6 +59,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
+
+@Composable
+private fun tr(key: String, fallback: String): String =
+    LocalStrings.current[key].ifEmpty { fallback }
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared panel scaffold — full-screen BouncyDialog with scroll + back button
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,8 +76,10 @@ private fun PanelScaffold(
     isSmallScreen: Boolean,
     isBlurred: Boolean = false,
     oledMode: Boolean = false,
+    rootExitCascade: Boolean = false,
     colors: ThemeColors,
     leadingFloatingButton: (@Composable (Modifier) -> Unit)? = null,
+    edgeSpacers: Boolean = true,
     reserveBackButtonSpace: Boolean = true,
     contentAvoidsBackButton: Boolean = true,
     contentScrollable: Boolean = true,
@@ -83,16 +91,17 @@ private fun PanelScaffold(
     val animLevel = LocalAnimationLevel.current
     val backButtonInversed = LocalBackButtonInversed.current
 
-    // Back button slide-in. Use offset instead of graphicsLayer translation so the
-    // visual position and the touch hitbox always move together.
-    val backButtonOffsetY by animateDpAsState(
-        targetValue = if (visible) 0.dp else 420.dp,
-        animationSpec = if (animLevel == 2) snap() else spring(
-            dampingRatio = 0.62f,
-            stiffness = 430f
-        ),
-        label = "panel_back_ty"
-    )
+    // Floating panel chrome should use the same visual language as the cards:
+    // fade + slight zoom + tiny vertical lift.
+    // Do NOT launch it from far below with an overshooting spring, because that
+    // makes the magnifier / globe / < button feel like a different animation system.
+    val floatingChromeOffsetYPx = with(LocalDensity.current) {
+        when (animLevel) {
+            0 -> 20.dp.toPx()
+            1 -> 8.dp.toPx()
+            else -> 0.dp.toPx()
+        }
+    }
 
     // Static bottom padding — reserves space for the floating back button so the
     // last card is never obscured.  Previously this was an animated spring, but
@@ -115,7 +124,19 @@ private fun PanelScaffold(
         label = "panel_dim_alpha"
     )
 
-    BouncyDialog(visible = visible, onDismiss = onDismiss, fullScreen = true) {
+    BouncyDialog(
+        visible = visible,
+        onDismiss = onDismiss,
+        fullScreen = true,
+        exitStartDelayMillis = if (rootExitCascade) {
+            when (animLevel) {
+                0 -> 105
+                1 -> 70
+                else -> 0
+            }
+        } else 0
+    ) {
+        CompositionLocalProvider(LocalRootPanelExitCascade provides rootExitCascade) {
         // Single render of panel content — no double composition.
         //
         // Previously: panelContent() was called twice (sharp copy + blurred copy),
@@ -158,10 +179,12 @@ private fun PanelScaffold(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(dismissOnClickOutside) {
-                            if (dismissOnClickOutside) detectTapGestures { onDismiss() }
-                            else detectTapGestures { }
-                        }
+                        .then(
+                            if (visible) Modifier.pointerInput(dismissOnClickOutside) {
+                                if (dismissOnClickOutside) detectTapGestures { onDismiss() }
+                                else detectTapGestures { }
+                            } else Modifier
+                        )
                 )
 
                 val backButtonSize = if (isSmallScreen) 48.dp else 52.dp
@@ -177,7 +200,7 @@ private fun PanelScaffold(
                 ) {
                     Column(
                         modifier = Modifier
-                            .widthIn(max = if (isLandscape) 980.dp else 500.dp)
+                            .widthIn(max = if (isLandscape) 800.dp else 500.dp)
                             .then(
                                 if (contentScrollable) Modifier.verticalScroll(scrollState)
                                 else Modifier.fillMaxHeight()
@@ -187,19 +210,49 @@ private fun PanelScaffold(
                                 top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
                                 bottom = if (reserveBackButtonSpace) bottomPaddingDp.dp else 0.dp
                             )
-                            .pointerInput(Unit) { detectTapGestures { } },
+                            .then(
+                                if (visible) Modifier.pointerInput(Unit) { detectTapGestures { } }
+                                else Modifier
+                            ),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 16.dp else 20.dp)
                     ) {
-                        Spacer(modifier = Modifier.height(if (isLandscape) 24.dp else 40.dp))
+                        if (edgeSpacers) Spacer(modifier = Modifier.height(if (isLandscape) 24.dp else 40.dp))
                         content(scrollState)
-                        Spacer(modifier = Modifier.height(16.dp))
+                        if (edgeSpacers) Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
 
                 val floatingBottomPadding = if (isSmallScreen) 18.dp else 24.dp
-                val floatingRestX = maxWidth / 2f - 16.dp - backButtonSize / 2f
-                val floatingOffscreenX = maxWidth / 2f + backButtonSize
+                // Match the main ":" button anchor exactly.
+                // The floating buttons draw a 1.8x glow wrapper, so anchoring by the
+                // raw button size made "<" sit closer to the edge than ":".
+                val floatingGlowSize = backButtonSize * 1.8f
+                val floatingRestX = maxWidth / 2f - 16.dp - floatingGlowSize / 2f
+                val floatingOffscreenX = maxWidth / 2f + floatingGlowSize
+                var floatingChromeVisible by remember { mutableStateOf(visible) }
+                LaunchedEffect(visible, animLevel) {
+                    if (visible) {
+                        floatingChromeVisible = true
+                    } else {
+                        // Root panels keep a short foreground-first beat. Deeper panels
+                        // should leave immediately so sub-menu navigation stays fast.
+                        if (animLevel != 2 && rootExitCascade) delay(85L)
+                        floatingChromeVisible = false
+                    }
+                }
+
+                val floatingChromeProgress by animateFloatAsState(
+                    targetValue = if (floatingChromeVisible) 1f else 0f,
+                    animationSpec = when (animLevel) {
+                        2 -> snap()
+                        1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasizedDecelerate)
+                        else -> spring(dampingRatio = 0.70f, stiffness = 520f)
+                    },
+                    label = "panel_floating_chrome_progress"
+                )
+                val floatingChromeScale = 0.94f + floatingChromeProgress * 0.06f
+                val floatingChromeTranslationY = (1f - floatingChromeProgress) * floatingChromeOffsetYPx
 
                 fun sideOffset(sideProgress: Float): Dp {
                     val direction = if (sideProgress < 0f) -1f else 1f
@@ -245,7 +298,13 @@ private fun PanelScaffold(
                     Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = floatingBottomPadding)
-                        .offset(x = sideOffset(leadingSideProgress.value), y = backButtonOffsetY)
+                        .offset(x = sideOffset(leadingSideProgress.value))
+                        .graphicsLayer(
+                            alpha = floatingChromeProgress,
+                            scaleX = floatingChromeScale,
+                            scaleY = floatingChromeScale,
+                            translationY = floatingChromeTranslationY
+                        )
                 )
 
                 PanelBackButton(
@@ -258,9 +317,16 @@ private fun PanelScaffold(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = floatingBottomPadding)
-                        .offset(x = sideOffset(backSideProgress.value), y = backButtonOffsetY)
+                        .offset(x = sideOffset(backSideProgress.value))
+                        .graphicsLayer(
+                            alpha = floatingChromeProgress,
+                            scaleX = floatingChromeScale,
+                            scaleY = floatingChromeScale,
+                            translationY = floatingChromeTranslationY
+                        )
                 )
             }
+        }
         }
     }
 }
@@ -335,6 +401,7 @@ fun SettingsPanel(
         visible = visible, onDismiss = onDismiss,
         isLandscape = isLandscape, isSmallScreen = isSmallScreen,
         oledMode = oledMode, colors = colors,
+        rootExitCascade = true,
         leadingFloatingButton = { floatingModifier ->
             PanelSearchButton(
                 onClick = { performHaptic(); onSearchClick() },
@@ -346,145 +413,52 @@ fun SettingsPanel(
             )
         }
     ) { scrollState ->
-        CleanTitle(
-            text = strings["settings.title"].ifEmpty { "SETTINGS" },
-            fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
-            colors = colors, scrollOffset = scrollState.value
-        )
+        AnimatedElement(visible = visible, staggerIndex = 0, totalItems = 5) {
+            CleanTitle(
+                text = strings["settings.title"].ifEmpty { "SETTINGS" },
+                fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
+                colors = colors, scrollOffset = scrollState.value
+            )
+        }
 
-        PanelCaption(
-            text = "Core app sections. Use search to jump directly to toggles, sliders, and selectors.",
-            colors = colors
-        )
+        AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 5) {
+            PanelCaption(
+                text = strings["settings.caption"]
+                    .ifEmpty { strings["text_catalog.core_app_sections_use_search_to_jump_directly_to_toggles_sli"] }
+                    .ifEmpty { "Core app sections. Use search to jump directly to toggles, sliders, and selectors." },
+                colors = colors
+            )
+        }
 
-        val useLandscapeGrid = isLandscape || isTablet
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 5) {
+            SettingsNavigationCard(
+                title = strings["settings.appearance"].ifEmpty { "APPEARANCE" },
+                description = strings["settings.appearance_desc"].ifEmpty { "Colors, theme, effects, animations, and interface scale" },
+                onClick = { performHaptic(); onAppearanceClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
 
-        if (useLandscapeGrid) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                AnimatedElement(
-                    visible = visible,
-                    cardShadow = true,
-                    staggerIndex = 1,
-                    totalItems = 4,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    SettingsNavigationCard(
-                        title = strings["settings.appearance"].ifEmpty { "VISUALS" },
-                        description = strings["settings.appearance_desc"].ifEmpty { "Colors, theme, effects, animations, and interface scale" },
-                        onClick = { performHaptic(); onAppearanceClick() },
-                        isSmallScreen = isSmallScreen,
-                        colors = colors,
-                        cardBackground = cardBackground,
-                        oledMode = oledMode,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                AnimatedElement(
-                    visible = visible,
-                    cardShadow = true,
-                    staggerIndex = 2,
-                    totalItems = 4,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    SettingsNavigationCard(
-                        title = strings["settings.renderer"].ifEmpty { "RENDERER" },
-                        description = strings["settings.renderer_desc"].ifEmpty { "Switching engine, aggressive mode, doze, and launcher behavior" },
-                        onClick = { performHaptic(); onRendererClick() },
-                        isSmallScreen = isSmallScreen,
-                        colors = colors,
-                        cardBackground = cardBackground,
-                        oledMode = oledMode,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 5) {
+            SettingsNavigationCard(
+                title = strings["settings.renderer"].ifEmpty { "RENDERER" },
+                description = strings["settings.renderer_desc"].ifEmpty { "Switching engine, aggressive mode, doze, and launcher behavior" },
+                onClick = { performHaptic(); onRendererClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
+        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                AnimatedElement(
-                    visible = visible,
-                    cardShadow = true,
-                    staggerIndex = 3,
-                    totalItems = 4,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    SettingsNavigationCard(
-                        title = "HAPTICS",
-                        description = "Touch feedback, hold-release strength, renderer pulses, language pattern, and bounce ticks",
-                        onClick = { performHaptic(); onHapticsClick() },
-                        isSmallScreen = isSmallScreen,
-                        colors = colors,
-                        cardBackground = cardBackground,
-                        oledMode = oledMode,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                AnimatedElement(
-                    visible = visible,
-                    cardShadow = true,
-                    staggerIndex = 4,
-                    totalItems = 4,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    SettingsNavigationCard(
-                        title = strings["settings.system"].ifEmpty { "SYSTEM" },
-                        description = strings["settings.system_desc"].ifEmpty { "Notifications, backup, language, integrations, and logs" },
-                        onClick = { performHaptic(); onSystemClick() },
-                        isSmallScreen = isSmallScreen,
-                        colors = colors,
-                        cardBackground = cardBackground,
-                        oledMode = oledMode,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        } else {
-            AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 4) {
-                SettingsNavigationCard(
-                    title = strings["settings.appearance"].ifEmpty { "VISUALS" },
-                    description = strings["settings.appearance_desc"].ifEmpty { "Colors, theme, effects, animations, and interface scale" },
-                    onClick = { performHaptic(); onAppearanceClick() },
-                    isSmallScreen = isSmallScreen, colors = colors,
-                    cardBackground = cardBackground, oledMode = oledMode
-                )
-            }
 
-            AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 4) {
-                SettingsNavigationCard(
-                    title = strings["settings.renderer"].ifEmpty { "RENDERER" },
-                    description = strings["settings.renderer_desc"].ifEmpty { "Switching engine, aggressive mode, doze, and launcher behavior" },
-                    onClick = { performHaptic(); onRendererClick() },
-                    isSmallScreen = isSmallScreen, colors = colors,
-                    cardBackground = cardBackground, oledMode = oledMode
-                )
-            }
-
-            AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 4) {
-                SettingsNavigationCard(
-                    title = "HAPTICS",
-                    description = "Touch feedback, hold-release strength, renderer pulses, language pattern, and bounce ticks",
-                    onClick = { performHaptic(); onHapticsClick() },
-                    isSmallScreen = isSmallScreen, colors = colors,
-                    cardBackground = cardBackground, oledMode = oledMode
-                )
-            }
-
-            AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 4, totalItems = 4) {
-                SettingsNavigationCard(
-                    title = strings["settings.system"].ifEmpty { "SYSTEM" },
-                    description = strings["settings.system_desc"].ifEmpty { "Notifications, backup, language, integrations, and logs" },
-                    onClick = { performHaptic(); onSystemClick() },
-                    isSmallScreen = isSmallScreen, colors = colors,
-                    cardBackground = cardBackground, oledMode = oledMode
-                )
-            }
+        AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 4, totalItems = 5) {
+            SettingsNavigationCard(
+                title = strings["settings.system"].ifEmpty { "SYSTEM" },
+                description = strings["settings.system_desc"].ifEmpty { "Notifications, backup, language, integrations, and logs" },
+                onClick = { performHaptic(); onSystemClick() },
+                isSmallScreen = isSmallScreen, colors = colors,
+                cardBackground = cardBackground, oledMode = oledMode
+            )
         }
     }
 }
@@ -496,6 +470,7 @@ private class SettingsSearchItem(
     val title: String,
     val keywords: List<String>,
     val path: String,         // breadcrumb path shown above the card, outside the shadow
+    val enabledForShadow: () -> Boolean = { true },
     val render: @Composable () -> Unit
 ) {
     // Pre-computed once at construction — never rebuilt during scoring.
@@ -559,19 +534,92 @@ private fun settingsSearchScore(q: String, queryTokens: List<String>, item: Sett
     return best
 }
 
+
+@Composable
+private fun AnimatedSearchPanelTitle(
+    titleKey: String,
+    text: String,
+    visible: Boolean,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    colors: ThemeColors,
+    scrollOffset: Int,
+    modifier: Modifier = Modifier
+) {
+    // Key the title by its logical panel, not by the shared Search/Global
+    // composable. This prevents the old SEARCH title from rendering for one
+    // frame inside GLOBAL while the new title animation starts.
+    key(titleKey) {
+        val density = LocalDensity.current
+        val animationLevel = LocalAnimationLevel.current
+        val progress = remember { Animatable(if (visible) 0f else 0f) }
+        val offsetYPx = with(density) {
+            when (animationLevel) {
+                0 -> 20.dp.toPx()
+                1 -> 8.dp.toPx()
+                else -> 0.dp.toPx()
+            }
+        }
+
+        LaunchedEffect(visible, titleKey) {
+            if (visible) {
+                progress.snapTo(0f)
+                if (animationLevel == 2) {
+                    progress.snapTo(1f)
+                } else {
+                    progress.animateTo(
+                        targetValue = 1f,
+                        animationSpec = if (animationLevel == 0)
+                            spring(dampingRatio = 0.55f, stiffness = 260f)
+                        else
+                            tween(durationMillis = 210, easing = MotionTokens.Easing.emphasizedDecelerate)
+                    )
+                }
+            } else {
+                if (animationLevel == 2) {
+                    progress.snapTo(0f)
+                } else {
+                    progress.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(durationMillis = 85, easing = MotionTokens.Easing.exit)
+                    )
+                }
+            }
+        }
+
+        Box(
+            modifier = modifier.graphicsLayer {
+                val p = progress.value.coerceIn(0f, 1f)
+                alpha = p
+                scaleX = 0.94f + p * 0.06f
+                scaleY = scaleX
+                translationY = (1f - p) * offsetYPx
+                clip = false
+            }
+        ) {
+            CleanTitle(
+                text = text,
+                fontSize = fontSize,
+                colors = colors,
+                scrollOffset = scrollOffset
+            )
+        }
+    }
+}
+
 @Composable
 private fun SearchInputCard(
     query: String,
     onQueryChange: (String) -> Unit,
     colors: ThemeColors,
     cardBackground: Color,
-    isSmallScreen: Boolean
+    isSmallScreen: Boolean,
+    modifier: Modifier = Modifier
 ) {
     val ts = LocalTypeScale.current
     val strings = LocalStrings.current
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(28.dp))
             .clip(RoundedCornerShape(28.dp))
@@ -713,7 +761,7 @@ fun SettingsSearchPanel(
     onCrashLogClick: () -> Unit,
     onLanguageClick: () -> Unit,
     onHapticsClick: () -> Unit,
-    // ── VISUALS / Appearance ──────────────────────────────────────────────────
+    // ── APPEARANCE / Appearance ──────────────────────────────────────────────────
     themePreference: Int,
     onThemeChange: (Int) -> Unit,
     animationLevel: Int,
@@ -919,6 +967,23 @@ fun SettingsSearchPanel(
         }
     }
 
+    fun tr(key: String, fallback: String): String = strings[key].ifEmpty { fallback }
+    fun trPath(vararg parts: String): String = parts.joinToString(" → ")
+
+    val pathSettings = tr("settings.title", "SETTINGS")
+    val pathAppearance = tr("settings.appearance", "APPEARANCE")
+    val pathEffects = tr("effects.title", "EFFECTS")
+    val pathColors = tr("colors.title", "COLORS")
+    val pathParticles = tr("particles.title", "PARTICLES")
+    val pathRenderer = tr("renderer.title", "RENDERER")
+    val pathSystem = tr("settings.system", "SYSTEM")
+    val pathNotifications = tr("system.notifications", "NOTIFICATIONS")
+    val pathBackgroundGradient = tr("colors.gradient_background", "BACKGROUND GRADIENT")
+    val pathShapeAndLook = tr("text_catalog.visuals_effects_particles_shape_look", "SHAPE & LOOK").substringAfterLast("→").trim().ifEmpty { "SHAPE & LOOK" }
+    val pathMotion = tr("particles.motion_title", "MOTION")
+    val pathPerformance = tr("particles.performance_title", "PERFORMANCE")
+    val pathMatrixSettings = tr("particles.matrix_settings_title", "MATRIX SETTINGS")
+
     // Search results must render live state. Do not remember these lambdas:
     // if a ToggleCard or GlideOptionSelector changes a setting, the result card
     // needs to recompose with the new checked/selected value immediately.
@@ -926,14 +991,14 @@ fun SettingsSearchPanel(
         // ── PANEL SHORTCUTS ───────────────────────────────────────────────────
         SettingsSearchItem(
             id = "appearance_panel",
-            title = "APPEARANCE",
-            keywords = listOf("appearance", "visuals", "theme", "ui", "colors", "effects", "particles", "look", "settings section"),
-            path = "SETTINGS"
+            title = strings["settings.appearance"].ifEmpty { "APPEARANCE" },
+            keywords = listOf("appearance", "visuals", "theme", "ui", "colors", "effects", "particles", "look", "settings section", "aspect", "temă", "culori", "efecte", "particule"),
+            path = strings["settings.title"].ifEmpty { "SETTINGS" }
         ) {
             Column {
                 SettingsNavigationCard(
-                    title = "APPEARANCE",
-                    description = "Theme, color, effects, particles, and visual behavior.",
+                    title = strings["settings.appearance"].ifEmpty { "APPEARANCE" },
+                    description = strings["text_catalog.theme_color_effects_particles_and_visual_behavior"].ifEmpty { "Theme, color, effects, particles, and visual behavior." },
                     onClick = { openSearchDestination(onAppearanceClick) },
                     isSmallScreen = isSmallScreen, colors = colors,
                     cardBackground = cardBackground, oledMode = oledMode
@@ -942,14 +1007,14 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "colors_panel",
-            title = "COLORS",
-            keywords = listOf("colors", "colour", "accent", "dynamic color", "color picker", "palette", "custom color"),
-            path = "SETTINGS → APPEARANCE"
+            title = strings["colors.title"].ifEmpty { "COLORS" },
+            keywords = listOf("colors", "colour", "accent", "dynamic color", "color picker", "palette", "custom color", "culori", "accent", "paletă", "culoare"),
+            path = trPath(pathSettings, pathAppearance)
         ) {
             Column {
                 SettingsNavigationCard(
-                    title = "COLORS",
-                    description = "Dynamic color, accent color, and background gradient controls.",
+                    title = strings["colors.title"].ifEmpty { "COLORS" },
+                    description = strings["text_catalog.dynamic_color_accent_color_and_background_gradient_controls"].ifEmpty { "Dynamic color, accent color, and background gradient controls." },
                     onClick = { openSearchDestination(onColorCustomizationClick) },
                     isSmallScreen = isSmallScreen, colors = colors,
                     cardBackground = cardBackground, oledMode = oledMode
@@ -958,14 +1023,14 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "effects_panel",
-            title = "EFFECTS",
-            keywords = listOf("effects", "blur", "shadows", "visual effects", "glass", "cards"),
-            path = "SETTINGS → APPEARANCE"
+            title = strings["effects.title"].ifEmpty { "EFFECTS" },
+            keywords = listOf("effects", "blur", "shadows", "visual effects", "glass", "cards", "efecte", "umbre", "sticlă", "carduri"),
+            path = trPath(pathSettings, pathAppearance)
         ) {
             Column {
                 SettingsNavigationCard(
-                    title = "EFFECTS",
-                    description = "Blur and card-shadow controls.",
+                    title = strings["effects.title"].ifEmpty { "EFFECTS" },
+                    description = strings["text_catalog.blur_and_card_shadow_controls"].ifEmpty { "Blur and card-shadow controls." },
                     onClick = { openSearchDestination(onEffectsClick) },
                     isSmallScreen = isSmallScreen, colors = colors,
                     cardBackground = cardBackground, oledMode = oledMode
@@ -974,14 +1039,14 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "particles_panel",
-            title = "PARTICLES",
-            keywords = listOf("particles", "stars", "matrix", "background", "rain", "parallax", "motion"),
-            path = "SETTINGS → APPEARANCE"
+            title = strings["particles.title"].ifEmpty { "PARTICLES" },
+            keywords = listOf("particles", "stars", "matrix", "background", "rain", "parallax", "motion", "particule", "stele", "fundal", "mișcare"),
+            path = trPath(pathSettings, pathAppearance)
         ) {
             Column {
                 SettingsNavigationCard(
-                    title = "PARTICLES",
-                    description = "Particle style, motion, appearance, and performance controls.",
+                    title = strings["particles.title"].ifEmpty { "PARTICLES" },
+                    description = strings["text_catalog.particle_style_motion_appearance_and_performance_controls"].ifEmpty { "Particle style, motion, appearance, and performance controls." },
                     onClick = { openSearchDestination(onParticlesClick) },
                     isSmallScreen = isSmallScreen, colors = colors,
                     cardBackground = cardBackground, oledMode = oledMode
@@ -990,14 +1055,14 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "renderer_panel",
-            title = "RENDERER",
-            keywords = listOf("renderer", "opengl", "vulkan", "switch", "aggressive", "launcher", "keyboard", "gpuwatch"),
-            path = "SETTINGS"
+            title = strings["renderer.title"].ifEmpty { "RENDERER" },
+            keywords = listOf("renderer", "opengl", "vulkan", "switch", "aggressive", "launcher", "keyboard", "gpuwatch", "redare", "motor", "grafic", "schimbare", "tastatură"),
+            path = strings["settings.title"].ifEmpty { "SETTINGS" }
         ) {
             Column {
                 SettingsNavigationCard(
-                    title = "RENDERER",
-                    description = "Renderer-switch behavior and advanced switching options.",
+                    title = strings["renderer.title"].ifEmpty { "RENDERER" },
+                    description = strings["text_catalog.renderer_switch_behavior_and_advanced_switching_options"].ifEmpty { "Renderer-switch behavior and advanced switching options." },
                     onClick = { openSearchDestination(onRendererClick) },
                     isSmallScreen = isSmallScreen, colors = colors,
                     cardBackground = cardBackground, oledMode = oledMode
@@ -1006,14 +1071,14 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "system_panel",
-            title = "SYSTEM",
-            keywords = listOf("app", "system", "notifications", "backup", "language", "logs", "verbose", "tap outside"),
-            path = "SETTINGS"
+            title = strings["settings.system"].ifEmpty { "SYSTEM" },
+            keywords = listOf("app", "system", "notifications", "backup", "language", "logs", "verbose", "tap outside", "sistem", "notificări", "limbă", "jurnale"),
+            path = strings["settings.title"].ifEmpty { "SETTINGS" }
         ) {
             Column {
                 SettingsNavigationCard(
-                    title = "SYSTEM",
-                    description = "Notifications, backups, language, logs, and app behavior.",
+                    title = strings["settings.system"].ifEmpty { "SYSTEM" },
+                    description = strings["text_catalog.notifications_backups_language_logs_and_app_behavior"].ifEmpty { "Notifications, backups, language, logs, and app behavior." },
                     onClick = { openSearchDestination(onSystemClick) },
                     isSmallScreen = isSmallScreen, colors = colors,
                     cardBackground = cardBackground, oledMode = oledMode
@@ -1021,31 +1086,15 @@ fun SettingsSearchPanel(
             }
         },
         SettingsSearchItem(
-            id = "haptics_panel",
-            title = "HAPTICS",
-            keywords = listOf("haptics", "vibration", "vibrate", "buzz", "click", "hold", "release", "renderer haptic", "language haptic", "bounce", "dodge", "return", "reset haptics", "strength", "mechanical", "engine"),
-            path = "SETTINGS"
-        ) {
-            Column {
-                SettingsNavigationCard(
-                    title = "HAPTICS",
-                    description = "Customize regular taps, hold release, renderer pulses, language patterns, and bounce feedback.",
-                    onClick = { openSearchDestination(onHapticsClick) },
-                    isSmallScreen = isSmallScreen, colors = colors,
-                    cardBackground = cardBackground, oledMode = oledMode
-                )
-            }
-        },
-        SettingsSearchItem(
             id = "notifications_panel",
-            title = "NOTIFICATIONS",
-            keywords = listOf("notifications", "reminders", "alerts", "open gl reminder", "opengl reminder"),
-            path = "SETTINGS → SYSTEM"
+            title = strings["system.notifications"].ifEmpty { "NOTIFICATIONS" },
+            keywords = listOf("notifications", "reminders", "alerts", "open gl reminder", "opengl reminder", "notificări", "memento", "alerte"),
+            path = trPath(pathSettings, pathSystem)
         ) {
             Column {
                 SettingsNavigationCard(
-                    title = "NOTIFICATIONS",
-                    description = "Reminder alerts if OpenGL is left enabled.",
+                    title = strings["system.notifications"].ifEmpty { "NOTIFICATIONS" },
+                    description = strings["text_catalog.reminder_alerts_if_opengl_is_left_enabled"].ifEmpty { "Reminder alerts if OpenGL is left enabled." },
                     onClick = { openSearchDestination(onNotificationsClick) },
                     isSmallScreen = isSmallScreen, colors = colors,
                     cardBackground = cardBackground, oledMode = oledMode
@@ -1054,14 +1103,14 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "backup_panel",
-            title = "BACKUP & RESTORE",
-            keywords = listOf("backup", "restore", "export", "import", "settings backup", "save settings"),
-            path = "SETTINGS → SYSTEM"
+            title = strings["system.backup"].ifEmpty { "BACKUP & RESTORE" },
+            keywords = listOf("backup", "restore", "export", "import", "settings backup", "save settings", "copie", "rezervă", "restaurare", "salvare"),
+            path = trPath(pathSettings, pathSystem)
         ) {
             Column {
                 SettingsNavigationCard(
-                    title = "BACKUP & RESTORE",
-                    description = "Export settings or restore them from a backup file.",
+                    title = strings["system.backup"].ifEmpty { "BACKUP & RESTORE" },
+                    description = strings["text_catalog.export_settings_or_restore_them_from_a_backup_file"].ifEmpty { "Export settings or restore them from a backup file." },
                     onClick = { openSearchDestination(onBackupClick) },
                     isSmallScreen = isSmallScreen, colors = colors,
                     cardBackground = cardBackground, oledMode = oledMode
@@ -1070,14 +1119,14 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "language_panel",
-            title = "LANGUAGE",
-            keywords = listOf("language", "translation", "locale", "english", "romanian", "romana", "limba"),
-            path = "SETTINGS → SYSTEM"
+            title = strings["settings.language"].ifEmpty { "LANGUAGE" },
+            keywords = listOf("language", "translation", "locale", "english", "romanian", "romana", "limba", "limbă", "traducere"),
+            path = trPath(pathSettings, pathSystem)
         ) {
             Column {
                 SettingsNavigationCard(
-                    title = "LANGUAGE",
-                    description = "Change the display language used throughout GAMA.",
+                    title = strings["settings.language"].ifEmpty { "LANGUAGE" },
+                    description = strings["text_catalog.change_the_display_language_used_throughout_gama"].ifEmpty { "Change the display language used throughout GAMA." },
                     onClick = { openSearchDestination(onLanguageClick) },
                     isSmallScreen = isSmallScreen, colors = colors,
                     cardBackground = cardBackground, oledMode = oledMode
@@ -1086,14 +1135,14 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "logs_panel",
-            title = "LOGS",
-            keywords = listOf("logs", "log", "crash", "crashes", "crash log", "debug", "reports", "system crash"),
-            path = "SETTINGS → SYSTEM"
+            title = strings["system.crash_log"].ifEmpty { "LOGS" },
+            keywords = listOf("logs", "log", "crash", "crashes", "crash log", "debug", "reports", "system crash", "jurnale", "rapoarte", "eroare"),
+            path = trPath(pathSettings, pathSystem)
         ) {
             Column {
                 SettingsNavigationCard(
-                    title = "LOGS",
-                    description = "View recent reports and copy details for troubleshooting.",
+                    title = strings["system.crash_log"].ifEmpty { "LOGS" },
+                    description = strings["text_catalog.view_recent_reports_and_copy_details_for_troubleshooting"].ifEmpty { "View recent reports and copy details for troubleshooting." },
                     onClick = { openSearchDestination(onCrashLogClick) },
                     isSmallScreen = isSmallScreen, colors = colors,
                     cardBackground = cardBackground, oledMode = oledMode
@@ -1101,80 +1150,80 @@ fun SettingsSearchPanel(
             }
         },
 
-        // ── VISUALS ───────────────────────────────────────────────────────────
+        // ── APPEARANCE ───────────────────────────────────────────────────────────
         SettingsSearchItem(
             id = "theme",
-            title = "THEME",
+            title = tr("appearance.theme", "THEME"),
             keywords = listOf("theme", "mode", "auto", "dark", "light", "appearance", "visuals", "color mode", "them", "thme", "teme", "night"),
-            path = "VISUALS"
+            path = pathAppearance
         ) {
             Column {
-            SearchSelectorCard(title = "THEME", description = "Choose how GAMA follows light, dark, or system appearance.", colors = colors, cardBackground = cardBackground) {
-                GlideOptionSelector(options = listOf("Auto", "Dark", "Light"), selectedIndex = themePreference,
+            SearchSelectorCard(title = tr("appearance.theme", "THEME"), description = tr("text_catalog.choose_how_gama_follows_light_dark_or_system_appearance", "Choose how GAMA follows light, dark, or system appearance."), colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf(tr("appearance.theme_auto", "Auto"), tr("appearance.theme_dark", "Dark"), tr("appearance.theme_light", "Light")), selectedIndex = themePreference,
                     onOptionSelected = { performHaptic(); onThemeChange(it) }, colors = colors, modifier = Modifier.fillMaxWidth(), enabled = true)
             } }
         },
         SettingsSearchItem(
             id = "animations",
-            title = "ANIMATIONS",
+            title = tr("appearance.animations", "ANIMATIONS"),
             keywords = listOf("animations", "animation", "motion", "movement", "reduce motion", "off", "full", "anim", "smooth", "transition", "reduced"),
-            path = "VISUALS"
+            path = pathAppearance
         ) {
             Column {
-            SearchSelectorCard(title = "ANIMATIONS", description = "Control how much motion the interface uses.", colors = colors, cardBackground = cardBackground) {
-                GlideOptionSelector(options = listOf("Full", "Reduced", "Off"), selectedIndex = animationLevel,
+            SearchSelectorCard(title = tr("appearance.animations", "ANIMATIONS"), description = tr("text_catalog.control_how_much_motion_the_interface_uses", "Control how much motion the interface uses."), colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf(tr("appearance.anim_full", "Full"), tr("appearance.anim_reduced", "Reduced"), tr("appearance.anim_off", "Off")), selectedIndex = animationLevel,
                     onOptionSelected = { performHaptic(); onAnimationLevelChange(it) }, colors = colors, modifier = Modifier.fillMaxWidth())
             } }
         },
         SettingsSearchItem(
             id = "ui_scale",
-            title = "UI SCALE",
+            title = tr("appearance.ui_scale", "UI SCALE"),
             keywords = listOf("ui", "scale", "size", "interface size", "zoom", "75", "100", "125", "text size", "font size", "big", "small", "large"),
-            path = "VISUALS"
+            path = pathAppearance
         ) {
             Column {
-            SearchSelectorCard(title = "UI SCALE", description = "Adjust the size of the interface.", colors = colors, cardBackground = cardBackground) {
+            SearchSelectorCard(title = tr("appearance.ui_scale", "UI SCALE"), description = tr("text_catalog.adjust_the_size_of_the_interface", "Adjust the size of the interface."), colors = colors, cardBackground = cardBackground) {
                 GlideOptionSelector(options = listOf("75%", "100%", "125%"), selectedIndex = uiScale,
                     onOptionSelected = { performHaptic(); onUiScaleChange(it) }, colors = colors, modifier = Modifier.fillMaxWidth())
             } }
         },
         SettingsSearchItem(
             id = "stagger_animations",
-            title = "STAGGER ANIMATIONS",
+            title = tr("appearance.stagger_animations", "STAGGER ANIMATIONS"),
             keywords = listOf("stagger", "stag", "stager", "staggered", "cards", "cascade", "panel cards", "entrance", "animations", "motion", "one by one", "instant"),
-            path = "VISUALS"
+            path = pathAppearance
         ) {
             Column {
-            ToggleCard(title = "STAGGER ANIMATIONS", description = "Panel cards animate in one by one — turn off for instant panel opens.",
+            ToggleCard(title = tr("appearance.stagger_animations", "STAGGER ANIMATIONS"), description = tr("text_catalog.panel_cards_animate_in_one_by_one_turn_off_for_instant_panel", "Panel cards animate in one by one — turn off for instant panel opens."),
                 checked = staggerEnabled, onCheckedChange = { performHaptic(); onStaggerEnabledChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
         },
         SettingsSearchItem(
             id = "back_button_avoidance",
-            title = "BACK BUTTON AVOIDANCE",
+            title = tr("appearance.back_button_avoidance", "BACK BUTTON AVOIDANCE"),
             keywords = listOf("back", "button", "avoid", "avoidance", "duck", "rescale", "layout", "overlap", "floating", "arrow"),
-            path = "VISUALS"
+            path = pathAppearance
         ) {
             Column {
-            ToggleCard(title = "BACK BUTTON AVOIDANCE", description = "Cards duck left when the floating < button would overlap them. Turn off if you prefer the button to float over the UI.",
+            ToggleCard(title = tr("appearance.back_button_avoidance", "BACK BUTTON AVOIDANCE"), description = tr("text_catalog.cards_duck_left_when_the_floating_button_would_overlap_them_", "Cards duck left when the floating < button would overlap them. Turn off if you prefer the button to float over the UI."),
                 checked = backButtonAvoidanceEnabled, onCheckedChange = { performHaptic(); onBackButtonAvoidanceEnabledChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
         },
         SettingsSearchItem(
             id = "back_button_position",
-            title = "BACK BUTTON POSITION",
+            title = tr("system.back_button_position", "BACK BUTTON POSITION"),
             keywords = listOf("back", "button", "position", "side", "left", "right", "inverted", "inversed", "inverse", "search button", "global button"),
-            path = "SYSTEM"
+            path = pathSystem
         ) {
             Column {
                 SearchSelectorCard(
-                    title = "BACK BUTTON POSITION",
-                    description = "Choose which side gets the floating < button. Search and Global move to the opposite side.",
+                    title = tr("system.back_button_position", "BACK BUTTON POSITION"),
+                    description = tr("system.back_button_position_desc", "Choose which side gets the floating < button. Search and Global move to the opposite side."),
                     colors = colors,
                     cardBackground = cardBackground
                 ) {
                     GlideOptionSelector(
-                        options = listOf("Normal", "Inverted"),
+                        options = listOf(tr("system.back_button_position_normal", "Normal"), tr("system.back_button_position_inversed", "Inverted")),
                         selectedIndex = if (backButtonInversed) 1 else 0,
                         onOptionSelected = { index -> performHaptic(); onBackButtonInversedChange(index == 1) },
                         colors = colors,
@@ -1185,25 +1234,27 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "card_shadows",
-            title = "CARD SHADOWS",
+            title = tr("appearance.card_shadows", "CARD SHADOWS"),
             keywords = listOf("card", "cards", "shadow", "shadows", "drop shadow", "gpu", "performance", "visual", "depth", "elevation"),
-            path = "VISUALS → EFFECTS"
+            path = trPath(pathAppearance, pathEffects),
+            enabledForShadow = { !oledMode }
         ) {
             Column {
-            ToggleCard(title = "CARD SHADOWS", description = "Drop shadows under cards — disable to reduce GPU load or fix visual glitches during animations.",
-                checked = shadowsEnabled, onCheckedChange = { performHaptic(); onShadowsEnabledChange(it) },
-                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
+            ToggleCard(title = tr("appearance.card_shadows", "CARD SHADOWS"), description = tr("text_catalog.drop_shadows_under_cards_disable_to_reduce_gpu_load_or_fix_v", "Drop shadows under cards — disable to reduce GPU load or fix visual glitches during animations."),
+                checked = shadowsEnabled && !oledMode, onCheckedChange = { performHaptic(); onShadowsEnabledChange(it) },
+                colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode, enabled = !oledMode) }
         },
         // ── COLORS ────────────────────────────────────────────────────────────
         SettingsSearchItem(
             id = "dynamic_color",
-            title = "DYNAMIC COLOR",
+            title = tr("colors.dynamic_color", "DYNAMIC COLOR"),
             keywords = listOf("dynamic", "material you", "wallpaper", "accent", "monet", "android 12", "auto color", "system color", "automatic"),
-            path = "VISUALS → COLORS"
+            path = trPath(pathAppearance, pathColors),
+            enabledForShadow = { dynamicColorAvailable }
         ) {
             Column {
-            ToggleCard(title = "DYNAMIC COLOR",
-                description = if (dynamicColorAvailable) "Picks accent colors from your wallpaper automatically via Material You" else "Requires Android 12 or newer",
+            ToggleCard(title = tr("colors.dynamic_color", "DYNAMIC COLOR"),
+                description = if (dynamicColorAvailable) tr("text_catalog.picks_accent_colors_from_your_wallpaper_automatically_via_ma", "Picks accent colors from your wallpaper automatically via Material You") else tr("colors.dynamic_color_unavailable", "Requires Android 12 or newer"),
                 checked = useDynamicColor && dynamicColorAvailable,
                 onCheckedChange = { performHaptic(); onDynamicColorChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
@@ -1211,13 +1262,14 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "advanced_color_picker",
-            title = "ADVANCED COLOR PICKER",
+            title = tr("colors.advanced_picker", "ADVANCED COLOR PICKER"),
             keywords = listOf("advanced", "hex", "color picker", "hex input", "custom color", "type color", "#", "picker", "colour"),
-            path = "VISUALS → COLORS"
+            path = trPath(pathAppearance, pathColors),
+            enabledForShadow = { !useDynamicColor || !dynamicColorAvailable }
         ) {
             Column {
-            ToggleCard(title = "ADVANCED COLOR PICKER",
-                description = "Adds a hex input field to the color pickers — type any color directly, e.g. #4895EF",
+            ToggleCard(title = tr("colors.advanced_picker", "ADVANCED COLOR PICKER"),
+                description = tr("text_catalog.adds_a_hex_input_field_to_the_color_pickers_type_any_color_d", "Adds a hex input field to the color pickers — type any color directly, e.g. #4895EF"),
                 checked = advancedColorPicker,
                 onCheckedChange = { performHaptic(); onAdvancedColorPickerChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
@@ -1225,14 +1277,15 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "accent_color",
-            title = "ACCENT COLOR",
+            title = tr("colors.accent_color", "ACCENT COLOR"),
             keywords = listOf("accent", "accent color", "custom accent", "color", "colour", "highlight", "buttons", "borders", "picker", "hex", "primary color"),
-            path = "VISUALS → COLORS"
+            path = trPath(pathAppearance, pathColors),
+            enabledForShadow = { customColorControlsEnabled }
         ) {
             Column {
                 CompactColorPickerCard(
-                    title = "ACCENT COLOR",
-                    description = if (customColorControlsEnabled) "The highlight color used on buttons, borders, and interactive elements" else "Controlled by Dynamic Color — disable it to set a custom accent",
+                    title = tr("colors.accent_color", "ACCENT COLOR"),
+                    description = if (customColorControlsEnabled) tr("text_catalog.the_highlight_color_used_on_buttons_borders_and_interactive_", "The highlight color used on buttons, borders, and interactive elements") else tr("text_catalog.controlled_by_dynamic_color_disable_it_to_set_a_custom_accen", "Controlled by Dynamic Color — disable it to set a custom accent"),
                     currentColor = customAccentColor,
                     onColorChange = { color -> performHaptic(); onAccentColorChange(color) },
                     colors = colors,
@@ -1247,17 +1300,18 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "background_gradient_panel",
-            title = "BACKGROUND GRADIENT",
+            title = tr("colors.gradient_background", "BACKGROUND GRADIENT"),
             keywords = listOf("background gradient", "gradient background", "gradient panel", "gradient colors", "gradient start", "gradient end", "background colors"),
-            path = "VISUALS → COLORS"
+            path = trPath(pathAppearance, pathColors),
+            enabledForShadow = { gradientAvailable }
         ) {
             Column {
                 SettingsNavigationCard(
-                    title = "BACKGROUND GRADIENT",
+                    title = tr("colors.gradient_background", "BACKGROUND GRADIENT"),
                     description = when {
-                        oledMode -> "Unavailable in dark mode — background is pure black"
-                        darkModeActive -> "Unavailable in Dark mode — background is pure black"
-                        else -> "Toggle the gradient and customize its start and end colors"
+                        oledMode -> tr("colors.gradient_background_oled_desc", "Unavailable in dark mode — background is pure black")
+                        darkModeActive -> tr("text_catalog.unavailable_in_dark_mode_background_is_pure_black", "Unavailable in Dark mode — background is pure black")
+                        else -> tr("colors.gradient_background_desc", "Toggle the gradient and customize its start and end colors")
                     },
                     onClick = { if (gradientAvailable) openSearchDestination(onGradientClick) },
                     isSmallScreen = isSmallScreen,
@@ -1270,9 +1324,10 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "gradient_background",
-            title = "GRADIENT BACKGROUND",
+            title = tr("effects.gradient_background", "GRADIENT BACKGROUND"),
             keywords = listOf("gradient", "background", "gradient background", "color shift", "wallpaper color", "shifting", "background color", "fade"),
-            path = "VISUALS → COLORS → BACKGROUND GRADIENT"
+            path = trPath(pathAppearance, pathColors, pathBackgroundGradient),
+            enabledForShadow = { gradientAvailable }
         ) {
             Column {
             val gradientCardScale by animateFloatAsState(
@@ -1292,11 +1347,11 @@ fun SettingsSearchPanel(
                         alpha = if (gradientAvailable) 1f else 0.42f
                     )
             ) {
-                ToggleCard(title = "GRADIENT BACKGROUND",
+                ToggleCard(title = tr("effects.gradient_background", "GRADIENT BACKGROUND"),
                     description = when {
-                        oledMode -> "Unavailable in dark mode — background is pure black"
-                        darkModeActive -> "Unavailable in Dark mode — background is pure black"
-                        else -> "A slow-shifting color gradient behind your home screen"
+                        oledMode -> tr("colors.gradient_background_oled_desc", "Unavailable in dark mode — background is pure black")
+                        darkModeActive -> tr("text_catalog.unavailable_in_dark_mode_background_is_pure_black", "Unavailable in Dark mode — background is pure black")
+                        else -> tr("text_catalog.a_slow_shifting_color_gradient_behind_your_home_screen", "A slow-shifting color gradient behind your home screen")
                     },
                     checked = gradientEnabled && gradientAvailable,
                     onCheckedChange = { if (gradientAvailable) { performHaptic(); onGradientChange(it) } },
@@ -1306,18 +1361,19 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "gradient_start",
-            title = "GRADIENT START",
+            title = tr("colors.gradient_start", "GRADIENT START"),
             keywords = listOf("gradient start", "start color", "top gradient", "background gradient start", "gradient first color", "gradient color"),
-            path = "VISUALS → COLORS → BACKGROUND GRADIENT"
+            path = trPath(pathAppearance, pathColors, pathBackgroundGradient),
+            enabledForShadow = { gradientPickersEnabled }
         ) {
             Column {
                 CompactColorPickerCard(
-                    title = "GRADIENT START",
+                    title = tr("colors.gradient_start", "GRADIENT START"),
                     description = when {
-                        oledMode -> "Disabled in dark mode"
-                        darkModeActive -> "Disabled in Dark mode"
-                        useDynamicColor && dynamicColorAvailable -> "Controlled by Dynamic Color — disable it to set a custom color"
-                        else -> "The color the background gradient fades from at the top of the screen"
+                        oledMode -> tr("colors.gradient_start_oled_desc", "Disabled in dark mode")
+                        darkModeActive -> tr("text_catalog.disabled_in_dark_mode", "Disabled in Dark mode")
+                        useDynamicColor && dynamicColorAvailable -> tr("colors.gradient_start_dynamic_desc", "Controlled by Dynamic Color — disable it to set a custom color")
+                        else -> tr("text_catalog.the_color_the_background_gradient_fades_from_at_the_top_of_t", "The color the background gradient fades from at the top of the screen")
                     },
                     currentColor = customGradientStart,
                     onColorChange = { color -> performHaptic(); onGradientStartChange(color) },
@@ -1333,18 +1389,19 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "gradient_end",
-            title = "GRADIENT END",
+            title = tr("colors.gradient_end", "GRADIENT END"),
             keywords = listOf("gradient end", "end color", "bottom gradient", "background gradient end", "gradient second color", "gradient color"),
-            path = "VISUALS → COLORS → BACKGROUND GRADIENT"
+            path = trPath(pathAppearance, pathColors, pathBackgroundGradient),
+            enabledForShadow = { gradientPickersEnabled }
         ) {
             Column {
                 CompactColorPickerCard(
-                    title = "GRADIENT END",
+                    title = tr("colors.gradient_end", "GRADIENT END"),
                     description = when {
-                        oledMode -> "Disabled in dark mode"
-                        darkModeActive -> "Disabled in Dark mode"
-                        useDynamicColor && dynamicColorAvailable -> "Controlled by Dynamic Color — disable it to set a custom color"
-                        else -> "The color the background gradient fades into at the bottom of the screen"
+                        oledMode -> tr("colors.gradient_start_oled_desc", "Disabled in dark mode")
+                        darkModeActive -> tr("text_catalog.disabled_in_dark_mode", "Disabled in Dark mode")
+                        useDynamicColor && dynamicColorAvailable -> tr("colors.gradient_start_dynamic_desc", "Controlled by Dynamic Color — disable it to set a custom color")
+                        else -> tr("text_catalog.the_color_the_background_gradient_fades_into_at_the_bottom_o", "The color the background gradient fades into at the bottom of the screen")
                     },
                     currentColor = customGradientEnd,
                     onColorChange = { color -> performHaptic(); onGradientEndChange(color) },
@@ -1362,132 +1419,140 @@ fun SettingsSearchPanel(
         // ── EFFECTS ───────────────────────────────────────────────────────────
         SettingsSearchItem(
             id = "blur",
-            title = "BLUR",
+            title = tr("blur.title", "BLUR"),
             keywords = listOf("blur", "frosted", "glass", "frosted glass", "panel blur", "backdrop", "depth", "premium", "translucent", "blured"),
-            path = "VISUALS → EFFECTS"
+            path = trPath(pathAppearance, pathEffects)
         ) {
             Column {
-            ToggleCard(title = "BLUR",
-                description = "Frosted glass behind panels and dialogs — subtle depth that makes the UI feel premium",
+            ToggleCard(title = tr("blur.title", "BLUR"),
+                description = tr("text_catalog.frosted_glass_behind_panels_and_dialogs_subtle_depth_that_ma", "Frosted glass behind panels and dialogs — subtle depth that makes the UI feel premium"),
                 checked = blurEnabled, onCheckedChange = { performHaptic(); onBlurChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
         },
         // ── PARTICLES ─────────────────────────────────────────────────────────
         SettingsSearchItem(
             id = "particles",
-            title = "PARTICLES",
+            title = tr("particles.title", "PARTICLES"),
             keywords = listOf("particles", "stars", "floating", "dots", "particle", "animation", "background animation", "star", "sparkle", "living", "feel"),
-            path = "VISUALS → EFFECTS → PARTICLES"
+            path = trPath(pathAppearance, pathEffects, pathParticles)
         ) {
             Column {
-            ToggleCard(title = "PARTICLES",
-                description = "Animates the background with floating particles or Matrix rain",
+            ToggleCard(title = tr("particles.title", "PARTICLES"),
+                description = tr("text_catalog.animates_the_background_with_floating_particles_or_matrix_ra", "Animates the background with floating particles or Matrix rain"),
                 checked = particlesEnabled, onCheckedChange = { performHaptic(); onParticlesChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
         },
         SettingsSearchItem(
             id = "particle_style",
-            title = "PARTICLE STYLE",
+            title = tr("text_catalog.particle_style", "PARTICLE STYLE"),
             keywords = listOf("style", "stars", "matrix", "rain", "matrix rain", "digital rain", "glyphs", "particle style", "mode"),
-            path = "VISUALS → EFFECTS → PARTICLES"
+            path = trPath(pathAppearance, pathEffects, pathParticles),
+            enabledForShadow = { particlesEnabled }
         ) {
             Column {
-            SearchSelectorCard(title = "PARTICLE STYLE",
+            SearchSelectorCard(title = tr("text_catalog.particle_style", "PARTICLE STYLE"),
                 description = if (matrixMode) "Cascading columns of glyphs — the classic Matrix digital rain effect" else "Twinkling stars that float and shift with device tilt via parallax",
                 colors = colors, cardBackground = cardBackground) {
-                GlideOptionSelector(options = listOf("Stars", "Matrix"), selectedIndex = if (matrixMode) 1 else 0,
+                GlideOptionSelector(options = listOf(tr("particles.style_particles", "Stars"), tr("particles.style_matrix", "Matrix")), selectedIndex = if (matrixMode) 1 else 0,
                     onOptionSelected = { performHaptic(); if (particlesEnabled) onMatrixModeChange(it == 1) },
                     colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled)
             } }
         },
         SettingsSearchItem(
             id = "star_mode",
-            title = "STAR MODE",
+            title = tr("particles.star_mode", "STAR MODE"),
             keywords = listOf("star", "star mode", "stars", "shape", "look", "glow", "twinkle", "sparkle", "star shape"),
-            path = "VISUALS → EFFECTS → PARTICLES → SHAPE & LOOK"
+            path = trPath(pathAppearance, pathEffects, pathParticles, pathShapeAndLook),
+            enabledForShadow = { particlesEnabled && !matrixMode }
         ) {
             Column {
-            ToggleCard(title = "STAR MODE",
-                description = "Renders particles as glowing 5-pointed stars instead of soft dots",
+            ToggleCard(title = tr("particles.star_mode", "STAR MODE"),
+                description = tr("text_catalog.renders_particles_as_glowing_5_pointed_stars_instead_of_soft", "Renders particles as glowing 5-pointed stars instead of soft dots"),
                 checked = particleStarMode, onCheckedChange = { performHaptic(); onParticleStarModeChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
                 oledMode = oledMode, enabled = particlesEnabled && !matrixMode) }
         },
         SettingsSearchItem(
             id = "time_mode",
-            title = "TIME MODE",
+            title = tr("particles.time_mode", "TIME MODE"),
             keywords = listOf("time", "time mode", "sun", "moon", "day", "night", "sky", "real time", "clock", "daytime", "sunrise", "sunset"),
-            path = "VISUALS → EFFECTS → PARTICLES → SHAPE & LOOK"
+            path = trPath(pathAppearance, pathEffects, pathParticles, pathShapeAndLook),
+            enabledForShadow = { particlesEnabled && !matrixMode }
         ) {
             Column {
-            ToggleCard(title = "TIME MODE",
-                description = "A sun and moon travel across the sky in sync with the real time of day",
+            ToggleCard(title = tr("particles.time_mode", "TIME MODE"),
+                description = tr("particles.time_mode_desc", "A sun and moon travel across the sky in sync with the real time of day"),
                 checked = particleTimeMode, onCheckedChange = { performHaptic(); onParticleTimeModeChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
                 oledMode = oledMode, enabled = particlesEnabled && !matrixMode) }
         },
         SettingsSearchItem(
             id = "parallax",
-            title = "PARALLAX",
+            title = tr("particles.parallax", "PARALLAX"),
             keywords = listOf("parallax", "tilt", "gyro", "gyroscope", "motion", "sensor", "depth", "3d", "perspective"),
-            path = "VISUALS → EFFECTS → PARTICLES → MOTION"
+            path = trPath(pathAppearance, pathEffects, pathParticles, pathMotion),
+            enabledForShadow = { particlesEnabled && !matrixMode }
         ) {
             Column {
-            ToggleCard(title = "PARALLAX",
-                description = "Particles shift with device tilt via the gyroscope for a depth effect",
+            ToggleCard(title = tr("particles.parallax", "PARALLAX"),
+                description = tr("text_catalog.particles_shift_with_device_tilt_via_the_gyroscope_for_a_dep", "Particles shift with device tilt via the gyroscope for a depth effect"),
                 checked = particleParallaxEnabled, onCheckedChange = { performHaptic(); onParticleParallaxEnabledChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
                 oledMode = oledMode, enabled = particlesEnabled && !matrixMode) }
         },
         SettingsSearchItem(
             id = "parallax_sensitivity",
-            title = "PARALLAX SENSITIVITY",
+            title = tr("particles.parallax_sensitivity", "PARALLAX SENSITIVITY"),
             keywords = listOf("parallax", "sensitivity", "tilt", "gyro", "strength", "intensity", "low", "medium", "high", "motion"),
-            path = "VISUALS → EFFECTS → PARTICLES → MOTION"
+            path = trPath(pathAppearance, pathEffects, pathParticles, pathMotion),
+            enabledForShadow = { particlesEnabled && particleParallaxEnabled && !matrixMode }
         ) {
             Column {
-            SearchSelectorCard(title = "PARALLAX SENSITIVITY", description = "How strongly the particles react to device tilt.", colors = colors, cardBackground = cardBackground) {
-                GlideOptionSelector(options = listOf("Low", "Medium", "High"), selectedIndex = particleParallaxSensitivity.coerceIn(0, 2),
+            SearchSelectorCard(title = tr("particles.parallax_sensitivity", "PARALLAX SENSITIVITY"), description = tr("text_catalog.how_strongly_the_particles_react_to_device_tilt", "How strongly the particles react to device tilt."), colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf(tr("particles.sensitivity_low", "Low"), tr("particles.sensitivity_medium", "Medium"), tr("particles.sensitivity_high", "High")), selectedIndex = particleParallaxSensitivity.coerceIn(0, 2),
                     onOptionSelected = { performHaptic(); onParticleParallaxSensitivityChange(it) },
                     colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && particleParallaxEnabled && !matrixMode)
             } }
         },
         SettingsSearchItem(
             id = "particle_speed",
-            title = "PARTICLE SPEED",
+            title = tr("text_catalog.particle_speed", "PARTICLE SPEED"),
             keywords = listOf("speed", "fast", "slow", "velocity", "float speed", "particle speed", "drift"),
-            path = "VISUALS → EFFECTS → PARTICLES → MOTION"
+            path = trPath(pathAppearance, pathEffects, pathParticles, pathMotion),
+            enabledForShadow = { particlesEnabled && !matrixMode }
         ) {
             Column {
-            SearchSelectorCard(title = "PARTICLE SPEED", description = "How fast particles drift across the screen.", colors = colors, cardBackground = cardBackground) {
-                GlideOptionSelector(options = listOf("Low", "Medium", "High"), selectedIndex = particleSpeed.coerceIn(0, 2),
+            SearchSelectorCard(title = tr("text_catalog.particle_speed", "PARTICLE SPEED"), description = tr("text_catalog.how_fast_particles_drift_across_the_screen", "How fast particles drift across the screen."), colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf(tr("particles.sensitivity_low", "Low"), tr("particles.sensitivity_medium", "Medium"), tr("particles.sensitivity_high", "High")), selectedIndex = particleSpeed.coerceIn(0, 2),
                     onOptionSelected = { performHaptic(); onParticleSpeedChange(it) },
                     colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && !matrixMode)
             } }
         },
         SettingsSearchItem(
             id = "particle_count",
-            title = "PARTICLE COUNT",
+            title = tr("text_catalog.particle_count", "PARTICLE COUNT"),
             keywords = listOf("count", "number", "amount", "density", "particles", "how many", "more", "less", "performance", "75", "150", "300"),
-            path = "VISUALS → EFFECTS → PARTICLES → PERFORMANCE"
+            path = trPath(pathAppearance, pathEffects, pathParticles, pathPerformance),
+            enabledForShadow = { particlesEnabled && !matrixMode }
         ) {
             Column {
-            SearchSelectorCard(title = "PARTICLE COUNT", description = "Low = 75 · Medium = 150 · High = 300", colors = colors, cardBackground = cardBackground) {
-                GlideOptionSelector(options = listOf("Low", "Medium", "High"), selectedIndex = particleCount.coerceIn(0, 2),
+            SearchSelectorCard(title = tr("text_catalog.particle_count", "PARTICLE COUNT"), description = tr("particles.count_desc", "Low = 75 · Medium = 150 · High = 300"), colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf(tr("particles.sensitivity_low", "Low"), tr("particles.sensitivity_medium", "Medium"), tr("particles.sensitivity_high", "High")), selectedIndex = particleCount.coerceIn(0, 2),
                     onOptionSelected = { performHaptic(); onParticleCountChange(it) },
                     colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && !matrixMode)
             } }
         },
         SettingsSearchItem(
             id = "particle_refresh_rate",
-            title = "PARTICLE REFRESH RATE",
+            title = tr("text_catalog.particle_refresh_rate", "PARTICLE REFRESH RATE"),
             keywords = listOf("refresh", "refresh rate", "fps", "frame", "native", "performance", "battery", "poll", "sensor"),
-            path = "VISUALS → EFFECTS → PARTICLES → PERFORMANCE"
+            path = trPath(pathAppearance, pathEffects, pathParticles, pathPerformance),
+            enabledForShadow = { particlesEnabled && !matrixMode }
         ) {
             Column {
             val refreshOption = when { nativeRefreshRate -> 0; quarterRefreshRate -> 2; else -> 1 }
-            SearchSelectorCard(title = "PARTICLE REFRESH RATE", description = "Controls how often particles update. Native = every frame, 1/2 = every other, 1/4 = every fourth.", colors = colors, cardBackground = cardBackground) {
-                GlideOptionSelector(options = listOf("Native", "1/2", "1/4"), selectedIndex = refreshOption,
+            SearchSelectorCard(title = tr("text_catalog.particle_refresh_rate", "PARTICLE REFRESH RATE"), description = tr("text_catalog.controls_how_often_particles_update_native_every_frame_1_2_e", "Controls how often particles update. Native = every frame, 1/2 = every other, 1/4 = every fourth."), colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf(tr("text_catalog.native", "Native"), "1/2", "1/4"), selectedIndex = refreshOption,
                     onOptionSelected = { opt -> performHaptic()
                         when (opt) { 0 -> { onNativeRefreshRateChange(true); onQuarterRefreshRateChange(false) }
                                      2 -> { onNativeRefreshRateChange(false); onQuarterRefreshRateChange(true) }
@@ -1497,52 +1562,56 @@ fun SettingsSearchPanel(
         },
         SettingsSearchItem(
             id = "matrix_speed",
-            title = "MATRIX SPEED",
+            title = tr("text_catalog.matrix_speed", "MATRIX SPEED"),
             keywords = listOf("matrix", "speed", "rain", "fall speed", "cascade", "slow", "fast", "velocity"),
-            path = "VISUALS → EFFECTS → PARTICLES → MATRIX SETTINGS"
+            path = trPath(pathAppearance, pathEffects, pathParticles, pathMatrixSettings),
+            enabledForShadow = { particlesEnabled && matrixMode }
         ) {
             Column {
-            SearchSelectorCard(title = "MATRIX SPEED", description = "How fast glyphs fall down the screen.", colors = colors, cardBackground = cardBackground) {
-                GlideOptionSelector(options = listOf("Slow", "Medium", "Fast"), selectedIndex = matrixSpeed.coerceIn(0, 2),
+            SearchSelectorCard(title = tr("text_catalog.matrix_speed", "MATRIX SPEED"), description = tr("matrix.speed_desc", "How fast glyphs fall down the screen."), colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf(tr("particles.speed_slow", "Slow"), tr("particles.speed_medium", "Medium"), tr("particles.speed_fast", "Fast")), selectedIndex = matrixSpeed.coerceIn(0, 2),
                     onOptionSelected = { performHaptic(); onMatrixSpeedChange(it) },
                     colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && matrixMode)
             } }
         },
         SettingsSearchItem(
             id = "matrix_density",
-            title = "MATRIX DENSITY",
+            title = tr("text_catalog.matrix_density", "MATRIX DENSITY"),
             keywords = listOf("matrix", "density", "rain", "columns", "sparse", "dense", "column density", "coverage"),
-            path = "VISUALS → EFFECTS → PARTICLES → MATRIX SETTINGS"
+            path = trPath(pathAppearance, pathEffects, pathParticles, pathMatrixSettings),
+            enabledForShadow = { particlesEnabled && matrixMode }
         ) {
             Column {
-            SearchSelectorCard(title = "MATRIX DENSITY", description = "How many columns of glyphs appear on screen.", colors = colors, cardBackground = cardBackground) {
-                GlideOptionSelector(options = listOf("Sparse", "Medium", "Dense"), selectedIndex = matrixDensity.coerceIn(0, 2),
+            SearchSelectorCard(title = tr("text_catalog.matrix_density", "MATRIX DENSITY"), description = tr("matrix.density_desc", "How many columns of glyphs appear on screen."), colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf(tr("text_catalog.sparse", "Sparse"), tr("particles.sensitivity_medium", "Medium"), tr("text_catalog.dense", "Dense")), selectedIndex = matrixDensity.coerceIn(0, 2),
                     onOptionSelected = { performHaptic(); onMatrixDensityChange(it) },
                     colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && matrixMode)
             } }
         },
         SettingsSearchItem(
             id = "matrix_font_size",
-            title = "MATRIX FONT SIZE",
+            title = tr("text_catalog.matrix_font_size", "MATRIX FONT SIZE"),
             keywords = listOf("matrix", "font", "size", "glyph", "text size", "characters", "small", "large", "big"),
-            path = "VISUALS → EFFECTS → PARTICLES → MATRIX SETTINGS"
+            path = trPath(pathAppearance, pathEffects, pathParticles, pathMatrixSettings),
+            enabledForShadow = { particlesEnabled && matrixMode }
         ) {
             Column {
-            SearchSelectorCard(title = "MATRIX FONT SIZE", description = "The size of individual glyphs in the rain.", colors = colors, cardBackground = cardBackground) {
-                GlideOptionSelector(options = listOf("Small", "Medium", "Large"), selectedIndex = matrixFontSize.coerceIn(0, 2),
+            SearchSelectorCard(title = tr("text_catalog.matrix_font_size", "MATRIX FONT SIZE"), description = tr("matrix.font_size_desc", "The size of individual glyphs in the rain."), colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf(tr("text_catalog.small", "Small"), tr("particles.sensitivity_medium", "Medium"), tr("text_catalog.large", "Large")), selectedIndex = matrixFontSize.coerceIn(0, 2),
                     onOptionSelected = { performHaptic(); onMatrixFontSizeChange(it) },
                     colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && matrixMode)
             } }
         },
         SettingsSearchItem(
             id = "matrix_fade",
-            title = "MATRIX TRAIL LENGTH",
+            title = tr("text_catalog.matrix_trail_length", "MATRIX TRAIL LENGTH"),
             keywords = listOf("matrix", "fade", "trail", "length", "tail", "ghost", "streak", "short", "long", "full"),
-            path = "VISUALS → EFFECTS → PARTICLES → MATRIX SETTINGS"
+            path = trPath(pathAppearance, pathEffects, pathParticles, pathMatrixSettings),
+            enabledForShadow = { particlesEnabled && matrixMode }
         ) {
             Column {
-            SearchSelectorCard(title = "MATRIX TRAIL LENGTH", description = "How long the glowing trail behind each glyph is.", colors = colors, cardBackground = cardBackground) {
-                GlideOptionSelector(options = listOf("Short", "Medium", "Full"), selectedIndex = matrixFadeLength.coerceIn(0, 2),
+            SearchSelectorCard(title = tr("text_catalog.matrix_trail_length", "MATRIX TRAIL LENGTH"), description = tr("text_catalog.how_long_the_glowing_trail_behind_each_glyph_is", "How long the glowing trail behind each glyph is."), colors = colors, cardBackground = cardBackground) {
+                GlideOptionSelector(options = listOf(tr("text_catalog.short", "Short"), tr("particles.sensitivity_medium", "Medium"), tr("appearance.anim_full", "Full")), selectedIndex = matrixFadeLength.coerceIn(0, 2),
                     onOptionSelected = { performHaptic(); onMatrixFadeLengthChange(it) },
                     colors = colors, modifier = Modifier.fillMaxWidth(), enabled = particlesEnabled && matrixMode)
             } }
@@ -1550,109 +1619,110 @@ fun SettingsSearchPanel(
         // ── RENDERER ──────────────────────────────────────────────────────────
         SettingsSearchItem(
             id = "aggressive_mode",
-            title = "AGGRESSIVE MODE",
+            title = tr("renderer.aggressive_mode", "AGGRESSIVE MODE"),
             keywords = listOf("aggressive", "mode", "renderer", "all packages", "coverage", "broad", "every app", "all apps", "force", "global"),
-            path = "RENDERER"
+            path = pathRenderer
         ) {
             Column {
-            ToggleCard(title = "AGGRESSIVE MODE",
-                description = "Applies the renderer to every installed package — broader coverage, but read the warning before enabling",
+            ToggleCard(title = tr("renderer.aggressive_mode", "AGGRESSIVE MODE"),
+                description = tr("renderer.aggressive_mode_desc", "Applies the renderer to every installed package — broader coverage, but read the warning before enabling"),
                 checked = aggressiveMode, onCheckedChange = { performHaptic(); onAggressiveModeChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode, accentBorder = true) }
         },
         SettingsSearchItem(
             id = "restart_launcher",
-            title = "RESTART LAUNCHER ON SWITCH",
+            title = tr("renderer.kill_launcher", "RESTART LAUNCHER ON SWITCH"),
             keywords = listOf("restart", "launcher", "switch", "kill", "force stop", "miui", "xiaomi", "immediately", "reload"),
-            path = "RENDERER"
+            path = pathRenderer
         ) {
             Column {
-            ToggleCard(title = "RESTART LAUNCHER ON SWITCH",
-                description = "Force-stops the launcher after switching so it picks up the new renderer immediately — leave off on Xiaomi / MIUI",
+            ToggleCard(title = tr("renderer.kill_launcher", "RESTART LAUNCHER ON SWITCH"),
+                description = tr("text_catalog.force_stops_the_launcher_after_switching_so_it_picks_up_the_", "Force-stops the launcher after switching so it picks up the new renderer immediately — leave off on Xiaomi / MIUI"),
                 checked = killLauncher, onCheckedChange = { performHaptic(); onKillLauncherChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode, accentBorder = true) }
         },
         SettingsSearchItem(
             id = "restart_keyboard",
-            title = "RESTART KEYBOARD ON SWITCH",
+            title = tr("renderer.kill_keyboard", "RESTART KEYBOARD ON SWITCH"),
             keywords = listOf("keyboard", "input method", "ime", "restart", "kill", "force stop", "gboard", "samsung keyboard", "after applying api", "renderer"),
-            path = "RENDERER"
+            path = pathRenderer
         ) {
             Column {
-            ToggleCard(title = "RESTART KEYBOARD ON SWITCH",
-                description = "Force-stops the currently selected keyboard after applying the renderer, so it reloads with the new graphics API",
+            ToggleCard(title = tr("renderer.kill_keyboard", "RESTART KEYBOARD ON SWITCH"),
+                description = tr("renderer.kill_keyboard_desc", "Force-stops the currently selected keyboard after applying the renderer, so it reloads with the new graphics API"),
                 checked = killKeyboard, onCheckedChange = { performHaptic(); onKillKeyboardChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode, accentBorder = true) }
         },
         SettingsSearchItem(
             id = "doze",
-            title = "DOZE",
+            title = tr("renderer.doze_mode", "DOZE"),
             keywords = listOf("doze", "sleep", "deep sleep", "battery", "power", "idle", "standby", "aggressive doze"),
-            path = "RENDERER"
+            path = pathRenderer
         ) {
             Column {
-            ToggleCard(title = "DOZE",
-                description = "Puts the device into deep sleep immediately — squeezes extra battery life when you're not using it",
+            ToggleCard(title = tr("renderer.doze_mode", "DOZE"),
+                description = tr("renderer.doze_mode_desc", "Puts the device into deep sleep immediately — squeezes extra battery life when you're not using it"),
                 checked = dozeMode, onCheckedChange = { performHaptic(); onDozeModeChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode, accentBorder = true) }
         },
         SettingsSearchItem(
             id = "gpuwatch_shortcut",
-            title = "GPUWATCH SHORTCUT",
+            title = tr("text_catalog.gpuwatch_shortcut", "GPUWATCH SHORTCUT"),
             keywords = listOf("gpuwatch", "gpu watch", "samsung", "shortcut", "gpu", "button", "monitor", "overlay"),
-            path = "RENDERER"
+            path = pathRenderer
         ) {
             Column {
-            ToggleCard(title = "GPUWATCH SHORTCUT",
-                description = "Adds an Open GPUWatch button on the main screen. Samsung devices only.",
+            ToggleCard(title = tr("text_catalog.gpuwatch_shortcut", "GPUWATCH SHORTCUT"),
+                description = tr("text_catalog.adds_an_open_gpuwatch_button_on_the_main_screen_samsung_devi", "Adds an Open GPUWatch button on the main screen. Samsung devices only."),
                 checked = showGpuWatchButton, onCheckedChange = { performHaptic(); onShowGpuWatchButtonChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode, accentBorder = true) }
         },
         // ── SYSTEM ──────────────────────────────────────────────────────
         SettingsSearchItem(
             id = "verbose_output",
-            title = "VERBOSE OUTPUT",
+            title = tr("text_catalog.verbose_output", "VERBOSE OUTPUT"),
             keywords = listOf("verbose", "output", "log", "shell", "command", "debug", "terminal", "output", "show output"),
-            path = "SYSTEM"
+            path = pathSystem
         ) {
             Column {
-            ToggleCard(title = "VERBOSE OUTPUT",
-                description = "Shows the full shell command output when switching renderers",
+            ToggleCard(title = tr("text_catalog.verbose_output", "VERBOSE OUTPUT"),
+                description = tr("text_catalog.shows_the_full_shell_command_output_when_switching_renderers", "Shows the full shell command output when switching renderers"),
                 checked = verboseMode, onCheckedChange = { performHaptic(); onVerboseModeChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
         },
         SettingsSearchItem(
             id = "tap_outside_to_close",
-            title = "TAP OUTSIDE TO CLOSE",
+            title = tr("renderer.tap_outside_to_close", "TAP OUTSIDE TO CLOSE"),
             keywords = listOf("tap", "outside", "close", "dismiss", "panel", "back button", "click outside", "touch outside", "gesture"),
-            path = "SYSTEM"
+            path = pathSystem
         ) {
             Column {
-            ToggleCard(title = "TAP OUTSIDE TO CLOSE",
-                description = "Tap anywhere outside an open panel to dismiss it — turn off to require the back button instead",
+            ToggleCard(title = tr("renderer.tap_outside_to_close", "TAP OUTSIDE TO CLOSE"),
+                description = tr("renderer.tap_outside_to_close_desc", "Tap anywhere outside an open panel to dismiss it — turn off to require the back button instead"),
                 checked = dismissOnClickOutside, onCheckedChange = { performHaptic(); onDismissOnClickOutsideChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
         },
         SettingsSearchItem(
             id = "notifications_reminders",
-            title = "NOTIFICATIONS / REMINDERS",
+            title = tr("text_catalog.notifications_reminders", "NOTIFICATIONS / REMINDERS"),
             keywords = listOf("notifications", "reminders", "alert", "notify", "opengl", "reminder", "ping", "notification", "notif"),
-            path = "SYSTEM → NOTIFICATIONS"
+            path = trPath(pathSystem, pathNotifications)
         ) {
             Column {
-            ToggleCard(title = "REMINDERS",
-                description = "Sends an alert if you switch to OpenGL and forget to switch back",
+            ToggleCard(title = tr("notifications.reminders", "REMINDERS"),
+                description = tr("notifications.reminders_off_desc", "Sends an alert if you switch to OpenGL and forget to switch back"),
                 checked = notificationsEnabled, onCheckedChange = { performHaptic(); onNotificationsEnabledChange(it) },
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen, oledMode = oledMode) }
         },
         SettingsSearchItem(
             id = "reminder_interval",
-            title = "REMINDER INTERVAL",
+            title = tr("notifications.interval", "REMINDER INTERVAL"),
             keywords = listOf("interval", "reminder", "frequency", "how often", "notification", "2h", "4h", "6h", "12h", "24h", "hours"),
-            path = "SYSTEM → NOTIFICATIONS"
+            path = trPath(pathSystem, pathNotifications),
+            enabledForShadow = { notificationsEnabled }
         ) {
             Column {
-            SearchSelectorCard(title = "REMINDER INTERVAL", description = "How often GAMA reminds you that you're on OpenGL.", colors = colors, cardBackground = cardBackground) {
+            SearchSelectorCard(title = tr("notifications.interval", "REMINDER INTERVAL"), description = tr("text_catalog.how_often_gama_reminds_you_that_you_re_on_opengl", "How often GAMA reminds you that you're on OpenGL."), colors = colors, cardBackground = cardBackground) {
                 GlideOptionSelector(options = listOf("2 h", "4 h", "6 h", "12 h", "24 h"), selectedIndex = notifIntervalIndex.coerceIn(0, 4),
                     onOptionSelected = { performHaptic(); onNotifIntervalChange(it) },
                     colors = colors, modifier = Modifier.fillMaxWidth(), enabled = notificationsEnabled)
@@ -1680,7 +1750,10 @@ fun SettingsSearchPanel(
                 .map { it.first }
         }
     }
-    val globalFloatingButton: (@Composable (Modifier) -> Unit)? = if (!showAllSettings) {
+    val itemById = remember(items) { items.associateBy { it.id } }
+
+    val globalShortcutVisible = !showAllSettings && query.trim().isBlank() && committedQuery.isBlank()
+    val globalFloatingButton: (@Composable (Modifier) -> Unit)? = if (globalShortcutVisible) {
         { floatingModifier ->
             PanelGlobalButton(
                 onClick = {
@@ -1692,7 +1765,7 @@ fun SettingsSearchPanel(
                 colors = colors,
                 oledMode = oledMode,
                 isSmallScreen = isSmallScreen,
-                enabled = visible,
+                enabled = visible && globalShortcutVisible,
                 modifier = floatingModifier
             )
         }
@@ -1707,70 +1780,320 @@ fun SettingsSearchPanel(
         isSmallScreen = isSmallScreen,
         oledMode = oledMode,
         colors = colors,
-        leadingFloatingButton = globalFloatingButton
+        leadingFloatingButton = globalFloatingButton,
+        edgeSpacers = false,
+        reserveBackButtonSpace = false,
+        contentScrollable = false
     ) { scrollState ->
-        CleanTitle(
-            text = if (showAllSettings)
-                strings["global.title"].ifEmpty { "GLOBAL" }
-            else
-                strings["search.title"].ifEmpty { "SEARCH" },
-            fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
-            colors = colors,
-            scrollOffset = scrollState.value
-        )
+        val panelTitleKey = if (showAllSettings) "global" else "search"
+        val panelTitleText = if (showAllSettings)
+            strings["global.title"].ifEmpty { "GLOBAL" }
+        else
+            strings["search.title"].ifEmpty { "SEARCH" }
+
+        val searchTyped = !showAllSettings && query.trim().isNotBlank()
+        val searchCommitted = !showAllSettings && committedQuery.isNotBlank()
+        var releaseSearchResults by remember { mutableStateOf(false) }
+
+        LaunchedEffect(showAllSettings, query, committedQuery) {
+            releaseSearchResults = false
+            if (showAllSettings) {
+                releaseSearchResults = true
+            } else if (query.trim().isNotBlank() && committedQuery.isNotBlank()) {
+                // Search has a two-stage choreography:
+                // 1) title + field glide from center to top
+                // 2) only then do the matching cards cascade underneath
+                delay(if (animationLevel == 0) 230 else if (animationLevel == 1) 150 else 0)
+                releaseSearchResults = true
+            }
+        }
+
+        val resultTargetReady = showAllSettings || (!showAllSettings && searchCommitted && releaseSearchResults)
+        val targetResultIds = if (resultTargetReady) results.map { it.id } else emptyList()
+        val targetShowsNoResults = resultTargetReady && !showAllSettings && query.trim().isNotBlank() && results.isEmpty()
+        val targetResultsKey = when {
+            !resultTargetReady -> "hidden"
+            targetShowsNoResults -> "empty:${committedQuery}"
+            else -> "items:${targetResultIds.joinToString("|")}"
+        }
+        var displayedResultsKey by remember { mutableStateOf("hidden") }
+        var displayedResultIds by remember { mutableStateOf<List<String>>(emptyList()) }
+        var displayedShowsNoResults by remember { mutableStateOf(false) }
+        var resultSetVisible by remember { mutableStateOf(false) }
+
+        LaunchedEffect(visible, targetResultsKey) {
+            val exitWait = when (animationLevel) {
+                2 -> 0L
+                1 -> 150L
+                else -> 220L
+            }
+
+            if (!visible) {
+                resultSetVisible = false
+                delay(exitWait)
+                displayedResultsKey = "hidden"
+                displayedResultIds = emptyList()
+                displayedShowsNoResults = false
+                return@LaunchedEffect
+            }
+
+            if (targetResultsKey == "hidden") {
+                // While the header is moving, a fresh query is debouncing, or the
+                // user clears the field, keep the old result set alive just long
+                // enough to fade/scale away. The spotlight header checks
+                // displayedResultsKey/resultSetVisible, so it will not glide back
+                // to center until these cards are actually gone.
+                resultSetVisible = false
+                delay(exitWait)
+                displayedResultsKey = "hidden"
+                displayedResultIds = emptyList()
+                displayedShowsNoResults = false
+                return@LaunchedEffect
+            }
+
+            val hadDisplayedContent = displayedResultsKey != "hidden" && (displayedResultIds.isNotEmpty() || displayedShowsNoResults)
+            if (!hadDisplayedContent) {
+                displayedResultsKey = targetResultsKey
+                displayedResultIds = targetResultIds
+                displayedShowsNoResults = targetShowsNoResults
+                resultSetVisible = true
+            } else if (displayedResultsKey != targetResultsKey) {
+                // Search result replacement choreography:
+                // old cards fade/scale out -> data swaps -> new cards stagger in.
+                resultSetVisible = false
+                delay(exitWait)
+                displayedResultsKey = targetResultsKey
+                displayedResultIds = targetResultIds
+                displayedShowsNoResults = targetShowsNoResults
+                delay(if (animationLevel == 2) 0L else 35L)
+                resultSetVisible = true
+            } else {
+                // Same result identity, but live card state may have changed.
+                displayedResultIds = targetResultIds
+                displayedShowsNoResults = targetShowsNoResults
+                resultSetVisible = true
+            }
+        }
+
+        val displayedResults = displayedResultIds.mapNotNull { itemById[it] }
+        val searchResultsStillLeaving = !showAllSettings && (
+            resultSetVisible ||
+                displayedResultsKey != "hidden" ||
+                displayedResults.isNotEmpty() ||
+                displayedShowsNoResults
+            )
+        val spotlightMode = !showAllSettings && query.trim().isBlank() && !searchResultsStillLeaving
+
+        val resultsScrollState = rememberScrollState()
+        LaunchedEffect(showAllSettings, committedQuery, results.size) {
+            resultsScrollState.scrollTo(0)
+        }
 
         if (!showAllSettings) {
-            AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = results.size + 3) {
-                SearchInputCard(
-                    query = query,
-                    onQueryChange = { query = it },
-                    colors = colors,
-                    cardBackground = cardBackground,
-                    isSmallScreen = isSmallScreen
-                )
-            }
-
-
-        } else {
-            PanelCaption(
-                text = strings["global.caption"].ifEmpty { "Every setting in one flattened list. Browse everything without guessing the name." },
-                colors = colors
+            val searchActive = query.trim().isNotBlank() || committedQuery.isNotBlank() || searchResultsStillLeaving
+            val density = LocalDensity.current
+            val configuration = LocalConfiguration.current
+            val headerProgress by animateFloatAsState(
+                targetValue = if (spotlightMode) 0f else 1f,
+                animationSpec = when (animationLevel) {
+                    2 -> snap()
+                    0 -> spring(dampingRatio = 0.54f, stiffness = 410f)
+                    else -> tween(durationMillis = 210, easing = MotionTokens.Easing.emphasizedDecelerate)
+                },
+                label = "search_spotlight_to_header_progress"
             )
-        }
 
-        if (!showAllSettings && query.isBlank()) {
-            // Intentional: blank search shows only the title, search field, and the floating GLOBAL shortcut.
-            // Results appear after the user starts typing.
-        } else if (!showAllSettings && committedQuery.isBlank()) {
-            // Query is being debounced for a few milliseconds. Keep the panel calm
-            // instead of composing cards while the user is still typing.
-        } else if (results.isEmpty()) {
-            AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 2) {
-                SettingsNavigationCard(
-                    title = strings["search.no_results"].ifEmpty { "NO RESULTS" },
-                    description = strings["search.no_results_desc"].ifEmpty { "Try: blur, theme, dark, matrix, particles, doze, aggressive, notifications, gradient…" },
-                    onClick = {},
-                    isSmallScreen = isSmallScreen,
-                    colors = colors,
-                    cardBackground = cardBackground,
-                    oledMode = oledMode
-                )
+            // Blank SEARCH must be centered from the very first frame.
+            // The measured heights arrive one frame later via onGloballyPositioned;
+            // if we start from 0px, the title appears at the top, then corrects
+            // itself to the center. Seed the layout with a realistic screen-height
+            // fallback so the first draw already matches the spotlight state.
+            val fallbackSearchAreaHeightPx = remember(configuration.screenHeightDp, density) {
+                with(density) { configuration.screenHeightDp.dp.toPx().roundToInt() }
             }
-        } else {
-            results.forEachIndexed { index, item ->
-                // PathLabel renders OUTSIDE AnimatedElement so the shadow only
-                // covers the card below it, not the breadcrumb pill above.
-                PathLabel(item.path)
-                AnimatedElement(
-                    visible = visible,
-                    cardShadow = true,
-                    staggerIndex = index + 2,
-                    totalItems = results.size + 2
-                ) {
-                    item.render()
+            var searchAreaHeightPx by remember(fallbackSearchAreaHeightPx) {
+                mutableStateOf(fallbackSearchAreaHeightPx)
+            }
+            var searchHeaderHeightPx by remember { mutableStateOf(0) }
+            val fallbackSearchHeaderHeight = if (isSmallScreen) 128.dp else 144.dp
+            val centerSpacerDp by remember(searchAreaHeightPx, searchHeaderHeightPx, density, fallbackSearchHeaderHeight) {
+                derivedStateOf {
+                    with(density) {
+                        val areaPx = searchAreaHeightPx.coerceAtLeast(0)
+                        val headerPx = if (searchHeaderHeightPx > 0) {
+                            searchHeaderHeightPx
+                        } else {
+                            fallbackSearchHeaderHeight.toPx().roundToInt()
+                        }
+                        ((areaPx - headerPx).coerceAtLeast(0) / 2f).toDp()
+                    }
                 }
             }
+            val normalPanelTitleTopSpacer = if (isLandscape) 24.dp else 40.dp
+            val animatedTopSpacer by animateDpAsState(
+                targetValue = if (spotlightMode) centerSpacerDp else normalPanelTitleTopSpacer,
+                animationSpec = when (animationLevel) {
+                    2 -> snap()
+                    0 -> spring(dampingRatio = 0.54f, stiffness = 410f)
+                    else -> tween(durationMillis = 210, easing = MotionTokens.Easing.emphasizedDecelerate)
+                },
+                label = "search_spotlight_scroll_spacer"
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .onGloballyPositioned { coordinates -> searchAreaHeightPx = coordinates.size.height }
+                    .verticalScroll(resultsScrollState),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 16.dp else 20.dp)
+            ) {
+                Spacer(modifier = Modifier.height(animatedTopSpacer.coerceAtLeast(0.dp)))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { coordinates -> searchHeaderHeightPx = coordinates.size.height }
+                        .graphicsLayer {
+                            val scale = 0.985f + ((1f - headerProgress) * 0.015f)
+                            scaleX = scale
+                            scaleY = scale
+                            clip = false
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 16.dp else 20.dp)
+                ) {
+                    AnimatedSearchPanelTitle(
+                        titleKey = panelTitleKey,
+                        text = panelTitleText,
+                        visible = visible,
+                        fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
+                        colors = colors,
+                        scrollOffset = resultsScrollState.value
+                    )
+
+                    AnimatedElement(
+                        visible = visible,
+                        cardShadow = true,
+                        staggerIndex = 1,
+                        totalItems = displayedResults.size + 3
+                    ) {
+                        SearchInputCard(
+                            query = query,
+                            onQueryChange = { query = it },
+                            colors = colors,
+                            cardBackground = cardBackground,
+                            isSmallScreen = isSmallScreen
+                        )
+                    }
+                }
+
+                if (displayedShowsNoResults) {
+                    AnimatedElement(
+                        visible = visible && resultSetVisible,
+                        cardShadow = true,
+                        staggerIndex = 2,
+                        totalItems = 3
+                    ) {
+                        SettingsNavigationCard(
+                            title = strings["search.no_results"].ifEmpty { "NO RESULTS" },
+                            description = strings["search.no_results_desc"].ifEmpty { "Try: blur, theme, dark, matrix, particles, doze, aggressive, notifications, gradient…" },
+                            onClick = {},
+                            isSmallScreen = isSmallScreen,
+                            colors = colors,
+                            cardBackground = cardBackground,
+                            oledMode = oledMode
+                        )
+                    }
+                } else {
+                    displayedResults.forEachIndexed { index, item ->
+                        AnimatedElement(
+                            visible = visible && resultSetVisible,
+                            cardShadow = false,
+                            avoidBackButton = true,
+                            staggerIndex = index + 2,
+                            totalItems = displayedResults.size + 2,
+                            enabled = item.enabledForShadow()
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                PathLabel(item.path)
+                                Box(modifier = Modifier.fillMaxWidth().directionalShadow(deferUntilSettled = true)) {
+                                    item.render()
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 88.dp else 96.dp))
+            }
+        } else {
+            val normalPanelTitleTopSpacer = if (isLandscape) 24.dp else 40.dp
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(resultsScrollState),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 16.dp else 20.dp)
+            ) {
+                Spacer(modifier = Modifier.height(normalPanelTitleTopSpacer))
+
+                // GLOBAL must behave like a normal panel, not like fixed chrome.
+                // Keep the title and caption inside the same scroll/avoidance flow
+                // as the cards so nothing gets clipped behind the floating < button.
+                AnimatedElement(
+                    visible = visible,
+                    cardShadow = false,
+                    avoidBackButton = true,
+                    staggerIndex = 0,
+                    totalItems = displayedResults.size + 2
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 16.dp else 20.dp)
+                    ) {
+                        AnimatedSearchPanelTitle(
+                            titleKey = panelTitleKey,
+                            text = panelTitleText,
+                            visible = visible,
+                            fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
+                            colors = colors,
+                            scrollOffset = resultsScrollState.value
+                        )
+
+                        PanelCaption(
+                            text = strings["global.caption"].ifEmpty { "Every setting in one flattened list. Browse everything without guessing the name." },
+                            colors = colors
+                        )
+                    }
+                }
+
+                displayedResults.forEachIndexed { index, item ->
+                    AnimatedElement(
+                        visible = visible && resultSetVisible,
+                        cardShadow = false,
+                        avoidBackButton = true,
+                        staggerIndex = index + 1,
+                        totalItems = displayedResults.size + 2,
+                        enabled = item.enabledForShadow()
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            PathLabel(item.path)
+                            Box(modifier = Modifier.fillMaxWidth().directionalShadow(deferUntilSettled = true)) {
+                                item.render()
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 88.dp else 96.dp))
+            }
         }
+
     }
 }
 
@@ -1815,7 +2138,7 @@ fun VisualEffectsPanel(
         oledMode = oledMode, colors = colors
     ) { scrollState ->
         CleanTitle(
-            text = LocalStrings.current["particles.appearance_title"].ifEmpty { "VISUALS" },
+            text = LocalStrings.current["particles.appearance_title"].ifEmpty { "APPEARANCE" },
             fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
             colors = colors, scrollOffset = scrollState.value
         )
@@ -1870,7 +2193,7 @@ fun VisualEffectsPanel(
                             color = colors.primaryAccent.copy(alpha = 0.7f)
                         )
                         GlideOptionSelector(
-                            options = listOf("Auto", "Dark", "Light"),
+                            options = listOf(tr("appearance.theme_auto", "Auto"), tr("appearance.theme_dark", "Dark"), tr("appearance.theme_light", "Light")),
                             selectedIndex = themePreference,
                             onOptionSelected = { performHaptic(); onThemeChange(it) },
                             colors = colors, modifier = Modifier.fillMaxWidth(),
@@ -1911,7 +2234,7 @@ fun VisualEffectsPanel(
                             color = colors.primaryAccent.copy(alpha = 0.7f)
                         )
                         GlideOptionSelector(
-                            options = listOf("Full", "Reduced", "Off"),
+                            options = listOf(tr("appearance.anim_full", "Full"), tr("appearance.anim_reduced", "Reduced"), tr("appearance.anim_off", "Off")),
                             selectedIndex = animationLevel,
                             onOptionSelected = { performHaptic(); onAnimationLevelChange(it) },
                             colors = colors, modifier = Modifier.fillMaxWidth()
@@ -2137,10 +2460,11 @@ fun EffectsPanel(
             ToggleCard(
                 title = LocalStrings.current["appearance.card_shadows"].ifEmpty { "CARD SHADOWS" },
                 description = LocalStrings.current["appearance.card_shadows_desc"].ifEmpty { "Drop shadows under cards — disable to reduce GPU load or fix visual glitches during animations" },
-                checked = shadowsEnabled,
+                checked = shadowsEnabled && !oledMode,
                 onCheckedChange = { performHaptic(); onShadowsEnabledChange(it) },
                 colors = colors, cardBackground = cardBackground,
-                isSmallScreen = isSmallScreen, oledMode = oledMode
+                isSmallScreen = isSmallScreen, oledMode = oledMode,
+                enabled = !oledMode
             )
         }
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 4) {
@@ -2538,7 +2862,7 @@ fun ParticlesMotionPanel(
                             fontFamily = quicksandFontFamily, fontWeight = FontWeight.Bold
                         )
                         GlideOptionSelector(
-                            options = listOf("Slow", "Medium", "Fast"),
+                            options = listOf(tr("particles.speed_slow", "Slow"), tr("particles.speed_medium", "Medium"), tr("particles.speed_fast", "Fast")),
                             selectedIndex = particleSpeed.coerceIn(0, 2),
                             onOptionSelected = { performHaptic(); onParticleSpeedChange(it) },
                             colors = colors, modifier = Modifier.fillMaxWidth(),
@@ -2604,7 +2928,7 @@ fun ParticlesMotionPanel(
                             color = colors.primaryAccent.copy(alpha = 0.7f)
                         )
                         GlideOptionSelector(
-                            options = listOf("Low", "Medium", "High"),
+                            options = listOf(tr("particles.sensitivity_low", "Low"), tr("particles.sensitivity_medium", "Medium"), tr("particles.sensitivity_high", "High")),
                             selectedIndex = particleParallaxSensitivity.coerceIn(0, 2),
                             onOptionSelected = { performHaptic(); onParticleParallaxSensitivityChange(it) },
                             colors = colors, modifier = Modifier.fillMaxWidth(),
@@ -2701,7 +3025,7 @@ fun ParticlesPerformancePanel(
                             fontFamily = quicksandFontFamily, fontWeight = FontWeight.Bold
                         )
                         GlideOptionSelector(
-                            options = listOf("Low", "Medium", "High"),
+                            options = listOf(tr("particles.sensitivity_low", "Low"), tr("particles.sensitivity_medium", "Medium"), tr("particles.sensitivity_high", "High")),
                             selectedIndex = particleCount.coerceIn(0, 2),
                             onOptionSelected = { performHaptic(); onParticleCountChange(it) },
                             colors = colors, modifier = Modifier.fillMaxWidth(),
@@ -2732,7 +3056,7 @@ fun ParticlesPerformancePanel(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "PARTICLE REFRESH RATE",
+                        text = LocalStrings.current["text_catalog.particle_refresh_rate"].ifEmpty { "PARTICLE REFRESH RATE" },
                         fontSize = ts.labelLarge,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 2.sp,
@@ -2740,14 +3064,14 @@ fun ParticlesPerformancePanel(
                         color = colors.primaryAccent.copy(alpha = 0.7f)
                     )
                     Text(
-                        text = "Controls how often particles update and how often the rotation sensor is polled. Native = every frame, 1/2 = every other frame, 1/4 = every fourth frame.",
+                        text = LocalStrings.current["text_catalog.controls_how_often_particles_update_and_how_often_the_rotati"].ifEmpty { "Controls how often particles update and how often the rotation sensor is polled. Native = every frame, 1/2 = every other frame, 1/4 = every fourth frame." },
                         fontSize = ts.bodySmall,
                         color = colors.textSecondary,
                         fontFamily = quicksandFontFamily,
                         fontWeight = FontWeight.Bold
                     )
                     GlideOptionSelector(
-                        options = listOf("Native", "1/2", "1/4"),
+                        options = listOf(tr("text_catalog.native", "Native"), "1/2", "1/4"),
                         selectedIndex = refreshOption,
                         onOptionSelected = { option ->
                             performHaptic()
@@ -2826,7 +3150,7 @@ fun ColorCustomizationPanel(
         }
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 4, enabled = !useDynamicColor || !dynamicColorAvailable) {
             ToggleCard(
-                title = LocalStrings.current["colors.advanced_picker"].ifEmpty { "ADVANCED COLOR PICKER" },
+                title = LocalStrings.current["colors.advanced_picker"].ifEmpty { "Advanced Color Picker" },
                 description = LocalStrings.current["colors.advanced_picker_desc"].ifEmpty { "Adds a hex input field to the color pickers — type any color directly, e.g. #4895EF" },
                 checked = advancedColorPicker,
                 onCheckedChange = { performHaptic(); onAdvancedColorPickerChange(it) },
@@ -2837,14 +3161,17 @@ fun ColorCustomizationPanel(
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 4,
             enabled = !useDynamicColor || !dynamicColorAvailable) {
             CompactColorPickerCard(
-                title = LocalStrings.current["colors.accent_color"].ifEmpty { "ACCENT COLOR" },
-                description = LocalStrings.current["colors.accent_color_desc"].ifEmpty { "The highlight color used on buttons, borders, and interactive elements" },
+                title = LocalStrings.current["colors.accent_color"].ifEmpty { "Accent Color" },
+                description = LocalStrings.current["colors.accent_color_desc"].ifEmpty { "The highlight color used on buttons, borders, and interactive elements." },
                 currentColor = customAccentColor,
                 onColorChange = onAccentColorChange,
                 colors = colors, cardBackground = cardBackground,
                 isSmallScreen = isSmallScreen, isLandscape = isLandscape,
                 advancedPicker = advancedColorPicker,
-                enabled = !useDynamicColor || !dynamicColorAvailable, oledMode = oledMode
+                enabled = !useDynamicColor || !dynamicColorAvailable,
+                oledMode = oledMode,
+                filterExtremeForTheme = true,
+                isDarkTheme = oledMode
             )
         }
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 4, totalItems = 4, enabled = gradientAvailable) {
@@ -2870,7 +3197,7 @@ fun ColorCustomizationPanel(
                     title = LocalStrings.current["colors.gradient_background"].ifEmpty { "BACKGROUND GRADIENT" },
                     description = when {
                         oledMode -> LocalStrings.current["colors.gradient_background_oled_desc"].ifEmpty { "Unavailable in dark mode — background is pure black" }
-                        isDarkTheme -> "Unavailable in Dark mode — background is pure black"
+                        isDarkTheme -> tr("text_catalog.unavailable_in_dark_mode_background_is_pure_black", "Unavailable in Dark mode — background is pure black")
                         else -> LocalStrings.current["colors.gradient_background_desc"].ifEmpty { "Toggle the gradient and customize its start and end colors" }
                     },
                     onClick = { if (gradientAvailable) { performHaptic(); onGradientClick() } },
@@ -2948,7 +3275,7 @@ fun GradientPanel(
                     title = LocalStrings.current["effects.gradient_background"].ifEmpty { "GRADIENT BACKGROUND" },
                     description = when {
                         oledMode -> LocalStrings.current["effects.gradient_background_oled_desc"].ifEmpty { "Unavailable in dark mode — background is pure black" }
-                        darkModeActive -> "Unavailable in Dark mode — background is pure black"
+                        darkModeActive -> tr("text_catalog.unavailable_in_dark_mode_background_is_pure_black", "Unavailable in Dark mode — background is pure black")
                         else -> LocalStrings.current["effects.gradient_background_on_desc"].ifEmpty { "A slow-shifting color gradient behind your home screen" }
                     },
                     checked = gradientEnabled && gradientAvailable,
@@ -2967,7 +3294,7 @@ fun GradientPanel(
                 title = LocalStrings.current["colors.gradient_start"].ifEmpty { "GRADIENT START" },
                 description = when {
                     oledMode -> LocalStrings.current["colors.gradient_start_oled_desc"].ifEmpty { "Disabled in dark mode" }
-                    darkModeActive -> "Disabled in Dark mode"
+                    darkModeActive -> tr("text_catalog.disabled_in_dark_mode", "Disabled in Dark mode")
                     useDynamicColor && dynamicColorAvailable -> LocalStrings.current["colors.gradient_start_dynamic_desc"].ifEmpty { "Controlled by Dynamic Color — disable it to set a custom color" }
                     else -> LocalStrings.current["colors.gradient_start_desc"].ifEmpty { "The color the background gradient fades from at the top of the screen" }
                 },
@@ -2987,7 +3314,7 @@ fun GradientPanel(
                 title = LocalStrings.current["colors.gradient_end"].ifEmpty { "GRADIENT END" },
                 description = when {
                     oledMode -> LocalStrings.current["colors.gradient_end_oled_desc"].ifEmpty { "Disabled in dark mode" }
-                    darkModeActive -> "Disabled in Dark mode"
+                    darkModeActive -> tr("text_catalog.disabled_in_dark_mode", "Disabled in Dark mode")
                     useDynamicColor && dynamicColorAvailable -> LocalStrings.current["colors.gradient_end_dynamic_desc"].ifEmpty { "Controlled by Dynamic Color — disable it to set a custom color" }
                     else -> LocalStrings.current["colors.gradient_end_desc"].ifEmpty { "The color the background gradient fades into at the bottom of the screen" }
                 },
@@ -3116,7 +3443,8 @@ fun RendererPanel(
     PanelScaffold(
         visible = visible, onDismiss = onDismiss,
         isLandscape = isLandscape, isSmallScreen = isSmallScreen,
-        oledMode = oledMode, colors = colors
+        oledMode = oledMode, colors = colors,
+        rootExitCascade = true,
     ) { _ ->
         CleanTitle(
             text = LocalStrings.current["renderer.title"].ifEmpty { "RENDERER" },
@@ -3328,7 +3656,7 @@ private fun HapticStrengthCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (enabled) "PATTERN ENABLED" else "PATTERN OFF",
+                    text = if (enabled) LocalStrings.current["text_catalog.pattern_enabled"].ifEmpty { "PATTERN ENABLED" } else LocalStrings.current["text_catalog.pattern_off"].ifEmpty { "PATTERN OFF" },
                     color = if (enabled) colors.primaryAccent else colors.textSecondary,
                     fontSize = ts.bodySmall,
                     fontWeight = FontWeight.Bold,
@@ -3371,7 +3699,7 @@ private fun HapticStrengthCard(
             )
 
             HapticPreviewButton(
-                text = "PREVIEW FEEL",
+                text = LocalStrings.current["text_catalog.preview_feel"].ifEmpty { "PREVIEW FEEL" },
                 onClick = preview,
                 colors = colors,
                 oledMode = oledMode,
@@ -3447,17 +3775,22 @@ fun HapticsPanel(
         isLandscape = isLandscape,
         isSmallScreen = isSmallScreen,
         oledMode = oledMode,
+        rootExitCascade = true,
         colors = colors
     ) { scrollState ->
-        CleanTitle(
+        AnimatedSearchPanelTitle(
+            titleKey = "haptics_$section",
             text = title,
+            visible = visible,
             fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge,
             colors = colors,
             scrollOffset = scrollState.value
         )
 
-        PanelCaption(
-            text = when (section) {
+        key("haptics_caption_$section") {
+            AnimatedElement(visible = visible, staggerIndex = 1, totalItems = 8) {
+                PanelCaption(
+                    text = when (section) {
                 "core" -> strings["haptics.core_caption"].ifEmpty { "Everyday tactile language: quick taps, first contact, and the stronger bloom after a deliberate hold." }
                 "actions" -> strings["haptics.actions_caption"].ifEmpty { "Special signatures for important actions. Renderer switches and language changes should feel different from regular UI." }
                 "layout" -> strings["haptics.layout_caption"].ifEmpty { "Mechanical feedback for visual motion. Open each motion pattern separately so the main panel stays clean." }
@@ -3465,17 +3798,15 @@ fun HapticsPanel(
                 "return" -> strings["haptics.return_settle_desc"].ifEmpty { "Stronger settling pulse when the card returns to normal width. This should feel like the UI snapping home." }
                 "preview" -> strings["haptics.preview_lab_desc"].ifEmpty { "Clone controls that do nothing except let you feel the app's haptic language safely." }
                 "reset" -> strings["haptics.reset_caption"].ifEmpty { "Restore the factory GAMA haptics profile if the feel gets messy." }
-                else -> strings["haptics.caption"].ifEmpty { "GAMA has no sound effects by design, so this is the mechanical side of the interface. Tune it like a tiny physical instrument." }
-            },
-            colors = colors
-        )
+                        else -> strings["haptics.caption"].ifEmpty { "GAMA has no sound effects by design, so this is the mechanical side of the interface. Tune it like a tiny physical instrument." }
+                    },
+                    colors = colors
+                )
+            }
+        }
 
-        Crossfade(
-            targetState = section,
-            animationSpec = tween(durationMillis = 170, easing = MotionTokens.Easing.enter),
-            label = "haptics_section_transition"
-        ) { activeSection ->
-            when (activeSection) {
+        key(section) {
+            when (section) {
             "overview" -> {
                 AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 1, totalItems = 6) {
                     ToggleCard(
@@ -4125,7 +4456,7 @@ fun NotificationsPanel(
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 2, totalItems = 4, enabled = hasPermission) {
             ToggleCard(
                 title = LocalStrings.current["notifications.reminders"].ifEmpty { "REMINDERS" },
-                description = if (currentRenderer == "OpenGL") "You're on OpenGL right now — reminder is active" else "Sends an alert if you switch to OpenGL and forget to switch back",
+                description = if (currentRenderer == "OpenGL") tr("text_catalog.you_re_on_opengl_right_now_reminder_is_active", "You're on OpenGL right now — reminder is active") else tr("notifications.reminders_off_desc", "Sends an alert if you switch to OpenGL and forget to switch back"),
                 checked = notificationsEnabled, onCheckedChange = onNotificationsEnabledChange,
                 colors = colors, cardBackground = cardBackground, isSmallScreen = isSmallScreen,
                 oledMode = oledMode, enabled = hasPermission
@@ -4531,7 +4862,7 @@ fun CrashLogPanel(
         CrashDetailPanel(
             visible       = isThisOpen,
             onDismiss     = { openedEntryKey = null },
-            title         = "GAMA LOG #${(idx + 1).toString().padStart(3, '0')}",
+            title         = "${LocalStrings.current["crash_log.gama_section"].ifEmpty { "GAMA LOGS" }.removeSuffix("S")} #${(idx + 1).toString().padStart(3, '0')}",
             date          = crashDateFromTimestamp(entry.timestamp),
             time          = crashTimeFromTimestamp(entry.timestamp),
             fullText      = entry.fullText,
@@ -4549,7 +4880,7 @@ fun CrashLogPanel(
         CrashDetailPanel(
             visible       = isThisOpen,
             onDismiss     = { openedEntryKey = null },
-            title         = "SYSTEM LOG #${(idx + 1).toString().padStart(3, '0')}",
+            title         = "${LocalStrings.current["crash_log.system_section"].ifEmpty { "SYSTEM LOGS" }.removeSuffix("S")} #${(idx + 1).toString().padStart(3, '0')}",
             date          = crashDateFromMillis(entry.timeMillis),
             time          = crashTimeFromMillis(entry.timeMillis),
             fullText      = entry.fullText,
@@ -4625,7 +4956,7 @@ fun CrashLogPanel(
                 // staggerIndex: header=0, cards start at 1
                 AnimatedElement(visible = listItemsVisible, staggerIndex = idx + 1, totalItems = totalListItems) {
                     CrashLogEntryCard(
-                        title = "GAMA LOG #${(idx + 1).toString().padStart(3, '0')}",
+                        title = "${LocalStrings.current["crash_log.gama_section"].ifEmpty { "GAMA LOGS" }.removeSuffix("S")} #${(idx + 1).toString().padStart(3, '0')}",
                         sourceLabel = "APP CRASH • ${entry.thread.uppercase()}",
                         date = crashDateFromTimestamp(entry.timestamp),
                         time = crashTimeFromTimestamp(entry.timestamp),
@@ -4730,7 +5061,7 @@ fun CrashLogPanel(
                         totalItems   = totalListItems
                     ) {
                         CrashLogEntryCard(
-                            title = "SYSTEM LOG #${(idx + 1).toString().padStart(3, '0')}",
+                            title = "${LocalStrings.current["crash_log.system_section"].ifEmpty { "SYSTEM LOGS" }.removeSuffix("S")} #${(idx + 1).toString().padStart(3, '0')}",
                             sourceLabel = entry.tag.uppercase(),
                             date = crashDateFromMillis(entry.timeMillis),
                             time = crashTimeFromMillis(entry.timeMillis),
@@ -4882,7 +5213,7 @@ fun DeveloperPanel(
         isLandscape = isLandscape, isSmallScreen = isSmallScreen,
         oledMode = oledMode, colors = colors
     ) { _ ->
-        CleanTitle(text = "DEVELOPER", fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
+        CleanTitle(text = LocalStrings.current["text_catalog.developer"].ifEmpty { "DEVELOPER" }, fontSize = if (isLandscape) ts.displayMedium else ts.displayLarge, colors = colors)
 
         PanelCaption(
             text = LocalStrings.current["renderer.verbose_mode_desc"].ifEmpty { "A little playground for testing things" },
@@ -4904,7 +5235,7 @@ fun DeveloperPanel(
         AnimatedElement(visible = visible, cardShadow = true, staggerIndex = 3, totalItems = 4) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "TIME OFFSET: ${if (timeOffsetHours >= 0) "+" else ""}${timeOffsetHours.toInt()}h",
+                    text = "${LocalStrings.current["text_catalog.time_offset_label"].ifEmpty { "TIME OFFSET:" }} ${if (timeOffsetHours >= 0) "+" else ""}${timeOffsetHours.toInt()}h",
                     fontSize = ts.labelLarge, fontWeight = FontWeight.Bold,
                     letterSpacing = 2.sp, fontFamily = quicksandFontFamily,
                     color = colors.primaryAccent.copy(alpha = 0.7f)
@@ -4971,7 +5302,8 @@ fun ResourcesPanel(
     PanelScaffold(
         visible = visible, onDismiss = onDismiss,
         isLandscape = isLandscape, isSmallScreen = isSmallScreen,
-        isBlurred = isBlurred, oledMode = oledMode, colors = colors
+        isBlurred = isBlurred, oledMode = oledMode, colors = colors,
+        rootExitCascade = true,
     ) { scrollState ->
         CleanTitle(
             text = LocalStrings.current["resources.title"].ifEmpty { "RESOURCES" },
@@ -5070,7 +5402,8 @@ fun VerbosePanel(
     PanelScaffold(
         visible = visible, onDismiss = onDismiss,
         isLandscape = false, isSmallScreen = isSmallScreen,
-        oledMode = oledMode, colors = colors
+        oledMode = oledMode, colors = colors,
+        rootExitCascade = true,
     ) { _ ->
         CleanTitle(text = LocalStrings.current["renderer.verbose_mode"].ifEmpty { "VERBOSE OUTPUT" }, fontSize = ts.displaySmall, colors = colors)
 
@@ -5101,7 +5434,7 @@ fun VerbosePanel(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "SHELL OUTPUT",
+                            text = LocalStrings.current["text_catalog.shell_output"].ifEmpty { "SHELL OUTPUT" },
                             fontSize = ts.bodySmall,
                             fontFamily = quicksandFontFamily,
                             fontWeight = FontWeight.Bold,
@@ -5109,7 +5442,7 @@ fun VerbosePanel(
                             color = colors.primaryAccent.copy(alpha = 0.85f)
                         )
                         Text(
-                            text = "${verboseOutput.lines().filter { it.isNotBlank() }.size} LINES",
+                            text = "${verboseOutput.lines().filter { it.isNotBlank() }.size} ${LocalStrings.current["text_catalog.lines_suffix"].ifEmpty { "LINES" }}",
                             fontSize = ts.bodySmall,
                             fontFamily = quicksandFontFamily,
                             fontWeight = FontWeight.Bold,
@@ -5661,7 +5994,7 @@ fun MatrixAppearancePanel(
                             fontSize = ts.bodySmall, color = colors.textSecondary,
                             fontFamily = quicksandFontFamily, fontWeight = FontWeight.Bold)
                         GlideOptionSelector(
-                            options = listOf("Small", "Medium", "Large"),
+                            options = listOf(tr("text_catalog.small", "Small"), tr("particles.sensitivity_medium", "Medium"), tr("text_catalog.large", "Large")),
                             selectedIndex = matrixFontSize.coerceIn(0, 2),
                             onOptionSelected = { performHaptic(); onMatrixFontSizeChange(it) },
                             colors = colors, modifier = Modifier.fillMaxWidth(), enabled = enabled
@@ -5739,7 +6072,7 @@ fun MatrixMotionPanel(
                             fontSize = ts.bodySmall, color = colors.textSecondary,
                             fontFamily = quicksandFontFamily, fontWeight = FontWeight.Bold)
                         GlideOptionSelector(
-                            options = listOf("Slow", "Medium", "Fast"),
+                            options = listOf(tr("particles.speed_slow", "Slow"), tr("particles.speed_medium", "Medium"), tr("particles.speed_fast", "Fast")),
                             selectedIndex = matrixSpeed.coerceIn(0, 2),
                             onOptionSelected = { performHaptic(); onMatrixSpeedChange(it) },
                             colors = colors, modifier = Modifier.fillMaxWidth(), enabled = enabled
@@ -5778,7 +6111,7 @@ fun MatrixMotionPanel(
                             fontSize = ts.bodySmall, color = colors.textSecondary,
                             fontFamily = quicksandFontFamily, fontWeight = FontWeight.Bold)
                         GlideOptionSelector(
-                            options = listOf("Sparse", "Medium", "Dense"),
+                            options = listOf(tr("text_catalog.sparse", "Sparse"), tr("particles.sensitivity_medium", "Medium"), tr("text_catalog.dense", "Dense")),
                             selectedIndex = matrixDensity.coerceIn(0, 2),
                             onOptionSelected = { performHaptic(); onMatrixDensityChange(it) },
                             colors = colors, modifier = Modifier.fillMaxWidth(), enabled = enabled
@@ -5817,7 +6150,7 @@ fun MatrixMotionPanel(
                             fontSize = ts.bodySmall, color = colors.textSecondary,
                             fontFamily = quicksandFontFamily, fontWeight = FontWeight.Bold)
                         GlideOptionSelector(
-                            options = listOf("Short", "Medium", "Full"),
+                            options = listOf(tr("text_catalog.short", "Short"), tr("particles.sensitivity_medium", "Medium"), tr("appearance.anim_full", "Full")),
                             selectedIndex = matrixFadeLength.coerceIn(0, 2),
                             onOptionSelected = { performHaptic(); onMatrixFadeLengthChange(it) },
                             colors = colors, modifier = Modifier.fillMaxWidth(), enabled = enabled

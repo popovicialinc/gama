@@ -205,80 +205,44 @@ fun WarningDialog(
     cardBackground: Color
 ) {
     val ts = LocalTypeScale.current
-    BouncyDialog(
-        visible = visible,
-        onDismiss = onDismiss
-    ) {
+    val dialogShape = RoundedCornerShape(28.dp)
+
+    BouncyDialog(visible = visible, onDismiss = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth(if (isLandscape && !isTablet) 0.6f else 0.9f)
-                .widthIn(max = 500.dp)
+                .widthIn(max = 480.dp)
                 .directionalShadow(cornerRadius = 28.dp)
-                .border(
-                    width = 1.dp,
-                    color = colors.primaryAccent.copy(alpha = 0.55f),
-                    shape = RoundedCornerShape(28.dp)
-                )
-                .pointerInput(Unit) {
-                    detectTapGestures { /* Block taps on card from dismissing dialog */ }
-                },
+                .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), dialogShape)
+                .pointerInput(Unit) { detectTapGestures { } },
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(28.dp),
+            shape = dialogShape,
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(if (isSmallScreen) 22.dp else 28.dp),
+                    .padding(if (isSmallScreen) 22.dp else 26.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 20.dp else 24.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Hourglass / pause icon — conveys "brief wait"
-                Canvas(modifier = Modifier.size(if (isSmallScreen) 56.dp else 64.dp)) {
-                    val s = size.minDimension
-                    val stroke = 3.dp.toPx()
-                    val color = colors.primaryAccent
-                    // Outer circle
-                    drawCircle(color = color, radius = s / 2f, style = Stroke(width = stroke))
-                    // Two horizontal lines (pause symbol)
-                    val barW = s * 0.14f
-                    val barH = s * 0.32f
-                    val cx = s / 2f
-                    val cy = s / 2f
-                    listOf(cx - barW * 1.4f, cx + barW * 0.4f).forEach { x ->
-                        drawRoundRect(
-                            color = color,
-                            topLeft = androidx.compose.ui.geometry.Offset(x, cy - barH / 2f),
-                            size = androidx.compose.ui.geometry.Size(barW, barH),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(barW / 2f),
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = LocalStrings.current["dialogs.warning_title"].ifEmpty { "Just a sec!" },
-                        fontSize = ts.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = quicksandFontFamily,
-                        color = colors.primaryAccent
-                    )
-                }
+                Text(
+                    text = LocalStrings.current["dialogs.warning_title"].ifEmpty { "Just a sec!" },
+                    fontSize = ts.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily,
+                    color = colors.textPrimary,
+                    textAlign = TextAlign.Center
+                )
 
                 Text(
                     text = if (killLauncher)
-                        LocalStrings.current["dialogs.warning_body_with_launcher"]
-                            .ifEmpty { "This will briefly restart System UI, the launcher, and other processes to apply the change. Your device will be back to normal in just a moment." }
+                        LocalStrings.current["dialogs.warning_body_with_launcher"].ifEmpty { "GAMA needs to briefly restart System UI, the launcher, and a few helper processes to apply this change." }
                     else
-                        LocalStrings.current["dialogs.warning_body_no_launcher"]
-                            .ifEmpty { "This will briefly restart System UI and other processes to apply the change. Your device will be back to normal in just a moment." },
+                        LocalStrings.current["dialogs.warning_body_no_launcher"].ifEmpty { "GAMA needs to briefly restart System UI and a few helper processes to apply this change." },
                     fontSize = ts.bodyLarge,
-                    lineHeight = (ts.bodyLarge.value * 1.4f).sp,
-                    color = colors.textPrimary.copy(alpha = 0.85f),
-                    modifier = Modifier.fillMaxWidth(),
+                    lineHeight = (ts.bodyLarge.value * 1.35f).sp,
+                    color = colors.textSecondary,
                     fontFamily = quicksandFontFamily,
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold
@@ -293,7 +257,8 @@ fun WarningDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         colors = colors,
-                        cardBackground = cardBackground
+                        cardBackground = cardBackground,
+                        borderAlphaOverride = 0.55f
                     )
                     DialogButton(
                         text = LocalStrings.current["dialogs.btn_continue"].ifEmpty { "Continue" },
@@ -301,13 +266,15 @@ fun WarningDialog(
                         modifier = Modifier.weight(1f),
                         colors = colors,
                         cardBackground = cardBackground,
-                        accent = true
+                        accent = true,
+                        borderAlphaOverride = 0.55f
                     )
                 }
             }
         }
     }
 }
+
 
 // NEW: Success Dialog
 @Composable
@@ -1227,73 +1194,30 @@ fun GPUWatchConfirmDialog(
     isSmallScreen: Boolean,
     colors: ThemeColors,
     cardBackground: Color,
-    oledMode: Boolean = false // Added
+    oledMode: Boolean = false
 ) {
     val ts = LocalTypeScale.current
-    BouncyDialog(
-        visible = visible,
-        onDismiss = onDismiss
-    ) {
+    val dialogShape = RoundedCornerShape(28.dp)
+
+    BouncyDialog(visible = visible, onDismiss = onDismiss) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.85f)
+                .fillMaxWidth(0.88f)
                 .widthIn(max = 450.dp)
-                .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), RoundedCornerShape(40.dp)),
+                .directionalShadow(cornerRadius = 28.dp)
+                .border(1.dp, colors.primaryAccent.copy(alpha = 0.55f), dialogShape)
+                .pointerInput(Unit) { detectTapGestures { } },
             colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = RoundedCornerShape(28.dp),
+            shape = dialogShape,
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(if (isSmallScreen) 24.dp else 28.dp),
+                    .padding(if (isSmallScreen) 22.dp else 26.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Modified: Terminal/Code Icon instead of Gear
-                Canvas(modifier = Modifier.size(80.dp)) {
-                    val strokeWidth = 4.dp.toPx()
-                    val cornerRadius = 12.dp.toPx()
-
-                    // Draw outer window rectangle
-                    drawRoundRect(
-                        color = colors.primaryAccent,
-                        topLeft = Offset(size.width * 0.15f, size.height * 0.2f),
-                        size = Size(size.width * 0.7f, size.height * 0.6f),
-                        cornerRadius = CornerRadius(cornerRadius, cornerRadius),
-                        style = Stroke(width = strokeWidth)
-                    )
-
-                    // Draw window header line
-                    drawLine(
-                        color = colors.primaryAccent,
-                        start = Offset(size.width * 0.15f, size.height * 0.35f),
-                        end = Offset(size.width * 0.85f, size.height * 0.35f),
-                        strokeWidth = strokeWidth
-                    )
-
-                    // Draw ">" prompt
-                    val promptPath = Path().apply {
-                        moveTo(size.width * 0.3f, size.height * 0.45f)
-                        lineTo(size.width * 0.4f, size.height * 0.55f)
-                        lineTo(size.width * 0.3f, size.height * 0.65f)
-                    }
-                    drawPath(
-                        path = promptPath,
-                        color = colors.primaryAccent,
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
-                    )
-
-                    // Draw "_" cursor
-                    drawLine(
-                        color = colors.primaryAccent,
-                        start = Offset(size.width * 0.45f, size.height * 0.65f),
-                        end = Offset(size.width * 0.55f, size.height * 0.65f),
-                        strokeWidth = strokeWidth,
-                        cap = StrokeCap.Round
-                    )
-                }
-
                 Text(
                     text = LocalStrings.current["dialogs.gpuwatch_title"].ifEmpty { "Open GPUWatch" },
                     fontSize = ts.headlineMedium,
@@ -1304,12 +1228,13 @@ fun GPUWatchConfirmDialog(
                 )
 
                 Text(
-                    text = LocalStrings.current["dialogs.gpuwatch_body"].ifEmpty { "GAMA can't open GPUWatch directly. You will be taken to Developer Options where you can find and enable 'GPUWatch' yourself." },
-                    fontSize = ts.labelLarge,
+                    text = LocalStrings.current["dialogs.gpuwatch_body"].ifEmpty { "GAMA cannot open GPUWatch directly. It will open Developer Options, where you can enable GPUWatch yourself." },
+                    fontSize = ts.bodyLarge,
                     color = colors.textSecondary,
                     fontFamily = quicksandFontFamily,
                     textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold // Force Bold
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = (ts.bodyLarge.value * 1.35f).sp
                 )
 
                 Row(
@@ -1323,7 +1248,8 @@ fun GPUWatchConfirmDialog(
                         colors = colors,
                         cardBackground = cardBackground,
                         accent = false,
-                        oledMode = oledMode
+                        oledMode = oledMode,
+                        borderAlphaOverride = 0.55f
                     )
                     DialogButton(
                         text = LocalStrings.current["dialogs.btn_open"].ifEmpty { "Open" },
@@ -1332,12 +1258,14 @@ fun GPUWatchConfirmDialog(
                         colors = colors,
                         cardBackground = cardBackground,
                         accent = true,
-                        oledMode = oledMode
+                        oledMode = oledMode,
+                        borderAlphaOverride = 0.55f
                     )
                 }
             }
         }
     }
 }
+
 
 // Private helper to get all installed applications

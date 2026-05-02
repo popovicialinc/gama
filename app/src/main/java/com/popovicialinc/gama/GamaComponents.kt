@@ -97,6 +97,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -145,8 +146,11 @@ fun Modifier.pressedAccentOutlineGlow(
 
     val strokePx = strokeWidth.toPx().coerceAtLeast(1f)
     val blurPx = glowRadius.toPx().coerceAtLeast(0f)
-    val inset = (strokePx / 2f + blurPx * 0.28f).coerceAtMost(minOf(size.width, size.height) / 3f)
-    val radiusPx = cornerRadius.toPx().coerceAtMost(minOf(size.width, size.height) / 2f)
+    // Keep the glow centered on the same path as the solid outline.
+    // The previous extra inset pushed the bloom inward and left a tiny dead gap.
+    val inset = (strokePx / 2f).coerceAtMost(minOf(size.width, size.height) / 3f)
+    val radiusPx = (cornerRadius.toPx() - strokePx / 2f).coerceAtLeast(0f)
+        .coerceAtMost(minOf(size.width, size.height) / 2f)
 
     val glowPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         style = android.graphics.Paint.Style.STROKE
@@ -169,9 +173,8 @@ fun Modifier.pressedAccentOutlineGlow(
         )
     }
 
-    // More subtle interior edge spill, clipped to the same rounded shape so the glow
-    // actually matches the card curvature instead of looking boxy in the corners.
-    val innerAlpha = (pressProgress * 0.085f).coerceIn(0f, 0.085f)
+    // Subtle interior spill that starts right at the outline, with no visual gap.
+    val innerAlpha = (pressProgress * 0.060f).coerceIn(0f, 0.060f)
     if (innerAlpha <= 0.002f) return@drawWithContent
 
     val left = inset
@@ -182,8 +185,8 @@ fun Modifier.pressedAccentOutlineGlow(
     val innerHeight = (bottom - top).coerceAtLeast(0f)
     if (innerWidth <= 0f || innerHeight <= 0f) return@drawWithContent
 
-    val edgeHeight = minOf(innerHeight * 0.18f, 18.dp.toPx())
-    val edgeWidth = minOf(innerWidth * 0.14f, 14.dp.toPx())
+    val edgeHeight = minOf(innerHeight * 0.16f, 14.dp.toPx())
+    val edgeWidth = minOf(innerWidth * 0.12f, 12.dp.toPx())
     val innerCorner = (radiusPx - inset).coerceAtLeast(0f)
     val clipShape = Path().apply {
         addRoundRect(
@@ -286,9 +289,9 @@ fun GlideOptionSelector(
     modifier: Modifier = Modifier,
     enabled: Boolean = true // Add enabled parameter
 ) {
+    val density = LocalDensity.current
     val ts = LocalTypeScale.current
     val animLevel = LocalAnimationLevel.current
-    val density = LocalDensity.current
     val viewConfiguration = LocalViewConfiguration.current
 
     val currentOnOptionSelected by rememberUpdatedState(onOptionSelected)
@@ -738,6 +741,11 @@ fun TitleSection(colors: ThemeColors, isSmallScreen: Boolean, isLandscape: Boole
 
 private val LocalStaggerCounter = compositionLocalOf<StaggerCounter?> { null }
 
+// True only for level-1/root panels. Those get the fancy top-to-bottom reverse
+// exit cascade before the panel shell fades. Deeper sub-panels keep the old,
+// faster exit timing so navigation never feels like it is stuck in a cutscene.
+val LocalRootPanelExitCascade = compositionLocalOf { false }
+
 class StaggerCounter {
     private var index = 0
     private var total = 0
@@ -770,8 +778,10 @@ fun AnimatedElement(
     modifier: Modifier = Modifier,
     cardShadow: Boolean = false,  // true = draw directional shadow (cards only, not buttons/text)
     enabled: Boolean = true,      // false = suppress shadow with ease-in-out animation
+    avoidBackButton: Boolean = false, // true = use the floating < avoidance layout without drawing wrapper shadow
     content: @Composable () -> Unit
 ) {
+    val density = LocalDensity.current
     val staggerCounter = LocalStaggerCounter.current
     val resolvedIndex = if (staggerIndex >= 0) staggerIndex
                         else staggerCounter?.next() ?: 0
@@ -779,15 +789,17 @@ fun AnimatedElement(
                         else staggerCounter?.total() ?: 0
     val animationLevel = LocalAnimationLevel.current
     val staggerEnabled = LocalStaggerEnabled.current
+    val rootPanelExitCascade = LocalRootPanelExitCascade.current
     val view = LocalView.current
-    val density = LocalDensity.current
     val context = LocalContext.current
     val backButtonAvoidance = LocalFloatingBackButtonAvoidance.current
     val backButtonInversed = LocalBackButtonInversed.current
     var overlapsFloatingBackButton by remember { mutableStateOf(false) }
     var lastAvoidanceHapticAtMs by remember { mutableStateOf(0L) }
+    val shouldAvoidBackButton = cardShadow || avoidBackButton
+
     val avoidEndPadding by animateDpAsState(
-        targetValue = if (cardShadow && backButtonAvoidance.enabled && overlapsFloatingBackButton)
+        targetValue = if (shouldAvoidBackButton && backButtonAvoidance.enabled && overlapsFloatingBackButton)
             backButtonAvoidance.endPadding
         else 0.dp,
         animationSpec = when (animationLevel) {
@@ -845,18 +857,26 @@ fun AnimatedElement(
                 progress.animateTo(targetValue = 1f, animationSpec = enterSpec)
             }
         } else {
-            if (resolvedTotal > 0 && resolvedIndex > 0 && animationLevel != 2 && staggerEnabled) {
-                delay((resolvedTotal - resolvedIndex) * 40L)
+            if (resolvedIndex > 0 && animationLevel != 2 && staggerEnabled) {
+                if (rootPanelExitCascade) {
+                    // Level-1/root panels: cinematic reverse stagger. Top chrome exits
+                    // first, lower cards follow, then the panel shell fades.
+                    delay(resolvedIndex * 18L)
+                } else if (resolvedTotal > 0) {
+                    // Deeper sub-panels: old style. Faster and less ceremonial, so
+                    // drilling in/out of menus feels immediate.
+                    delay((resolvedTotal - resolvedIndex) * 22L)
+                }
             }
             localVisible = false
             if (animationLevel == 2) {
                 progress.snapTo(0f)
             } else {
-                // Exit: swift, decisive. Items don't linger — they depart with purpose.
+                // Exit: quicker than the previous pass, but still visually readable.
                 progress.animateTo(
                     targetValue = 0f,
                     animationSpec = tween(
-                        durationMillis = if (animationLevel == 0) 200 else 150,
+                        durationMillis = if (animationLevel == 0) 120 else 85,
                         easing = MotionTokens.Easing.exit
                     )
                 )
@@ -870,7 +890,7 @@ fun AnimatedElement(
         LocalCardProgress provides progress.value,
         LocalCardEnabled  provides enabled
     ) {
-        val avoidanceModifier = if (cardShadow && backButtonAvoidance.enabled) {
+        val avoidanceModifier = if (shouldAvoidBackButton && backButtonAvoidance.enabled) {
             Modifier.onGloballyPositioned { coordinates ->
                 val position = coordinates.positionInWindow()
                 val itemTop = position.y
@@ -941,22 +961,27 @@ fun Modifier.directionalShadow(
     dx: Dp = 4.dp,
     dy: Dp = 6.dp,
     blurRadius: Dp = 12.dp,
-    cornerRadius: Dp = 18.dp
+    cornerRadius: Dp = 28.dp,
+    deferUntilSettled: Boolean = false
 ): Modifier = composed {
     val density = LocalDensity.current
     val shadowsEnabled = LocalShadowsEnabled.current
     val cardProgress   = LocalCardProgress.current
+    val cardSettled    = LocalCardSettled.current
     val cardEnabled    = LocalCardEnabled.current
-    val density        = LocalDensity.current
     val dxPx           = with(density) { dx.toPx() }
     val dyPx           = with(density) { dy.toPx() }
     val blurPx         = with(density) { blurRadius.toPx() }
     val cornerPx       = with(density) { cornerRadius.toPx() }
 
-    // Animate shadow opacity when enabled/disabled — ease-in-out so it doesn't snap.
+    // Enabled cards may ease shadows in, but disabled cards lose shadows immediately.
     val enabledAlpha by animateFloatAsState(
         targetValue = if (cardEnabled) 1f else 0f,
-        animationSpec = tween(durationMillis = 280, easing = MotionTokens.Easing.velvet),
+        animationSpec = if (cardEnabled) {
+            tween(durationMillis = 180, easing = MotionTokens.Easing.velvet)
+        } else {
+            snap()
+        },
         label = "shadowEnabledAlpha"
     )
 
@@ -965,6 +990,20 @@ fun Modifier.directionalShadow(
         targetValue = if (shadowsEnabled) 1f else 0f,
         animationSpec = tween(durationMillis = 600, easing = LinearOutSlowInEasing),
         label = "shadowsToggleAlpha"
+    )
+
+    // Search/global result cards cannot draw their shadow while the parent card is
+    // scaling, because Android briefly rasterizes that blurred layer as a box.
+    // But snapping the shadow on after settle looks cheap. So for deferred cards,
+    // keep the shadow fully hidden during movement, then ease it in after landing.
+    val settledShadowAlpha by animateFloatAsState(
+        targetValue = if (!deferUntilSettled || cardSettled) 1f else 0f,
+        animationSpec = if (!deferUntilSettled || cardSettled) {
+            tween(durationMillis = 190, easing = FastOutSlowInEasing)
+        } else {
+            snap()
+        },
+        label = "settledShadowAlpha"
     )
 
     // ── Cached native objects — allocated ONCE, never per frame ──────────────
@@ -987,18 +1026,30 @@ fun Modifier.directionalShadow(
 
     drawBehind {
         if (cardProgress <= 0f || enabledAlpha <= 0f || shadowsAlpha <= 0f) return@drawBehind
-        val fraction = (cardProgress * cardProgress * enabledAlpha * shadowsAlpha).coerceIn(0f, 1f)
+
+        // Search/global result cards animate inside a scaled parent. Drawing the
+        // native blurred shadow during that scale transition can make Android
+        // briefly rasterize the blur against rectangular layer bounds. For those
+        // cards, the card body performs the stagger first, then the final rounded
+        // shadow eases in after landing. Regular panels keep the normal progressive
+        // shadow fade that follows cardProgress.
+        val motionProgress = if (deferUntilSettled) settledShadowAlpha else cardProgress
+        val fraction = (motionProgress * motionProgress * enabledAlpha * shadowsAlpha).coerceIn(0f, 1f)
+        if (fraction <= 0.001f) return@drawBehind
 
         // Only rebuild BlurMaskFilter when the effective blur radius changes.
         // Because fraction animates smoothly this will update on most frames, BUT
         // BlurMaskFilter on Android is resolved to a fixed-radius GPU convolution at
         // draw time — rebuilding it is cheap (~microseconds) compared to the old
         // approach of also constructing a new Paint every frame.
-        val newBlurFraction = blurPx * fraction
+        // Keep blur radius stable while alpha fades in. Animating blur from ~0 made
+        // newly appearing result cards briefly draw a hard, boxy shadow before it
+        // softened into the real rounded card shadow.
+        val newBlurFraction = blurPx
         if (newBlurFraction != cachedBlurFraction) {
             cachedBlurFraction = newBlurFraction
             cachedShadowPaint.maskFilter = BlurMaskFilter(
-                newBlurFraction.coerceAtLeast(0.1f), BlurMaskFilter.Blur.NORMAL
+                newBlurFraction.coerceAtLeast(1f), BlurMaskFilter.Blur.NORMAL
             )
         }
 
@@ -1009,11 +1060,17 @@ fun Modifier.directionalShadow(
         cachedShadowPaint.color = shadowArgb
 
         drawIntoCanvas { canvas ->
+            // Keep the shadow geometry completely stable during card enter/exit.
+            // Animating the shadow rect/offset together with alpha looked fine at
+            // the first and last frames, but in the middle Android would briefly
+            // rasterize the blur against the layer bounds and the shadow looked
+            // square-ish. Only alpha animates now; the rounded shadow shape stays
+            // locked to the final card shape for the entire stagger.
             canvas.nativeCanvas.drawRoundRect(
-                dxPx * fraction,
-                dyPx * fraction,
-                size.width  + dxPx * fraction,
-                size.height + dyPx * fraction,
+                dxPx,
+                dyPx,
+                size.width + dxPx,
+                size.height + dyPx,
                 cornerPx, cornerPx,
                 cachedShadowPaint
             )
@@ -1068,7 +1125,7 @@ fun SettingsNavigationCard(
         }
     }
     val p = pressProgress.value
-    val pressScale = 1f - p * (1f - MotionTokens.Scale.subtle)
+    val pressScale = 1f - p * 0.070f
     val chevronScaleVal = 1f + p * 0.18f
     val chevronAlphaVal = 0.55f + p * 0.45f
     val borderWidthVal = (if (oledMode) 0.75f else 1f) + p * (if (oledMode) 0.75f else 1f)
@@ -1141,7 +1198,8 @@ fun SettingsNavigationCard(
                         fontSize = ts.labelLarge,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 2.sp,
-                        fontFamily = quicksandFontFamily
+                        fontFamily = quicksandFontFamily,
+                        modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     androidx.compose.animation.AnimatedContent(
@@ -1159,7 +1217,8 @@ fun SettingsNavigationCard(
                             color = colors.textSecondary,
                             fontSize = ts.bodyMedium,
                             fontFamily = quicksandFontFamily,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -1208,10 +1267,10 @@ fun FlatButton(
     oledMode: Boolean = false,
     cornerRadius: Dp = 28.dp
 ) {
+    val density = LocalDensity.current
     val animLevel = LocalAnimationLevel.current
     val context = LocalContext.current
     val view = LocalView.current
-    val density = LocalDensity.current
     val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
 
     val baseHeight = if (isSmallScreen) 54.dp else 58.dp
@@ -1271,7 +1330,7 @@ fun FlatButton(
 
     // Outer Box: handles layout sizing (modifier carries weight/fill/etc.) — never scaled
     Box(
-        modifier = modifier.height(baseHeight),
+        modifier = modifier.heightIn(min = baseHeight),
         contentAlignment = Alignment.Center
     ) {
         // Neon border glow — previously a Modifier.blur(9dp) Box (= full RenderEffect per button).
@@ -1321,13 +1380,16 @@ fun FlatButton(
                 fontWeight = FontWeight.Bold,
                 color = animatedTextColor,
                 fontFamily = quicksandFontFamily,
-                maxLines = maxLines,
+                maxLines = maxLines.coerceAtLeast(3),
                 textAlign = TextAlign.Center,
-                modifier = Modifier.graphicsLayer(
-                    scaleX = textScale,
-                    scaleY = textScale,
-                    translationY = textTranslateY
-                )
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .graphicsLayer(
+                        scaleX = textScale,
+                        scaleY = textScale,
+                        translationY = textTranslateY
+                    )
             )
         }
     }
@@ -1400,13 +1462,10 @@ private fun MainMenuPressShell(
                 clip = false
             )
             .then(if (semanticsLabel != null) Modifier.semantics(mergeDescendants = true) { contentDescription = semanticsLabel } else Modifier)
-            .pressedAccentOutlineGlow(
-                pressProgress = p,
-                color = colors.primaryAccent,
-                cornerRadius = 28.dp,
-                strokeWidth = borderWidth,
-                glowRadius = 11.dp
-            )
+            // Do NOT use the blurred outline glow on the main menu shell.
+            // On these larger nested cards the blur layer can read as a rectangular
+            // box around the rounded button. Keep the main menu clean: crisp outline,
+            // clipped press tint inside the real rounded shape.
             .border(width = borderWidth, color = borderColor, shape = shape),
         contentAlignment = contentAlignment
     ) {
@@ -1414,8 +1473,37 @@ private fun MainMenuPressShell(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(shape)
+                // Clipped glow: this keeps the held glow, but forces it to respect
+                // the actual rounded button shape instead of drawing a rectangular
+                // blur layer around the main menu card.
+                .pressedAccentOutlineGlow(
+                    pressProgress = p,
+                    color = colors.primaryAccent,
+                    cornerRadius = 28.dp,
+                    strokeWidth = borderWidth,
+                    glowRadius = 8.dp,
+                    maxAlpha = 0.34f
+                )
                 .background(cardBackground)
-                .background(colors.primaryAccent.copy(alpha = if (enabled) p * 0.10f else 0f))
+                .background(colors.primaryAccent.copy(alpha = if (enabled) p * 0.09f else 0f))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            colors.primaryAccent.copy(alpha = if (enabled) p * 0.055f else 0f),
+                            Color.Transparent,
+                            colors.primaryAccent.copy(alpha = if (enabled) p * 0.040f else 0f)
+                        )
+                    )
+                )
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            colors.primaryAccent.copy(alpha = if (enabled) p * 0.045f else 0f),
+                            Color.Transparent,
+                            colors.primaryAccent.copy(alpha = if (enabled) p * 0.035f else 0f)
+                        )
+                    )
+                )
                 .then(
                     if (enabled) Modifier.pointerInput(enabled, onClick, hapticStyle) {
                         detectTapGestures(
@@ -1452,17 +1540,21 @@ fun IllustratedButton(
     oledMode: Boolean = false,
     iconType: String   // "vulkan" | "opengl" | "resources" | "gpuwatch"
 ) {
-    val configuration = LocalConfiguration.current
     val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
     val isSmallScreen = configuration.screenWidthDp.dp < 360.dp
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val screenMinDp = minOf(configuration.screenWidthDp, configuration.screenHeightDp)
     val ts = LocalTypeScale.current
 
+    val isUtilityButton = iconType == "resources" || iconType == "gpuwatch"
     val baseHeight = when {
-        isSmallScreen -> 46.dp
-        isLandscape   -> (screenMinDp * 0.125f).dp.coerceIn(44.dp, 54.dp)
-        else          -> (screenMinDp * 0.145f).dp.coerceIn(54.dp, 68.dp)
+        isUtilityButton && isSmallScreen -> 54.dp
+        isUtilityButton && isLandscape   -> (screenMinDp * 0.115f).dp.coerceIn(50.dp, 58.dp)
+        isUtilityButton                  -> (screenMinDp * 0.135f).dp.coerceIn(58.dp, 66.dp)
+        isSmallScreen                    -> 46.dp
+        isLandscape                      -> (screenMinDp * 0.125f).dp.coerceIn(44.dp, 54.dp)
+        else                             -> (screenMinDp * 0.145f).dp.coerceIn(54.dp, 68.dp)
     }
     val cornerRadius = (baseHeight.value * 0.48f).dp.coerceIn(22.dp, 32.dp)
     val shape = RoundedCornerShape(cornerRadius)
@@ -1496,7 +1588,7 @@ fun IllustratedButton(
     MainMenuPressShell(
         modifier = modifier
             .fillMaxWidth()
-            .height(baseHeight),
+            .then(if (isUtilityButton) Modifier.height(baseHeight) else Modifier.heightIn(min = baseHeight)),
         enabled = enabled,
         colors = colors,
         cardBackground = baseButtonColor,
@@ -1579,8 +1671,10 @@ fun IllustratedButton(
                 fontWeight = FontWeight.Bold,
                 color = textColor,
                 fontFamily = quicksandFontFamily,
-                maxLines = 1,
-                textAlign = TextAlign.Start
+                maxLines = if (isUtilityButton) 1 else 3,
+                overflow = if (isUtilityButton) TextOverflow.Ellipsis else TextOverflow.Clip,
+                textAlign = if (isUtilityButton) TextAlign.Center else TextAlign.Start,
+                modifier = if (isUtilityButton) Modifier else Modifier.weight(1f)
             )
         }
     }
@@ -1687,9 +1781,9 @@ fun BigRendererButton(
     oledMode: Boolean = false,
     iconType: String
 ) {
+    val density = LocalDensity.current
     val ts = LocalTypeScale.current
     val configuration = LocalConfiguration.current
-    val density = LocalDensity.current
     val isSmallScreen = configuration.screenWidthDp.dp < 360.dp
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val screenMinDp = minOf(configuration.screenWidthDp, configuration.screenHeightDp)
@@ -1788,8 +1882,9 @@ fun BigRendererButton(
                     fontSize = ts.buttonLarge,
                     fontWeight = FontWeight.Bold,
                     fontFamily = quicksandFontFamily,
-                    maxLines = 1,
-                    textAlign = TextAlign.Center
+                    maxLines = 3,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
@@ -2150,11 +2245,11 @@ fun RendererCard(
     rendererLoading: Boolean = false,
     lastSwitchTime: Long = 0L  // epoch millis; 0 means never recorded
 ) {
+    val density = LocalDensity.current
     val ts = LocalTypeScale.current
     val animLevel = LocalAnimationLevel.current
     val context = LocalContext.current
     val view = LocalView.current
-    val density = LocalDensity.current
     val strings = LocalStrings.current
     val configuration = LocalConfiguration.current
     val isLandscape   = configuration.screenWidthDp > configuration.screenHeightDp
@@ -2245,8 +2340,8 @@ fun RendererCard(
     // Border width follows the same single press progress as the scale, exactly like SettingsNavigationCard.
     val rendererCardRestBorderWidth = if (oledMode) 0.75f else 1f
     val borderWidth = when {
-        !shizukuReady -> 2.dp
-        else          -> (rendererCardRestBorderWidth + rcp * 2.25f).dp
+        !shizukuReady -> 1.5.dp
+        else          -> (rendererCardRestBorderWidth + rcp * 0.65f).dp
     }
     val rendererCardPressedTintAlpha = if (shizukuReady) rcp * 0.08f else 0f
 
@@ -2547,17 +2642,27 @@ fun CompactColorPickerCard(
     advancedPicker: Boolean = false,
     enabled: Boolean = true,
     oledMode: Boolean = false,
+    filterExtremeForTheme: Boolean = false,
+    isDarkTheme: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val ts = LocalTypeScale.current
-    val presetColors = listOf(
+    val animLevel = LocalAnimationLevel.current
+
+    val allPresetColors = listOf(
         Color(0xFF4895EF), Color(0xFF2563EB), Color(0xFF7C3AED),
         Color(0xFFEC4899), Color(0xFFEF4444), Color(0xFFF59E0B),
         Color(0xFF10B981), Color(0xFF06B6D4), Color(0xFF8B5CF6),
         Color.White, Color.Black
     )
+    val presetColors = remember(filterExtremeForTheme, isDarkTheme) {
+        if (!filterExtremeForTheme) allPresetColors
+        else allPresetColors.filterNot {
+            (isDarkTheme && it.toArgb() == Color.Black.toArgb()) ||
+            (!isDarkTheme && it.toArgb() == Color.White.toArgb())
+        }
+    }
 
-    // Hex input state — initialised from the current color
     fun Color.toHexString(): String {
         val r = (red * 255).toInt()
         val g = (green * 255).toInt()
@@ -2568,246 +2673,154 @@ fun CompactColorPickerCard(
     var hexInput by remember(currentColor) { mutableStateOf(currentColor.toHexString()) }
     var hexError by remember { mutableStateOf(false) }
 
-    // Border color comes directly from the already-animated colors.* — no local tween needed
-    val cardBorderColor = colors.primaryAccent.copy(alpha = if (enabled) 0.55f else 0.25f)
+    val cardShape = RoundedCornerShape(28.dp)
+    val cardScale by animateFloatAsState(
+        targetValue = if (enabled) 1f else 0.92f,
+        animationSpec = if (animLevel == 2) snap() else tween(260, easing = MotionTokens.Easing.emphasized),
+        label = "accent_card_scale"
+    )
+    val cardAlpha by animateFloatAsState(
+        targetValue = if (enabled) 1f else 0.38f,
+        animationSpec = tween(260, easing = MotionTokens.Easing.emphasized),
+        label = "accent_card_alpha"
+    )
 
-    val colorCardShape = RoundedCornerShape(28.dp)
-    val colorCardScale by animateFloatAsState(
-        targetValue = if (enabled) 1f else 0.88f,
-        animationSpec = if (LocalAnimationLevel.current == 1) tween(360, easing = MotionTokens.Easing.emphasized) else spring(
-            dampingRatio = MotionTokens.Springs.balanced.dampingRatio,
-            stiffness = MotionTokens.Springs.balanced.stiffness
-        ),
-        label = "color_card_scale"
-    )
-    val colorCardAlpha by animateFloatAsState(
-        targetValue = if (enabled) 1f else 0.32f,
-        animationSpec = tween(durationMillis = 360, easing = MotionTokens.Easing.emphasized),
-        label = "color_card_alpha"
-    )
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .graphicsLayer(scaleX = colorCardScale, scaleY = colorCardScale)
-            .clip(colorCardShape)
-            .border(width = 1.dp, color = cardBorderColor, shape = colorCardShape)
+            .graphicsLayer(scaleX = cardScale, scaleY = cardScale, alpha = cardAlpha)
+            .clip(cardShape)
+            .background(cardBackground)
+            .border(1.dp, colors.primaryAccent.copy(alpha = if (enabled) 0.50f else 0.24f), cardShape)
     ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // Blurred border overlay removed for performance (one RenderEffect per card was the main overdraw culprit).
-        }
-        Card(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .animateContentSize(
-                    animationSpec = tween(
-                        durationMillis = 560,
-                        easing = MotionTokens.Easing.velvet
-                    )
+                    animationSpec = tween(durationMillis = 560, easing = MotionTokens.Easing.velvet)
                 )
-                .graphicsLayer(alpha = colorCardAlpha)
-                .then(if (!enabled) Modifier.pointerInput(enabled) {
-                    // Intercept taps only — vertical scroll events pass through to parent scrollable
-                    detectTapGestures { }
-                } else Modifier),
-            colors = CardDefaults.cardColors(containerColor = cardBackground),
-            shape = colorCardShape,
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                .then(if (!enabled) Modifier.pointerInput(enabled) { detectTapGestures { } } else Modifier)
+                .padding(if (isSmallScreen) 18.dp else 22.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Left accent bar + content side-by-side using IntrinsicSize.Min
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min),
-                verticalAlignment = Alignment.Top
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Left accent bar — always shown for active color picker cards
-                Box(
-                    modifier = Modifier
-                        .width(3.dp)
-                        .fillMaxHeight()
-                        .background(
-                            color = colors.primaryAccent,
-                            shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
-                        )
+                Text(
+                    text = title,
+                    color = colors.textPrimary,
+                    fontSize = ts.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily
                 )
-                // Content — always uses single-column (portrait) layout inside the card,
-                // regardless of screen orientation. The CARD itself may be in a multi-column
-                // grid (controlled by the caller), but the swatches stay centred and readable.
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(if (isSmallScreen) 20.dp else 24.dp),
-                    horizontalAlignment = Alignment.Start,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Title + description — consistent font size matching ToggleCard / DYNAMIC COLORS
-                    Column(
+                Text(
+                    text = description,
+                    color = colors.textSecondary,
+                    fontSize = ts.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = quicksandFontFamily,
+                    lineHeight = (ts.bodyMedium.value * 1.28f).sp
+                )
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                presetColors.chunked(if (isLandscape) 5 else 5).forEach { rowColors ->
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.Start,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text(
-                            text = title,
-                            color = colors.primaryAccent.copy(alpha = 0.8f),
-                            fontSize = ts.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 2.sp,
+                        rowColors.forEach { color ->
+                            CompactColorBox(
+                                color = color,
+                                isSelected = !advancedPicker && color.toArgb() == currentColor.toArgb(),
+                                onClick = {
+                                    onColorChange(color)
+                                    hexInput = color.toHexString()
+                                    hexError = false
+                                },
+                                colors = colors,
+                                isLandscape = false
+                            )
+                        }
+                    }
+                }
+            }
+
+            AnimatedVisibility(
+                visible = advancedPicker,
+                enter = fadeIn(animationSpec = tween(260, easing = MotionTokens.Easing.velvet)) +
+                    expandVertically(animationSpec = tween(360, easing = MotionTokens.Easing.velvet)),
+                exit = fadeOut(animationSpec = tween(180, easing = MotionTokens.Easing.exit)) +
+                    shrinkVertically(animationSpec = tween(220, easing = MotionTokens.Easing.exit))
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = hexInput,
+                        onValueChange = { input ->
+                            val clean = input.uppercase().replace("#", "").take(6)
+                            hexInput = if (input.startsWith("#")) "#$clean" else "#$clean"
+                            if (clean.length == 6) {
+                                try {
+                                    val parsed = Color(android.graphics.Color.parseColor("#$clean"))
+                                    onColorChange(parsed)
+                                    hexError = false
+                                } catch (_: Exception) {
+                                    hexError = true
+                                }
+                            } else {
+                                hexError = clean.isNotEmpty() && clean.length != 6
+                            }
+                        },
+                        label = {
+                            Text(
+                                text = "Hex Color",
+                                fontFamily = quicksandFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = ts.labelSmall
+                            )
+                        },
+                        singleLine = true,
+                        isError = hexError,
+                        textStyle = androidx.compose.ui.text.TextStyle(
                             fontFamily = quicksandFontFamily,
-                            textAlign = TextAlign.Start
-                        )
+                            fontWeight = FontWeight.Bold
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary,
+                            unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.primaryAccent,
+                            unfocusedBorderColor = colors.border,
+                            errorBorderColor = Color(0xFFEF4444),
+                            cursorColor = colors.primaryAccent,
+                            focusedLabelColor = colors.primaryAccent,
+                            unfocusedLabelColor = colors.textSecondary,
+                            errorLabelColor = Color(0xFFEF4444)
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (hexError) {
                         Text(
-                            text = description,
-                            color = colors.textSecondary,
-                            fontSize = ts.bodyMedium,
+                            text = LocalStrings.current["colors.advanced_picker_desc"].ifEmpty { "Enter a valid 6-digit hex (for example #4895EF)." },
+                            fontSize = ts.labelSmall,
+                            color = Color(0xFFEF4444),
                             fontFamily = quicksandFontFamily,
-                            textAlign = TextAlign.Start,
                             fontWeight = FontWeight.Bold
                         )
                     }
-
-                    // Swatch rows
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.Start,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            presetColors.take(6).forEach { color ->
-                                CompactColorBox(
-                                    color = color,
-                                    isSelected = !advancedPicker && color == currentColor,
-                                    onClick = {
-                                        onColorChange(color)
-                                        hexInput = color.toHexString()
-                                        hexError = false
-                                    },
-                                    colors = colors,
-                                    isLandscape = false
-                                )
-                            }
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            presetColors.drop(6).forEach { color ->
-                                CompactColorBox(
-                                    color = color,
-                                    isSelected = !advancedPicker && color == currentColor,
-                                    onClick = {
-                                        onColorChange(color)
-                                        hexInput = color.toHexString()
-                                        hexError = false
-                                    },
-                                    colors = colors,
-                                    isLandscape = false
-                                )
-                            }
-                        }
-                    }
-
-                    // Hex input — animated in/out when Advanced Color Picker is toggled.
-                    // Also hidden when the card is disabled (e.g. OLED mode disables gradient cards)
-                    // so toggling Advanced Color Picker while in OLED mode has no visible effect here.
-                    AnimatedVisibility(
-                        visible = advancedPicker && enabled,
-                        enter = expandVertically(
-                            animationSpec = tween(520, easing = MotionTokens.Easing.velvet)
-                        ) + fadeIn(animationSpec = tween(360, delayMillis = 90, easing = MotionTokens.Easing.enter)),
-                        exit = shrinkVertically(
-                            animationSpec = tween(380, easing = MotionTokens.Easing.velvet)
-                        ) + fadeOut(animationSpec = tween(220, easing = MotionTokens.Easing.exit))
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Live color preview swatch
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(
-                                        color = try {
-                                            val hex = hexInput.trimStart('#')
-                                            if (hex.length == 6) Color(android.graphics.Color.parseColor("#$hex")) else currentColor
-                                        } catch (e: Exception) { currentColor },
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (hexError) Color(0xFFEF4444) else colors.primaryAccent.copy(alpha = 0.4f),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                            )
-                            OutlinedTextField(
-                                value = hexInput,
-                                onValueChange = { input ->
-                                    hexInput = input
-                                    val clean = input.trimStart('#')
-                                    if (clean.length == 6) {
-                                        try {
-                                            val parsed = Color(android.graphics.Color.parseColor("#$clean"))
-                                            onColorChange(parsed)
-                                            hexError = false
-                                        } catch (e: Exception) {
-                                            hexError = true
-                                        }
-                                    } else {
-                                        hexError = clean.isNotEmpty() && clean.length != 6
-                                    }
-                                },
-                                label = {
-                                    Text(
-                                        "Hex color",
-                                        fontFamily = quicksandFontFamily,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = ts.labelSmall
-                                    )
-                                },
-                                singleLine = true,
-                                isError = hexError,
-                                textStyle = androidx.compose.ui.text.TextStyle(
-                                    fontFamily = quicksandFontFamily,
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = colors.textPrimary,
-                                    unfocusedTextColor = colors.textPrimary,
-                                    focusedBorderColor = colors.primaryAccent,
-                                    unfocusedBorderColor = if (oledMode) colors.primaryAccent.copy(alpha = 0.5f) else colors.border,
-                                    errorBorderColor = Color(0xFFEF4444),
-                                    cursorColor = colors.primaryAccent,
-                                    focusedLabelColor = colors.primaryAccent,
-                                    unfocusedLabelColor = colors.textSecondary,
-                                    errorLabelColor = Color(0xFFEF4444)
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        if (hexError) {
-                            Text(
-                                text = LocalStrings.current["colors.advanced_picker_desc"].ifEmpty { "Enter a valid 6-digit hex (e.g. #4895EF)" },
-                                fontSize = ts.labelSmall,
-                                color = Color(0xFFEF4444),
-                                fontFamily = quicksandFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Start,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                        } // end Column inside AnimatedVisibility
-                    } // end AnimatedVisibility
                 }
-            } // end accent bar Row
+            }
         }
-    } // end border Box
+    }
 }
+
 
 @Composable
 fun CompactColorBox(
@@ -2817,7 +2830,7 @@ fun CompactColorBox(
     colors: ThemeColors,
     isLandscape: Boolean
 ) {
-    val size = if (isLandscape) 32.dp else 36.dp
+    val size = if (isLandscape) 34.dp else 38.dp
     val animLevel = LocalAnimationLevel.current
     var isPressed by remember { mutableStateOf(false) }
     val pressProgress = remember { Animatable(0f) }
@@ -2826,36 +2839,29 @@ fun CompactColorBox(
             targetValue = if (isPressed) 1f else 0f,
             animationSpec = when (animLevel) {
                 2 -> snap()
-                1 -> tween(durationMillis = 110, easing = MotionTokens.Easing.emphasized)
-                else -> spring(
-                    dampingRatio = if (isPressed) MotionTokens.Springs.pressDown.dampingRatio else MotionTokens.Springs.pressUp.dampingRatio,
-                    stiffness = if (isPressed) MotionTokens.Springs.pressDown.stiffness else MotionTokens.Springs.pressUp.stiffness
-                )
+                1 -> tween(durationMillis = 120, easing = MotionTokens.Easing.emphasized)
+                else -> tween(durationMillis = 180, easing = MotionTokens.Easing.velvet)
             }
         )
     }
     val pp = pressProgress.value
-    val pressScale = 1f - pp * (1f - MotionTokens.Scale.subtle)
+    val scale = if (isSelected) 1.06f - pp * 0.04f else 1f - pp * 0.05f
+    val shape = RoundedCornerShape(12.dp)
 
     Box(
         modifier = Modifier
             .size(size)
-            .graphicsLayer(scaleX = pressScale, scaleY = pressScale)
-            .clip(RoundedCornerShape(8.dp))
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .clip(shape)
             .background(color)
-            .background(colors.primaryAccent.copy(alpha = pp * 0.16f))
+            .background(colors.primaryAccent.copy(alpha = pp * 0.10f))
             .pressedAccentOutlineGlow(
-                pressProgress = pp,
+                pressProgress = if (isSelected) maxOf(pp, 0.55f) else pp,
                 color = colors.primaryAccent,
-                cornerRadius = 8.dp,
-                strokeWidth = if (isSelected) 2.5.dp else 1.dp,
-                glowRadius = 7.dp,
-                maxAlpha = 0.85f
-            )
-            .border(
-                width = if (isSelected) 2.5.dp else 1.dp,
-                color = if (isSelected) colors.primaryAccent else colors.border.copy(alpha = 0.4f + pp * 0.35f),
-                shape = RoundedCornerShape(8.dp)
+                cornerRadius = 12.dp,
+                strokeWidth = 1.4.dp,
+                glowRadius = 6.dp,
+                maxAlpha = if (isSelected) 0.42f else 0.26f
             )
             .pointerInput(Unit) {
                 detectTapGestures(
@@ -2870,27 +2876,23 @@ fun CompactColorBox(
         contentAlignment = Alignment.Center
     ) {
         if (isSelected) {
-            Canvas(modifier = Modifier.size(size * 0.5f)) {
+            Canvas(modifier = Modifier.size(size * 0.45f)) {
                 val strokeWidth = 2.dp.toPx()
                 val checkColor = if (color.luminance() > 0.5f) Color.Black else Color.White
-
                 drawPath(
                     path = Path().apply {
-                        moveTo(this@Canvas.size.width * 0.2f, this@Canvas.size.height * 0.5f)
-                        lineTo(this@Canvas.size.width * 0.4f, this@Canvas.size.height * 0.7f)
-                        lineTo(this@Canvas.size.width * 0.8f, this@Canvas.size.height * 0.3f)
+                        moveTo(this@Canvas.size.width * 0.20f, this@Canvas.size.height * 0.52f)
+                        lineTo(this@Canvas.size.width * 0.40f, this@Canvas.size.height * 0.72f)
+                        lineTo(this@Canvas.size.width * 0.80f, this@Canvas.size.height * 0.30f)
                     },
                     color = checkColor,
-                    style = Stroke(
-                        width = strokeWidth,
-                        cap = StrokeCap.Round,
-                        join = StrokeJoin.Round
-                    )
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
                 )
             }
         }
     }
 }
+
 
 @Composable
 fun CleanTitle(
@@ -3435,6 +3437,7 @@ fun PanelBackButton(
     scrollState: ScrollState? = null,
     modifier: Modifier = Modifier
 ) {
+    val density = LocalDensity.current
     // scrollState is kept as a parameter for future use (e.g. auto-scroll-to-top on tap),
     // but the back button is always rendered regardless of whether the content scrolls.
     // Hiding it when content fits on screen caused panels to have no visible back button
@@ -3443,7 +3446,6 @@ fun PanelBackButton(
     val animLevel = LocalAnimationLevel.current
     val context = LocalContext.current
     val view = LocalView.current
-    val density = LocalDensity.current
     val currentOnClick by rememberUpdatedState(onClick)
     val btnSize  = if (isSmallScreen) 48.dp else 52.dp
     val iconSize = if (isSmallScreen) 22.dp else 26.dp
@@ -3594,11 +3596,11 @@ fun PanelSearchButton(
     enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val density = LocalDensity.current
     val animLevel = LocalAnimationLevel.current
     val strings = LocalStrings.current
     val context = LocalContext.current
     val view = LocalView.current
-    val density = LocalDensity.current
     val currentOnClick by rememberUpdatedState(onClick)
     val btnSize  = if (isSmallScreen) 48.dp else 52.dp
     val iconSize = if (isSmallScreen) 23.dp else 27.dp
@@ -3746,11 +3748,11 @@ fun PanelGlobalButton(
     enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val density = LocalDensity.current
     val animLevel = LocalAnimationLevel.current
     val strings = LocalStrings.current
     val context = LocalContext.current
     val view = LocalView.current
-    val density = LocalDensity.current
     val currentOnClick by rememberUpdatedState(onClick)
     val btnSize  = if (isSmallScreen) 48.dp else 52.dp
     val iconSize = if (isSmallScreen) 24.dp else 28.dp
@@ -3944,12 +3946,12 @@ fun DialogButton(
     oledMode: Boolean = false,
     borderAlphaOverride: Float? = null // when set, rest-state border alpha matches the surrounding card outline
 ) {
+    val density = LocalDensity.current
     val ts = LocalTypeScale.current
     val animLevel = LocalAnimationLevel.current
     var isPressed by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val view = LocalView.current
-    val density = LocalDensity.current
     val isSmallScreen = LocalConfiguration.current.screenWidthDp.dp < 360.dp
     val shape = RoundedCornerShape(28.dp)
 
@@ -4062,6 +4064,7 @@ fun BouncyDialog(
     onDismiss: () -> Unit,
     fullScreen: Boolean = false,
     applyBlur: Boolean = false,
+    exitStartDelayMillis: Int = 0,
     content: @Composable () -> Unit
 ) {
     val animLevel = LocalAnimationLevel.current
@@ -4141,7 +4144,15 @@ fun BouncyDialog(
                 return@LaunchedEffect
             }
 
-            val exitDuration = when (animLevel) { 0 -> 340; else -> 190 }
+            // Root panels may intentionally wait a tiny beat so their foreground
+            // cascade can leave first. Sub-panels pass 0 and use the old fast shell
+            // exit immediately. If the panel is reopened while waiting, LaunchedEffect
+            // cancels this block automatically.
+            if (exitStartDelayMillis > 0) {
+                delay(exitStartDelayMillis.toLong())
+            }
+
+            val exitDuration = when (animLevel) { 0 -> 170; else -> 115 }
 
             scope.launch {
                 animScale.animateTo(
@@ -4152,7 +4163,7 @@ fun BouncyDialog(
 
             animAlpha.animateTo(
                 targetValue = 0f,
-                animationSpec = tween(durationMillis = exitDuration - 30, easing = MotionTokens.Easing.exit)
+                animationSpec = tween(durationMillis = (exitDuration - 20).coerceAtLeast(70), easing = MotionTokens.Easing.exit)
             )
 
             renderContent = false
@@ -4310,7 +4321,7 @@ fun SecondaryIconButton(
                 fontWeight = FontWeight.Bold,
                 fontFamily = quicksandFontFamily,
                 color = colors.textPrimary,
-                maxLines = 1
+                maxLines = 2
             )
         }
     }

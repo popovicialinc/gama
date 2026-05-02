@@ -13,6 +13,9 @@ import android.provider.Settings
 import android.view.HapticFeedbackConstants
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -118,6 +121,14 @@ private fun String.withoutGreetingEmoji(): String = this
 // GamaUI: main composable — state, navigation, layout
 // ============================================================
 
+private fun sanitizeAccentColorForTheme(color: Color, isDarkTheme: Boolean): Color {
+    return when {
+        isDarkTheme && color.toArgb() == Color.Black.toArgb() -> Color.White
+        !isDarkTheme && color.toArgb() == Color.White.toArgb() -> Color.Black
+        else -> color
+    }
+}
+
 @Composable
 fun GamaUI(
     onRequestNotificationPermission: () -> Unit = {},
@@ -132,6 +143,26 @@ fun GamaUI(
     val context = LocalContext.current
     val view = LocalView.current
     val configuration = LocalConfiguration.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    var appInForeground by remember {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START,
+                Lifecycle.Event.ON_RESUME -> appInForeground = true
+                Lifecycle.Event.ON_STOP -> appInForeground = false
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     val screenWidth = configuration.screenWidthDp.dp
     val screenHeight = configuration.screenHeightDp.dp
@@ -277,7 +308,6 @@ fun GamaUI(
     // JNI checkSelfPermission call. DisposableEffect + LifecycleEventObserver is the
     // idiomatic way to run a side-effect tied to a specific lifecycle event.
     val hasNotifPermission = remember { mutableStateOf(ShizukuHelper.hasNotificationPermission(context)) }
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
@@ -521,7 +551,9 @@ fun GamaUI(
     // Dynamic colors
     var useDynamicColor by remember { mutableStateOf(prefs.getBoolean("use_dynamic_color", true)) }
     var advancedColorPicker by remember { mutableStateOf(prefs.getBoolean("advanced_color_picker", false)) }
-    var customAccentColor by remember { mutableStateOf(Color(prefs.getInt("custom_accent", 0xFF4895EF.toInt()))) }
+    var customAccentColor by remember {
+        mutableStateOf(sanitizeAccentColorForTheme(Color(prefs.getInt("custom_accent", 0xFF4895EF.toInt())), false))
+    }
     var customGradientStart by remember { mutableStateOf(Color(prefs.getInt("custom_gradient_start", 0xFF0A2540.toInt()))) }
     var customGradientEnd by remember { mutableStateOf(Color(prefs.getInt("custom_gradient_end", 0xFF000000.toInt()))) }
 
@@ -548,6 +580,14 @@ fun GamaUI(
     // In GAMA, dark mode is OLED mode. There is no separate dark-grey theme anymore.
     // This also makes Auto follow the system: if the phone is in dark mode, GAMA uses pure black.
     val effectiveOledMode = isDarkTheme || oledMode
+
+    LaunchedEffect(effectiveOledMode) {
+        val sanitized = sanitizeAccentColorForTheme(customAccentColor, effectiveOledMode)
+        if (sanitized.toArgb() != customAccentColor.toArgb()) {
+            customAccentColor = sanitized
+            prefs.edit().putInt("custom_accent", sanitized.toArgb()).apply()
+        }
+    }
 
     // Dark/OLED mode uses a pure black background, so card shadows are effectively invisible.
     // Keep the setting honest: if the app enters dark mode, turn CARD SHADOWS off instead of
@@ -659,22 +699,22 @@ fun GamaUI(
 
     val animatedEffectsAccent by animateColorAsState(
         targetValue = targetEffectsAccent,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 760 else 260, easing = MotionTokens.Easing.velvet),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 820 else 340, easing = MotionTokens.Easing.velvet),
         label = "effects_accent_anim"
     )
     val matrixHeadColor by animateColorAsState(
         targetValue = targetMatrixHeadColor,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 760 else 260, easing = MotionTokens.Easing.velvet),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 820 else 340, easing = MotionTokens.Easing.velvet),
         label = "matrix_head_color_anim"
     )
     val matrixRainColor by animateColorAsState(
         targetValue = targetMatrixRainColor,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 760 else 260, easing = MotionTokens.Easing.velvet),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 820 else 340, easing = MotionTokens.Easing.velvet),
         label = "matrix_rain_color_anim"
     )
     val matrixTrailColor by animateColorAsState(
         targetValue = targetMatrixTrailColor,
-        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 760 else 260, easing = MotionTokens.Easing.velvet),
+        animationSpec = if (animationLevel == 2) snap() else tween(durationMillis = if (themeModeSwitchInProgress) 820 else 340, easing = MotionTokens.Easing.velvet),
         label = "matrix_trail_color_anim"
     )
     // Determine target colors.
@@ -697,14 +737,14 @@ fun GamaUI(
         animationLevel == 2 -> snap()
         themeModeSwitchInProgress -> tween(durationMillis = 780, easing = MotionTokens.Easing.velvet)
         animationLevel == 1 -> tween(durationMillis = 180, easing = MotionTokens.Easing.emphasized)
-        else -> tween(durationMillis = 320, easing = MotionTokens.Easing.emphasized)
+        else -> tween(durationMillis = 420, easing = MotionTokens.Easing.velvet)
     }
 
     val themeTextAnimSpec: AnimationSpec<Color> = when {
         animationLevel == 2 -> snap()
         themeModeSwitchInProgress -> tween(durationMillis = 560, easing = MotionTokens.Easing.velvet)
         animationLevel == 1 -> tween(durationMillis = 160, easing = MotionTokens.Easing.emphasized)
-        else -> tween(durationMillis = 260, easing = MotionTokens.Easing.emphasized)
+        else -> tween(durationMillis = 320, easing = MotionTokens.Easing.velvet)
     }
 
     val themeBackgroundAnimSpec: AnimationSpec<Color> = when {
@@ -995,6 +1035,31 @@ fun GamaUI(
         }
     }
 
+    // Visual open-state lingers briefly after the boolean panel state flips false.
+    // This lets the panel contents exit first, then the panel shell fade/scale out,
+    // and only then lets the main menu unblur + bottom controls return. Without this,
+    // the background starts clearing while the panel is still visibly closing.
+    var visualAnyPanelOpen by remember { mutableStateOf(anyPanelOpen) }
+    var visualAnyFullPanelOpen by remember { mutableStateOf(anyFullPanelOpen) }
+
+    LaunchedEffect(anyPanelOpen, animationLevel) {
+        if (anyPanelOpen) {
+            visualAnyPanelOpen = true
+        } else {
+            if (animationLevel != 2) delay(135L)
+            visualAnyPanelOpen = false
+        }
+    }
+
+    LaunchedEffect(anyFullPanelOpen, animationLevel) {
+        if (anyFullPanelOpen) {
+            visualAnyFullPanelOpen = true
+        } else {
+            if (animationLevel != 2) delay(95L)
+            visualAnyFullPanelOpen = false
+        }
+    }
+
     val currentVersion = remember {
         try {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "—"
@@ -1009,7 +1074,7 @@ fun GamaUI(
     // is actually visible — when gradientEnabled is false the slot returns a
     // static 1f so the transition object is never allocated and zero frames are
     // spent animating an invisible layer.
-    val breathingAlpha by if (gradientEnabled) {
+    val breathingAlpha by if (gradientEnabled && appInForeground) {
         val infiniteTransition = rememberInfiniteTransition(label = "breathing")
         infiniteTransition.animateFloat(
             initialValue = 1f,
@@ -1127,7 +1192,9 @@ fun GamaUI(
     // ── OpenGL reminder notification loop ─────────────────────────────────────
     // Runs while the app is in the foreground. Interval options (hours):
     // index: 0=2h, 1=4h, 2=6h, 3=12h, 4=24h
-    LaunchedEffect(notificationsEnabled, notifIntervalIndex) {
+    LaunchedEffect(notificationsEnabled, notifIntervalIndex, appInForeground) {
+        if (!appInForeground) return@LaunchedEffect
+
         val intervalMs: Long = when (notifIntervalIndex) {
             0 -> 2L * 3_600_000L
             1 -> 4L * 3_600_000L
@@ -1266,7 +1333,7 @@ fun GamaUI(
             // smoothness — no animated blur-radius transition is needed.
             val blurShouldApply by remember {
                 derivedStateOf {
-                    (anyFullPanelOpen && blurEnabled) || showAggressiveWarning
+                    (visualAnyFullPanelOpen && blurEnabled) || showAggressiveWarning
                 }
             }
 
@@ -2187,18 +2254,18 @@ fun GamaUI(
                 targetValue = if (blurShouldApply) 1f else 0f,
                 animationSpec = if (animationLevel != 2)
                     tween(
-                        durationMillis = if (blurShouldApply) 340 else 440,
+                        durationMillis = if (blurShouldApply) 320 else 300,
                         easing = if (blurShouldApply) MotionTokens.Easing.emphasizedDecelerate else MotionTokens.Easing.emphasized
                     )
                 else snap(),
                 label = "bg_blur_alpha"
             )
             val fallbackScrimAlpha by animateFloatAsState(
-                targetValue = if ((anyFullPanelOpen && !blurEnabled) || showAggressiveWarning) 1f else 0f,
+                targetValue = if ((visualAnyFullPanelOpen && !blurEnabled) || showAggressiveWarning) 1f else 0f,
                 animationSpec = if (animationLevel != 2)
                     tween(
-                        durationMillis = if ((anyFullPanelOpen && !blurEnabled) || showAggressiveWarning) 300 else 220,
-                        easing = if ((anyFullPanelOpen && !blurEnabled) || showAggressiveWarning) MotionTokens.Easing.emphasizedDecelerate else MotionTokens.Easing.emphasized
+                        durationMillis = if ((visualAnyFullPanelOpen && !blurEnabled) || showAggressiveWarning) 300 else 220,
+                        easing = if ((visualAnyFullPanelOpen && !blurEnabled) || showAggressiveWarning) MotionTokens.Easing.emphasizedDecelerate else MotionTokens.Easing.emphasized
                     )
                 else snap(),
                 label = "fallback_scrim_alpha"
@@ -2210,79 +2277,80 @@ fun GamaUI(
             //   • They cannot intercept touch events that belong to the UI ✓
             //   • When a panel opens the blur+scrim (below) covers particles too,
             //     which is intentional: the whole background dims together ✓
-            if (matrixMode) {
-                // Do NOT key this by accent color. The Matrix columns must stay alive
-                // while the color eases to the new ACCENT COLOR. Keying this block by
-                // color disposes/recreates the overlay, which makes the rain respawn.
-                MatrixRainOverlay(
-                    enabled          = particlesEnabled,
-                    headColor        = targetMatrixHeadColor,
-                    rainColor        = targetMatrixRainColor,
-                    trailColor       = targetMatrixTrailColor,
-                    backgroundColor  = Color.Black,
-                    backgroundAlpha  = matrixBgAlpha,
-                    speedLevel       = matrixSpeed,
-                    densityLevel     = matrixDensity,
-                    fontSizeLevel    = matrixFontSize,
-                    fadeLength       = matrixFadeLength
+            if (appInForeground) {
+                if (matrixMode) {
+                    // Do NOT key this by accent color. The Matrix columns must stay alive
+                    // while the color eases to the new ACCENT COLOR. Keying this block by
+                    // color disposes/recreates the overlay, which makes the rain respawn.
+                    MatrixRainOverlay(
+                        enabled          = particlesEnabled,
+                        headColor        = targetMatrixHeadColor,
+                        rainColor        = targetMatrixRainColor,
+                        trailColor       = targetMatrixTrailColor,
+                        backgroundColor  = Color.Black,
+                        backgroundAlpha  = matrixBgAlpha,
+                        speedLevel       = matrixSpeed,
+                        densityLevel     = matrixDensity,
+                        fontSizeLevel    = matrixFontSize,
+                        fadeLength       = matrixFadeLength
+                    )
+                }
+
+                // Only compose particle/matrix simulations while the app is visible.
+                // When GAMA goes to recents/background, these composables are removed,
+                // which cancels their LaunchedEffect loops, sensor listeners, and frame clocks.
+                // Coming back reloads them cleanly, which is cheaper than burning battery hidden.
+                ParticlesOverlay(
+                    enabled          = particlesEnabled && !matrixMode,
+                    color            = effectsAccent,
+                    particleSpeed    = particleSpeed,
+                    parallaxEnabled  = particleParallaxEnabled,
+                    particleCount    = particleCount,
+                    particleCountCustom = particleCountCustom.toIntOrNull() ?: 150,
+                    parallaxSensitivity = animatedParallaxSensitivity,
+                    starMode         = false,
+                    timeModeEnabled  = particleTimeMode,
+                    timeOffsetHours  = timeOffsetHours,
+                    anyPanelOpen     = anyPanelOpen,
+                    isLandscape      = isLandscape,
+                    nativeRefreshRate  = particleNativeRefreshRate,
+                    quarterRefreshRate = particleQuarterRefreshRate,
+                    celestialDarkMode = effectiveOledMode
                 )
             }
-            // Always composed so the sun/moon can fade out smoothly via its internal
-            // celestialAlpha animation (600 ms tween) even when switching modes.
-            // Use the raw ACCENT COLOR directly, not the animated theme accent, so stars
-            // update immediately when Dynamic Color is OFF.
-            ParticlesOverlay(
-                enabled          = particlesEnabled && !matrixMode,
-                color            = effectsAccent,
-                particleSpeed    = particleSpeed,
-                parallaxEnabled  = particleParallaxEnabled,
-                particleCount    = particleCount,
-                particleCountCustom = particleCountCustom.toIntOrNull() ?: 150,
-                parallaxSensitivity = animatedParallaxSensitivity,
-                starMode         = false,
-                timeModeEnabled  = particleTimeMode,
-                timeOffsetHours  = timeOffsetHours,
-                anyPanelOpen     = anyPanelOpen,
-                isLandscape      = isLandscape,
-                nativeRefreshRate  = particleNativeRefreshRate,
-                quarterRefreshRate = particleQuarterRefreshRate,
-                celestialDarkMode = effectiveOledMode
+
+            // ── Main content layer ────────────────────────────────────────────
+            // Render the main menu ONCE.
+            //
+            // The previous sharp/blurred crossfade rendered mainContent() twice and
+            // animated alpha every time a panel opened. That made the home screen look
+            // like it was re-entering or doing a tiny animation behind panels.
+            //
+            // The menu should stay physically still. Panels may animate; the menu should not.
+            val mainMenuBlurRadius by animateDpAsState(
+                targetValue = if (blurShouldApply && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) 20.dp else 0.dp,
+                animationSpec = if (animationLevel != 2) {
+                    tween(
+                        durationMillis = if (blurShouldApply) 400 else 330,
+                        easing = if (blurShouldApply) MotionTokens.Easing.emphasizedDecelerate else MotionTokens.Easing.emphasized
+                    )
+                } else {
+                    snap()
+                },
+                label = "main_menu_blur_radius"
             )
 
-            // ── Main content layers ───────────────────────────────────────────
-            // Sharp layer fades OUT, blurred layer fades IN when a panel opens.
-            // Both layers sit ABOVE particles so buttons are always hittable.
-            // Modifier.blur() only affects this layer's own pixels — it never
-            // reaches back to blur the particles drawn underneath.
-
-            // Sharp (unblurred) — always visible when no panel is open.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer(alpha = 1f - blurAlpha)
-            ) { mainContent() }
-
-            // Blurred — fades in when a panel opens. Fixed radius = kernel built once.
-            // IMPORTANT: do not keep a fully transparent duplicate of mainContent() on top.
-            // Even at alpha = 0, Compose still hit-tests that layer, so taps can go to the
-            // invisible copy instead of the visible sharp copy underneath. That is why the
-            // main menu buttons were clicking functionally but not showing their press animation.
-            val shouldRenderBlurredMainContent = blurShouldApply || blurAlpha > 0.001f
-            if (shouldRenderBlurredMainContent) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer(alpha = blurAlpha)
-                            .blur(radius = 20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                    ) { mainContent() }
+            val mainContentModifier =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && mainMenuBlurRadius > 0.1.dp) {
+                    Modifier
+                        .fillMaxSize()
+                        .blur(radius = mainMenuBlurRadius, edgeTreatment = BlurredEdgeTreatment.Unbounded)
                 } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer(alpha = blurAlpha)
-                    ) { mainContent() }
+                    Modifier.fillMaxSize()
                 }
+
+            Box(modifier = mainContentModifier) {
+                mainContent()
             }
 
             // Scrim — dims everything (including particles) behind open panels.
@@ -2549,7 +2617,10 @@ fun GamaUI(
                 gradientEnabled = gradientEnabled,
                 onGradientChange = { gradientEnabled = it; savePreferences() },
                 customAccentColor = customAccentColor,
-                onAccentColorChange = { color -> customAccentColor = color; savePreferencesDebounced() },
+                onAccentColorChange = { color ->
+                    customAccentColor = sanitizeAccentColorForTheme(color, effectiveOledMode)
+                    savePreferencesDebounced()
+                },
                 customGradientStart = customGradientStart,
                 onGradientStartChange = { color -> customGradientStart = color; savePreferencesDebounced() },
                 customGradientEnd = customGradientEnd,
@@ -3474,14 +3545,22 @@ VerbosePanel(
 
             // Bottom UI Elements
             // Ensure these are NOT visible during the setup flow
-            val controlsVisible = !anyPanelOpen
+            val controlsVisible = !visualAnyPanelOpen
             val controlsAlpha by animateFloatAsState(
                 targetValue = if (controlsVisible) 1f else 0f,
                 animationSpec = if (animationLevel == 2) snap<Float>() else tween<Float>(animDuration),
                 label = "controls_alpha"
             )
+            val controlsScale by animateFloatAsState(
+                targetValue = if (controlsVisible) 1f else 0.82f,
+                animationSpec = if (animationLevel == 2) snap<Float>() else spring(
+                    dampingRatio = 0.62f,
+                    stiffness = 360f
+                ),
+                label = "controls_scale"
+            )
 
-            if (controlsAlpha > 0f) {
+            if (controlsVisible || controlsAlpha > 0f) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -3489,8 +3568,15 @@ VerbosePanel(
                         .alpha(controlsAlpha)
                 ) {
                     // Version number
-                    AnimatedElement(visible = isVisible, staggerIndex = 4,
-                        totalItems = 8, modifier = Modifier.align(Alignment.BottomCenter)) {
+                    AnimatedElement(visible = controlsVisible, staggerIndex = 4,
+                        totalItems = 8,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .graphicsLayer(
+                                scaleX = controlsScale,
+                                scaleY = controlsScale
+                            )
+                    ) {
                         Text(
                             text = "v$currentVersion",
                             fontSize = ts.labelMedium,
@@ -3502,8 +3588,17 @@ VerbosePanel(
 
                     // Settings button (bottom-end). This is the source-of-truth anchor.
                     // Panel back/search/global buttons mirror this exact resting position.
-                    AnimatedElement(visible = isVisible, staggerIndex = 4,
-                        totalItems = 8, modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = if (isSmallScreen) 18.dp else 24.dp).offset(x = 20.dp, y = if (isSmallScreen) 20.dp else 30.dp)) {
+                    AnimatedElement(visible = controlsVisible, staggerIndex = 4,
+                        totalItems = 8,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 16.dp, bottom = if (isSmallScreen) 18.dp else 24.dp)
+                            .offset(x = 20.dp, y = if (isSmallScreen) 20.dp else 30.dp)
+                            .graphicsLayer(
+                                scaleX = controlsScale,
+                                scaleY = controlsScale
+                            )
+                    ) {
                         val btnSize = if (isSmallScreen) 48.dp else 52.dp
                         val iconSize = if (isSmallScreen) 24.dp else 28.dp
 
@@ -3531,7 +3626,7 @@ VerbosePanel(
                         }
                         val spp = settingsPressProgress.value
                         val settingsAppearScale by animateFloatAsState(
-                            targetValue = if (isVisible) 1f else 0.82f,
+                            targetValue = if (controlsVisible) 1f else 0.82f,
                             animationSpec = when (LocalAnimationLevel.current) {
                                 2 -> snap()
                                 1 -> tween(240, easing = MotionTokens.Easing.emphasized)
@@ -3606,20 +3701,22 @@ VerbosePanel(
                                         )
                                         .border(settingsBorderWidth, colors.primaryAccent.copy(alpha = settingsBorderAlpha), RoundedCornerShape(28.dp))
                                         .semantics { contentDescription = "Open Settings" }
-                                        .pointerInput(Unit) {
-                                            detectTapGestures(
-                                                onPress = {
-                                                    val hapticStartedAt = GamaHaptics.pressStart(context, view)
-                                                    settingsPressed = true
-                                                    val released = tryAwaitRelease()
-                                                    settingsPressed = false
-                                                    GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
-                                                    if (released) {
-                                                        openMainPanelExclusive { showSettings = true }
+                                        .then(
+                                            if (controlsVisible) Modifier.pointerInput(controlsVisible) {
+                                                detectTapGestures(
+                                                    onPress = {
+                                                        val hapticStartedAt = GamaHaptics.pressStart(context, view)
+                                                        settingsPressed = true
+                                                        val released = tryAwaitRelease()
+                                                        settingsPressed = false
+                                                        GamaHaptics.releaseAfterPress(context, view, hapticStartedAt, released)
+                                                        if (released) {
+                                                            openMainPanelExclusive { showSettings = true }
+                                                        }
                                                     }
-                                                }
-                                            )
-                                        },
+                                                )
+                                            } else Modifier
+                                        ),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Canvas(modifier = Modifier.size(iconSize)) {
